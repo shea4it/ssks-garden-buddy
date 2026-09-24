@@ -1,0 +1,4529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SSK's Garden Buddy</title>
+<style>
+  :root {
+    --base: #251730;
+    --surface: #33203f;
+    --surface-lift: #3e2a4c;
+    --edge: #4b3459;
+    --moss: #7fc98a;
+    --moss-dim: #47624c;
+    --gold: #e8c170;
+    --text: #f6f1f8;
+    --muted: #cbb8d8;
+    --faint: #93809f;
+    --warn: #e8a07a;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+
+  body {
+    background: var(--base);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 20px 0;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  header h1 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  /* The version lives in Extras → Troubleshooting, not the header. */
+  header h1 small { display: none; }
+
+  nav { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; margin: 0 -8px; }
+  nav::-webkit-scrollbar { display: none; }
+
+  nav button {
+    flex: 1 1 auto;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13.5px;
+    padding: 8px 6px 10px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  nav button:hover { color: var(--text); }
+  nav button i { display: block; font-style: normal; font-size: 17px; line-height: 1.2; }
+  nav button { font-size: 11.5px; padding: 4px 1px 8px; }
+  .dedication { text-align: center; color: var(--faint); opacity: 0.55; font-size: 11px; font-style: italic; margin: 34px 0 4px; letter-spacing: 0.02em; }
+  #sprout { cursor: default; display: inline-block; transition: transform 300ms ease; }
+  #sprout.bloom { transform: scale(1.25) rotate(-8deg); }
+  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .head-row h1 { margin-bottom: 8px; }
+  .head-btns { display: flex; gap: 4px; margin-top: -6px; }
+  .icon-btn { background: var(--surface); border: 1px solid var(--edge); color: var(--muted); border-radius: 7px; width: 30px; height: 28px; cursor: pointer; font-size: 15px; line-height: 1; }
+  .icon-btn:hover { color: var(--text); background: var(--surface-lift); }
+  .icon-btn[aria-pressed="true"] { background: #5a4a22; border-color: #8a7030; color: #fff; }
+  .chip.protected { background: #5a4a22; border-color: #8a7030; color: #fde9b8; }
+
+  /* pets */
+  .pet-card { background: var(--base); border: 1px solid var(--edge); border-radius: 9px; padding: 10px 12px; }
+  .pet-card + .pet-card { margin-top: 8px; }
+  .pet-top { display: flex; align-items: center; gap: 8px; }
+  .pet-top .who { flex: 1; min-width: 0; font-weight: 600; }
+  .pet-top .who small { font-weight: 400; color: var(--faint); margin-left: 4px; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--surface-lift); color: var(--muted); white-space: nowrap; }
+  .badge.gold { background: #5a4a22; color: #f6dfa0; }
+  .badge.rainbow { background: linear-gradient(90deg, #6a3a3a, #5a5a2a, #2f5a3a, #2f4a6a, #4f3a6a); color: #fff; }
+  .str-line { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin: 6px 0 4px; }
+  .str-line .bar { flex: 1; height: 6px; }
+  .str-line .bar > span { background: var(--moss); }
+  .ab { display: flex; gap: 8px; font-size: 13px; padding: 3px 0; align-items: baseline; }
+  .ab .n { white-space: nowrap; color: var(--text); min-width: 0; }
+  .ab .t { color: var(--muted); flex: 1; text-align: right; }
+  .ab.off { opacity: 0.55; }
+  .ab.unknown .t { color: var(--warn); }
+  .goal-line { display: grid; grid-template-columns: 150px 1fr; gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.5); }
+  .goal-line:last-child { border-bottom: none; }
+  .goal-line span:first-child { color: var(--muted); }
+  .rank { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; font-size: 13px; padding: 5px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.5); }
+  .rank:last-child { border-bottom: none; }
+  .rank .num { color: var(--faint); text-align: right; }
+  .rank .val { color: var(--moss); white-space: nowrap; }
+  .where { font-size: 11px; color: var(--faint); }
+  details.team { border-bottom: 1px solid rgba(75, 52, 89, 0.6); padding: 6px 0; }
+  details.team:last-child { border-bottom: none; }
+  details.team summary { cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; }
+  details.team summary::-webkit-details-marker { display: none; }
+  details.team summary .rule-text { flex: 1; }
+
+  /* the 🌙 "ring even during quiet hours" button on each alert */
+  .moon { background: none; border: 1px solid transparent; border-radius: 7px; font-size: 15px; line-height: 1; padding: 5px 6px; cursor: pointer; filter: grayscale(1); opacity: 0.35; }
+  .moon:hover { opacity: 0.7; border-color: var(--edge); }
+  .moon[aria-pressed="true"] { filter: none; opacity: 1; background: #4a3a1c; border-color: #7a6030; }
+
+  .fun-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .fun-grid .btn[aria-pressed="true"] { background: var(--moss-dim); color: #eafbec; }
+
+  /* team ideas */
+  .chip.on { background: var(--moss-dim); border-color: var(--moss-dim); color: #eafbec; }
+  .rec { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.5); font-size: 13px; }
+  .rec:last-of-type { border-bottom: none; }
+  .rec .num { color: var(--gold); font-weight: 700; text-align: center; }
+
+  .btn.danger { background: #6a2f2f; border-color: #8a3f3f; color: #ffe3dc; }
+  .btn.danger:hover { background: #7d3838; }
+
+  .clip-banner { margin: 8px 0 0; padding: 8px 10px; border-radius: 9px; background: #2f4a36; border: 1px solid #47624c; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .clip-banner .t { flex: 1; min-width: 140px; }
+  .clip-banner[hidden] { display: none; }
+
+  details.dev { margin: 18px 0 6px; border: 1px dashed var(--edge); border-radius: 10px; padding: 8px 12px; }
+  details.dev summary { cursor: pointer; color: var(--faint); font-size: 12.5px; }
+  details.dev .goal-line { font-size: 12px; }
+
+  .restocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; margin-top: 6px; }
+  .restock { display: flex; flex-direction: column; align-items: center; gap: 1px; background: var(--base); border: 1px solid var(--edge); border-radius: 10px; padding: 7px 4px 6px; }
+  .restock .ico { font-size: 20px; line-height: 1.1; }
+  .restock .nm { font-size: 11.5px; color: var(--muted); }
+  .restock .tm { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .restock.soon { border-color: var(--moss); background: rgba(127, 201, 138, 0.1); }
+  .restock.soon .tm { color: var(--moss); }
+
+  .worth-svg { width: 100%; height: 150px; display: block; margin-top: 6px; }
+  .worth-sum { font-size: 13.5px; margin-top: 4px; }
+  .worth-sum .up { color: var(--moss); font-weight: 700; }
+  .worth-sum .down { color: var(--warn); font-weight: 700; }
+
+  /* open spots: the garden as two 10x10 beds side by side */
+  .spot-map { display: grid; grid-template-columns: repeat(10, 1fr) 8px repeat(10, 1fr); gap: 2px; margin-top: 8px; }
+  .spot-map i { aspect-ratio: 1; border-radius: 3px; background: #3a2a46; display: block; }
+  .spot-map i.p { background: #35523a; }
+  .spot-map i.e { background: #8a7a3a; }
+  .spot-map i.d { background: #6a4d3a; }
+  .spot-map i.o { background: #4b3a5a; }
+  .spot-map i.open { background: #e6ffd6; box-shadow: 0 0 0 2px #7fc98a, 0 0 12px 2px #9dffab; position: relative; z-index: 1; animation: spotGlow 1.4s ease-in-out infinite; }
+  .spot-map b { display: block; }
+  @keyframes spotGlow { 0%, 100% { box-shadow: 0 0 0 2px #7fc98a, 0 0 12px 2px #9dffab; } 50% { box-shadow: 0 0 0 2px #7fc98a, 0 0 3px 0 #9dffab; } }
+  @media (prefers-reduced-motion: reduce) { .spot-map i.open { animation: none; } }
+  .spot-key { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: var(--faint); margin-top: 6px; }
+  .spot-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .spot-key .k-open { background: #e6ffd6; box-shadow: 0 0 0 1px #7fc98a; } .spot-key .k-p { background: #35523a; } .spot-key .k-e { background: #8a7a3a; } .spot-key .k-d { background: #6a4d3a; }
+
+  /* luck */
+  .luck-src { padding: 6px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); }
+  .luck-src:last-child { border-bottom: none; }
+  .luck-src summary { cursor: pointer; display: flex; align-items: baseline; gap: 6px; list-style: none; font-size: 13.5px; }
+  .luck-src summary::-webkit-details-marker { display: none; }
+  .luck-src summary::before { content: '▸'; color: var(--faint); font-size: 11px; transition: transform .15s; }
+  .luck-src[open] summary::before { transform: rotate(90deg); }
+  .luck-sum { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .luck-sum.primed { color: var(--moss); font-weight: 600; }
+  .luck-row { display: grid; grid-template-columns: 1fr 88px 76px; gap: 8px; align-items: center; font-size: 12.5px; padding: 3px 0 3px 14px; }
+  .luck-row .nm { color: var(--muted); }
+  .luck-row .nm small { color: var(--faint); }
+  .luck-row .luck { margin: 0; }
+  .luck-row input { width: 76px; padding: 3px 6px; font-size: 12px; }
+  .luck-row.primed .nm { color: var(--moss); font-weight: 600; }
+  .primed-item { padding: 6px 0; font-size: 14px; color: var(--moss); border-bottom: 1px solid rgba(75, 52, 89, 0.5); }
+  .primed-item:last-child { border-bottom: none; }
+
+  /* triggers */
+  .trig { background: var(--base); border: 1px solid var(--edge); border-radius: 9px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+  .trig.off { opacity: 0.6; }
+  .trig-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 3px 0; }
+  .trig-line select { max-width: 220px; }
+  .trig-line input[type=number] { width: 68px; }
+  .trig-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .trig-foot .now { flex: 1; color: var(--muted); font-size: 12px; }
+  .trig-foot .met { color: var(--moss); font-weight: 600; }
+
+  /* eggs */
+  .egg-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+  .counter-meta { font-size: 12px; color: var(--faint); }
+  .counter-meta b { color: var(--muted); font-weight: 600; }
+  .luck { height: 5px; border-radius: 3px; background: var(--base); overflow: hidden; margin-top: 4px; }
+  .luck > span { display: block; height: 100%; background: linear-gradient(90deg, var(--moss), var(--gold), var(--warn)); }
+  .hatch-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.5); }
+  .hatch-row:last-child { border-bottom: none; }
+  .form-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
+  .form-grid select, .form-grid input { max-width: none; width: 100%; }
+
+  /* rooms */
+  .room { display: grid; grid-template-columns: 1fr 64px 62px auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.5); font-size: 13px; }
+  .room:last-child { border-bottom: none; }
+  .room .seats { display: flex; gap: 2px; }
+  .room .seats i { width: 8px; height: 12px; border-radius: 2px; background: var(--base); border: 1px solid var(--edge); }
+  .room .seats i.on { background: var(--moss); border-color: var(--moss); }
+  .room .bonus { color: var(--gold); text-align: right; white-space: nowrap; }
+  .room.full { opacity: 0.5; }
+  .room.here { background: rgba(127, 201, 138, 0.08); border-radius: 6px; }
+
+  nav button[aria-selected="true"] {
+    color: var(--text);
+    border-bottom-color: var(--moss);
+  }
+
+  main { flex: 1; overflow-y: auto; padding: 16px 16px 28px; }
+  section[hidden] { display: none; }
+
+  h2 {
+    margin: 22px 4px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .card + .card { margin-top: 10px; }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 36px;
+  }
+
+  .hint { margin: 4px 0 10px; color: var(--faint); font-size: 12.5px; }
+
+  /* switch */
+  .switch {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 23px;
+    border: none;
+    border-radius: 12px;
+    background: var(--surface-lift);
+    cursor: pointer;
+    padding: 0;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 17px; height: 17px;
+    border-radius: 50%;
+    background: var(--faint);
+    transition: transform 140ms ease, background 140ms ease;
+  }
+  .switch[aria-checked="true"] { background: var(--moss-dim); }
+  .switch[aria-checked="true"]::after { transform: translateX(17px); background: var(--moss); }
+
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--moss);
+    outline-offset: 2px;
+  }
+
+  .btn {
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--edge);
+    background: var(--surface-lift);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn:hover { background: #4a3459; }
+  .btn.primary { background: var(--moss-dim); border-color: var(--moss-dim); color: #eafbec; }
+  .btn.primary:hover { background: #55765b; }
+  .btn.small { padding: 4px 10px; font-size: 12.5px; }
+
+  .link {
+    background: none; border: none; padding: 0;
+    color: var(--moss); font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .link:hover { text-decoration: underline; }
+
+  input[type="range"] { width: 100%; accent-color: var(--moss); }
+
+  select, input[type="text"], input[type="time"], input[type="number"] {
+    background: var(--base);
+    color: var(--text);
+    border: 1px solid var(--edge);
+    border-radius: 7px;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 13px;
+  }
+  select { max-width: 220px; }
+  input[type="time"] { color-scheme: dark; }
+
+  /* status */
+  .status-main { font-weight: 500; }
+  .status-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .status-err { color: var(--warn); font-size: 13px; margin-top: 6px; }
+
+  /* rule rows */
+  .rule {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(75, 52, 89, 0.6);
+  }
+  .rule:last-child { border-bottom: none; }
+  .rule-text { flex: 1; min-width: 0; }
+  .rule-name { font-weight: 500; }
+  .rule-desc { color: var(--faint); font-size: 12.5px; }
+  .tier-legendary .rule-name { color: var(--gold); }
+
+  .add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .add-row input { flex: 1 1 150px; }
+
+  /* pity */
+  .hatch {
+    width: 100%;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--moss-dim);
+    background: var(--moss-dim);
+    color: #f0fff2;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 80ms ease;
+  }
+  .hatch:hover { background: #55765b; }
+  .hatch:active { transform: scale(0.99); }
+  .hatch small { display: block; font-size: 12px; font-weight: 400; color: #cfe8d3; margin-top: 2px; }
+
+  .counters { display: grid; gap: 10px; margin-top: 12px; }
+
+  .counter {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 6px 12px;
+  }
+  .counter-name {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 4px;
+    margin-left: -5px;
+    width: 100%;
+  }
+  .counter-name:hover { border-color: var(--edge); }
+  .counter-value {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 34px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+    padding: 0 4px;
+    margin-left: -5px;
+    line-height: 1.15;
+  }
+  .counter-value:hover { border-color: var(--edge); }
+  .counter-value::-webkit-inner-spin-button { opacity: 0.4; }
+  .counter-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .counter-remove { color: var(--faint); }
+
+  .pity-foot {
+    display: flex; flex-wrap: wrap; gap: 6px 16px;
+    margin-top: 12px; padding: 0 4px;
+    color: var(--muted); font-size: 13px;
+  }
+
+  .history-item {
+    display: flex; justify-content: space-between; gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(75, 52, 89, 0.6);
+    font-size: 13px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-when { color: var(--faint); white-space: nowrap; }
+  .empty { color: var(--faint); font-size: 13px; }
+
+  /* scripts */
+  .script-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+  .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+  /* garden */
+  .bucket + .bucket { margin-top: 14px; }
+  .bucket-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .bucket-name { font-weight: 600; }
+  .bucket-total { color: var(--muted); font-size: 13px; }
+  .bar-row { display: grid; grid-template-columns: 70px 1fr 56px; align-items: center; gap: 10px; font-size: 13px; margin-top: 4px; }
+  .bar-label { color: var(--muted); }
+  .bar { height: 8px; border-radius: 4px; background: var(--base); overflow: hidden; }
+  .bar > span { display: block; height: 100%; border-radius: 4px; }
+  .bar.gold > span { background: var(--gold); }
+  .bar.rainbow > span { background: linear-gradient(90deg, #e87a7a, #e8c170, #7fc98a, #7ab0e8, #b58ae8); }
+  .bar-pct { text-align: right; font-variant-numeric: tabular-nums; }
+  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .total-num { display: block; font-size: 32px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .total-num.gold { color: var(--gold); }
+  .total-label { color: var(--muted); font-size: 13px; }
+  .pet-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); font-size: 13.5px; }
+  .pet-row:last-child { border-bottom: none; }
+  .pet-name { flex: 1; min-width: 0; }
+  .pet-species { color: var(--faint); }
+  .pet-counts { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #petList { margin-top: 12px; }
+
+  .voice-progress { margin-top: 8px; }
+  .voice-progress .bar { display: block; }
+  .voice-progress .bar > span { background: var(--moss); transition: width 200ms ease; }
+  .voice-progress-label { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .in-use { color: var(--moss); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .voice-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .voice-actions .row-btns { display: flex; gap: 6px; align-items: center; }
+
+  .voice-detail { background: var(--base); border: 1px solid var(--edge); border-radius: 8px; padding: 10px 12px; margin: 4px 0 8px; }
+  .voice-detail .rule-name { margin-bottom: 2px; }
+  .voice-detail .button-row { margin-top: 8px; align-items: center; }
+  #voicePicker { max-width: 250px; }
+  .bar.total > span { background: linear-gradient(90deg, var(--gold), #b58ae8); }
+  .history-item.muted span:first-child { color: var(--faint); }
+  .snooze-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  .hungry { color: var(--warn); font-weight: 600; }
+  .worth { margin-top: 10px; font-size: 14px; }
+  .worth strong { color: var(--gold); font-size: 16px; }
+  .ability-pet { border-bottom: 1px solid rgba(75, 52, 89, 0.6); padding: 9px 0; }
+  .ability-pet:last-child { border-bottom: none; }
+  .ability-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .ability-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 2px 0 2px 10px; }
+  .ability-row span:last-child { color: var(--muted); text-align: right; }
+  .str-input { width: 62px; }
+  .totals-line { font-size: 13.5px; padding: 3px 0; }
+  .totals-line b { color: var(--moss); font-weight: 600; }
+
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: 14px;
+    background: var(--surface-lift);
+    border: 1px solid var(--edge);
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: none; }
+
+  /* weather schedule */
+  .sched { display: grid; grid-template-columns: 62px 1fr auto; gap: 2px 10px; margin-top: 8px; font-size: 13.5px; }
+  .sched .t { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sched .now { color: var(--moss); font-weight: 600; }
+  .sched .what small { color: var(--faint); font-size: 12px; }
+  .sched .tags { text-align: right; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: var(--surface-lift); color: var(--muted); margin-left: 4px; }
+  .tag.off { background: #5a3a3a; color: #f3c9b5; }
+  .tag.team { background: var(--moss-dim); color: #dff5e2; }
+
+  .subhead { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .subhead:first-child { margin-top: 0; }
+  .big-line { font-size: 15px; }
+  .big-line strong { font-size: 18px; }
+  .note { color: var(--faint); font-size: 12.5px; margin-top: 6px; }
+  .note b { color: var(--muted); font-weight: 600; }
+
+  .team-pick { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 5px 0; }
+  .team-pick select { max-width: 190px; }
+  .team-card { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); }
+  .team-card:last-child { border-bottom: none; }
+  .team-card .rule-text { flex: 1; }
+  .live { color: var(--moss); font-size: 12px; font-weight: 600; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  .chip { border: 1px solid var(--edge); background: var(--base); color: var(--muted); border-radius: 16px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip[aria-pressed="true"] { background: #5a3a3a; border-color: #7a4a4a; color: #fde3d6; }
+
+  .banner { border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: #3f2b2b; border: 1px solid #6a4040; }
+  .banner .status-main { color: #fde3d6; }
+
+  .bar.hydro > span { background: #7ab0e8; }
+  .bar.thunder > span { background: #e8d67a; }
+  .bar.dawn > span { background: #b58ae8; }
+  .bar.amber > span { background: #e8a95a; }
+  .bar.size > span { background: var(--moss); }
+  .bar-row { grid-template-columns: 118px 1fr 56px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <h1><span id="sprout" title="">🌱</span> SSK's Garden Buddy <small id="appVersion"></small></h1>
+    <span class="head-btns">
+      <button class="icon-btn" id="lockBtn" title="Harvest lock (Ctrl+Shift+L)" aria-pressed="false">🔓</button>
+      <button class="icon-btn" id="panelPop" title="Pop the panel out into its own window">⧉</button>
+      <button class="icon-btn" id="panelHide" title="Hide the panel (Ctrl+Shift+D brings it back)">⟩</button>
+    </span>
+  </div>
+  <nav role="tablist">
+    <button role="tab" data-tab="alerts" aria-selected="true"><i>🔔</i>Alerts</button>
+    <button role="tab" data-tab="weather" aria-selected="false"><i>🌦️</i>Weather</button>
+    <button role="tab" data-tab="garden" aria-selected="false"><i>🌻</i>Garden</button>
+    <button role="tab" data-tab="pets" aria-selected="false"><i>🐾</i>Pets</button>
+    <button role="tab" data-tab="pity" aria-selected="false"><i>🍀</i>Luck</button>
+    <button role="tab" data-tab="rooms" aria-selected="false"><i>🎮</i>Rooms</button>
+    <button role="tab" data-tab="scripts" aria-selected="false"><i>🧰</i>Extras</button>
+  </nav>
+  <div id="clipBanner" class="clip-banner" hidden></div>
+</header>
+
+<main>
+
+  <!-- ============================ ALERTS ============================ -->
+  <section id="tab-alerts">
+    <div class="card">
+      <div class="status-main" id="statusMain">Starting up…</div>
+      <div id="statusWeather"></div>
+      <div class="note" id="statusNext"></div>
+      <div class="status-err" id="statusErr" hidden></div>
+      <div class="snooze-row" id="snoozeRow"></div>
+      <div class="button-row"><button class="link" id="checkNow">Check the shops now</button></div>
+    </div>
+
+    <h2>Recent alerts and events</h2>
+    <div class="card">
+      <div id="historyList"></div>
+      <div class="button-row"><button class="link" id="clearHistory">Clear</button></div>
+    </div>
+
+    <h2>Sound and voice</h2>
+
+    <div class="card">
+      <div class="row">
+        <span>Sound volume</span>
+        <span id="volumeValue"></span>
+      </div>
+      <input type="range" id="volume" min="0" max="100" step="1" aria-label="Sound volume">
+      <div class="row">
+        <span>Voice volume</span>
+        <span id="voiceVolumeValue"></span>
+      </div>
+      <input type="range" id="voiceVolume" min="0" max="100" step="1" aria-label="Voice volume">
+      <p class="hint">Chimes and the voice have their own levels. Both are separate from the game's volume, so you can mute the game and still hear alerts.</p>
+      <div class="row">
+        <span>Mute alerts</span>
+        <button class="switch" role="switch" id="muted" aria-label="Mute alerts"></button>
+      </div>
+      <div class="row">
+        <label for="voicePicker">Voice</label>
+        <select id="voicePicker" aria-label="Choose a voice"></select>
+      </div>
+      <div class="status-sub" id="voiceInUse" style="margin: -2px 0 4px"></div>
+      <div class="note" id="voiceRetiredNote" hidden></div>
+      <div class="voice-detail" id="voiceDetail"></div>
+      <div class="row">
+        <span>Pop-up notifications too</span>
+        <button class="switch" role="switch" id="popups" aria-label="Pop-up notifications"></button>
+      </div>
+      <div class="row">
+        <span>Quiet hours</span>
+        <button class="switch" role="switch" id="quiet" aria-label="Quiet hours"></button>
+      </div>
+      <div class="row" id="quietTimes">
+        <span class="hint" style="margin:0">No sound between</span>
+        <span><input type="time" id="quietFrom" aria-label="Quiet from"> and <input type="time" id="quietTo" aria-label="Quiet until"></span>
+      </div>
+      <p class="hint" style="margin-top:0">Want one alert to wake you anyway? Light up its 🌙 in the list below and it rings through quiet hours and snooze.</p>
+      <div class="row">
+        <label for="outputDevice">Play alerts on</label>
+        <select id="outputDevice"></select>
+      </div>
+      <p class="hint" id="deviceNote" hidden></p>
+      <div class="row">
+        <label for="panelMode">This panel</label>
+        <select id="panelMode">
+          <option value="attached">Attached to the game</option>
+          <option value="window">In its own window</option>
+        </select>
+      </div>
+      <div class="row" id="panelWidthRow">
+        <span>Panel width</span>
+        <input type="range" id="panelWidth" min="320" max="700" step="10" style="width: 55%" aria-label="Panel width">
+      </div>
+      <p class="hint">Ctrl+Shift+D shows or hides the panel from anywhere in the app.</p>
+      <div class="row">
+        <span>Keep speaker awake</span>
+        <button class="switch" role="switch" id="keepAwake" aria-label="Keep speaker awake"></button>
+      </div>
+      <p class="hint">Sends a signal too low to hear, so Bluetooth speakers like an Echo don't doze off and announce themselves over your next alert.</p>
+      <div class="button-row">
+        <button class="btn small" id="testVoice">Test the voice</button>
+        <button class="btn small" id="testSpeaker">Test this speaker</button>
+      </div>
+    </div>
+
+
+    <h2>Shop items</h2>
+    <div class="card" id="itemRules"></div>
+
+    <h2>Weather</h2>
+    <div class="card" id="weatherRules"></div>
+
+    <h2>Your pets</h2>
+    <div class="card" id="petRules"></div>
+
+    <h2>Add another item</h2>
+    <div class="card">
+      <div class="add-row">
+        <input type="text" id="customName" placeholder="Item name, like Lychee" aria-label="Item name">
+        <select id="customTier" aria-label="How loud">
+          <option value="basic">Basic</option>
+          <option value="named">Callout</option>
+          <option value="big">Big</option>
+          <option value="epic">Huge</option>
+          <option value="legendary">Biggest</option>
+        </select>
+        <button class="btn primary small" id="customAdd">Add</button>
+      </div>
+      <p class="hint" style="margin-bottom:0">Matches the start of the item's name, so "lychee" catches "Lychee Pit".</p>
+    </div>
+
+    <h2>Backups</h2>
+    <div class="card">
+      <p class="hint" style="margin-top:0">Everything in one file: settings, weather teams and triggers, egg counts and history, pet counts, saved rooms, and scripts. The app also saves one by itself each day and keeps the last 7.</p>
+      <div class="button-row">
+        <button class="btn small" id="backupSave">Save a backup…</button>
+        <button class="btn small" id="backupRestore">Restore…</button>
+        <button class="link" id="backupFolder">Open the backups folder</button>
+      </div>
+    </div>
+
+    <p class="dedication">🌷 dedicated to my sweet hannah buns</p>
+  </section>
+
+  <!-- ============================ WEATHER ============================ -->
+  <section id="tab-weather" hidden>
+    <div class="card">
+      <div id="parkedBanner"></div>
+      <div class="status-main">Weather today</div>
+      <div id="wxSchedule"></div>
+      <div class="note" id="wxLegend"></div>
+    </div>
+
+    <h2>Pet team for each weather</h2>
+    <div class="card">
+      <div class="row">
+        <span>Swap pet teams with the weather</span>
+        <button class="switch" role="switch" id="teamsOn" aria-label="Swap pet teams with the weather"></button>
+      </div>
+      <p class="hint">When the weather changes, the app switches to the team you pick below, exactly as if you'd tapped that team in the game. It switches once per change, so if you swap by hand afterwards it leaves you alone.</p>
+      <div id="teamPicks"></div>
+      <div class="subhead" style="margin-top:14px">Your saved teams</div>
+      <div id="teamList"></div>
+      <p class="hint" style="margin-bottom:0">Teams come from the game's own Pet Teams. Make or edit them in the game and they show up here. <b>Apply</b> swaps one in now, which is a handy way to check it works.</p>
+    </div>
+
+    <h2>Swap teams when your garden is ready</h2>
+    <div class="card">
+      <p class="hint" style="margin-top:0">Swap to another team once the garden reaches a goal. For example: once 95% of your crops are Thunderstruck, swap your Thunderstruck team out for your usual one. Each trigger fires once when the goal is reached, and again after the garden drops back below it (when you harvest and replant).</p>
+      <div id="triggerList"></div>
+      <div class="button-row"><button class="btn small" id="addTrigger">Add a trigger</button></div>
+    </div>
+
+    <h2>Log off during weather</h2>
+    <div class="card">
+      <div class="row">
+        <span>Step out of the game for some weather</span>
+        <button class="switch" role="switch" id="logoffOn" aria-label="Log off during weather"></button>
+      </div>
+      <p class="hint">Weather only changes crops while you're in the game. Pick the weather you want to keep off your garden and the app steps out about 30 seconds before it starts.</p>
+      <div class="chips" id="logoffKinds"></div>
+      <div class="row">
+        <span>Come back when it's over</span>
+        <button class="switch" role="switch" id="logoffRejoin" aria-label="Rejoin when the weather ends"></button>
+      </div>
+      <p class="hint">Don't play on another device while the app is stepped out. When it comes back it would take over from that session.</p>
+      <div class="button-row">
+        <button class="btn small" id="logoffNow">Log off now</button>
+        <button class="btn small primary" id="rejoinNow" hidden>Rejoin now</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ LUCK (Bad Luck Protection) ============================ -->
+  <section id="tab-pity" hidden>
+    <div class="card">
+      <div class="status-main">🍀 Bad Luck Protection</div>
+      <p class="hint" style="margin-top:4px">Every egg, plant and capsule has its own counters. When one is a pull away from its guarantee, you get a heads-up. The game keeps the real counts to itself, so these are the app's own count of what it saw.</p>
+      <div class="row">
+        <span>Count automatically</span>
+        <button class="switch" role="switch" id="pityAuto" aria-label="Count automatically"></button>
+      </div>
+      <div class="row">
+        <span>My account played before the update<div class="rule-desc">Counters the app hasn't seen yet start halfway, like the update did</div></span>
+        <button class="switch" role="switch" id="luckHalf" aria-label="Start new counters halfway"></button>
+      </div>
+      <div class="row">
+        <span>Heads-ups for</span>
+        <span class="chips" style="margin:0" id="luckNotify"></span>
+      </div>
+    </div>
+
+    <h2>Primed now</h2>
+    <div class="card" id="luckPrimed"></div>
+
+    <h2>Eggs</h2>
+    <div class="card" id="luckEggs"></div>
+
+    <h2>Plants</h2>
+    <div class="card" id="luckPlants"></div>
+
+    <h2>Capsules</h2>
+    <div class="card" id="luckCapsules"></div>
+
+    <h2>Recent hatches</h2>
+    <div class="card" id="recentHatches"></div>
+
+    <h2>By egg</h2>
+    <div class="card" id="byEgg"></div>
+
+    <h2>Rare finds</h2>
+    <div class="card" id="history"></div>
+    <p class="hint" style="padding:0 4px">Click any number to type in your own. Crops only count while the game is open in the app; hatches and capsules catch up by themselves.</p>
+  </section>
+
+  <!-- ============================ GARDEN ============================ -->
+  <section id="tab-garden" hidden>
+    <div class="card">
+      <div class="status-main" id="gardenMain">Waiting for the game to connect.</div>
+      <div class="status-sub" id="gardenSub"></div>
+    </div>
+
+    <h2>Harvest lock</h2>
+    <div class="card">
+      <div class="row">
+        <span>Lock harvesting<div class="rule-desc">While it's on, nothing gets harvested. Handy while moving pots around. Ctrl+Shift+L or the 🔒 up top.</div></span>
+        <button class="switch" role="switch" id="lockOn" aria-label="Harvest lock"></button>
+      </div>
+      <div class="subhead" style="margin-top:10px">Always protect</div>
+      <div class="chips" id="lockSpecies"></div>
+      <p class="hint" style="margin-bottom:0" id="lockHint">Tap a crop to protect it: it's never harvested by accident, lock or no lock. Tap again to allow it.</p>
+    </div>
+
+    <h2>Open spots</h2>
+    <div class="card">
+      <div class="big-line" id="spotCount">Waiting for the game…</div>
+      <div class="spot-map" id="spotMap" aria-label="Your garden, with open spots glowing"></div>
+      <div class="note" id="spotWhere"></div>
+      <div class="spot-key"><span><i class="k-open"></i>open</span><span><i class="k-p"></i>plant</span><span><i class="k-e"></i>egg</span><span><i class="k-d"></i>decoration</span></div>
+    </div>
+
+    <h2>Your garden</h2>
+    <div class="card" id="cropStats"></div>
+
+    <h2>Garden worth over time</h2>
+    <div class="card">
+      <div class="chips" id="worthRange" style="margin-top:0">
+        <button class="chip on" data-range="1">24 hours</button>
+        <button class="chip" data-range="7">7 days</button>
+        <button class="chip" data-range="30">30 days</button>
+      </div>
+      <div id="worthChart"></div>
+    </div>
+
+    <h2>Weather mutations</h2>
+    <div class="card" id="mutStats"></div>
+
+    <h2>Crop size</h2>
+    <div class="card" id="sizeStats"></div>
+
+    <h2>Your stats</h2>
+    <div class="card" id="lifeStats"></div>
+
+  </section>
+
+  <!-- ============================ PETS ============================ -->
+  <section id="tab-pets" hidden>
+    <h2 style="margin-top:4px">Your team right now</h2>
+    <div class="card" id="teamNow"></div>
+
+    <h2>Pets that are out</h2>
+    <div id="petCards"></div>
+
+    <h2>Team ideas</h2>
+    <div class="card">
+      <div class="chips" id="presetChips" style="margin-top:0"></div>
+      <div id="presetBody"></div>
+      <p class="hint" style="margin-bottom:0">Picked from every pet you own, at their current strength. Like a team? Save it in the game (Pet Teams) and it can be swapped in with one tap, or by the weather and triggers.</p>
+    </div>
+
+    <h2>Best pets for…</h2>
+    <div class="card">
+      <div class="row">
+        <select id="goalPick" style="max-width:none;flex:1" aria-label="Pick a goal"></select>
+      </div>
+      <div id="goalRank" style="margin-top:6px"></div>
+      <p class="hint" style="margin-bottom:0">Every pet you own (out, in your inventory, or in the hutch), ranked at its current strength.</p>
+    </div>
+
+    <h2>Your saved teams</h2>
+    <div class="card" id="teamCompare"></div>
+
+    <h2>Food</h2>
+    <div class="card" id="petFood"></div>
+
+    <h2>Made by your pets</h2>
+    <div class="card">
+      <div class="totals" style="grid-template-columns: repeat(3, 1fr)">
+        <div><span class="total-num gold" id="petGoldTotal">0</span><span class="total-label">crops turned Gold</span></div>
+        <div><span class="total-num" id="petRainbowTotal">0</span><span class="total-label">crops turned Rainbow</span></div>
+        <div><span class="total-num" id="petCoinsTotal">0</span><span class="total-label">coins found</span></div>
+      </div>
+      <div class="status-sub" id="petSince"></div>
+      <div id="petList"></div>
+      <div class="button-row"><button class="link" id="gardenReset">Reset these counts</button></div>
+    </div>
+    <p class="hint" style="padding: 0 4px">Strength is worked out from each pet's size and XP. If one looks wrong, type the right number over it; clear the box to go back to the worked-out one.</p>
+  </section>
+
+  <!-- ============================ ROOMS ============================ -->
+  <section id="tab-rooms" hidden>
+    <div class="card">
+      <div class="status-main" id="roomHere">Your room</div>
+      <div class="note" id="roomCheck"></div>
+      <div class="button-row" id="roomHereBtns"></div>
+      <div class="note">Every other player in your room adds 10% to what you get for selling crops, up to +50% with a full room of 6.</div>
+    </div>
+
+    <h2>Open rooms right now</h2>
+    <div class="card">
+      <div class="row" style="min-height:30px">
+        <span class="note" id="sharedStatus" style="margin:0">Loading…</span>
+        <button class="switch" role="switch" id="sharedOn" aria-label="Show rooms other players share"></button>
+      </div>
+      <div id="sharedList"></div>
+      <p class="hint" style="margin-bottom:0">Rooms players have chosen to share through Arie's Mod, most players first. Not every room on the Discord, but these are real and current: the app checks each one with the game before showing it.</p>
+    </div>
+
+    <h2>Your rooms</h2>
+    <div class="card">
+      <div class="row" style="min-height:0">
+        <span class="note" id="roomsStatus" style="margin:0">Loading…</span>
+        <button class="link" id="roomsRefresh">Refresh</button>
+      </div>
+      <div id="roomList"></div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      <div class="row" style="min-height:30px">
+        <span>Offer rooms I copy<div class="rule-desc">Copy a room code (in Discord, say), come back to the app, and it offers Join or Save</div></span>
+        <button class="switch" role="switch" id="clipOn" aria-label="Offer rooms I copy"></button>
+      </div>
+      <div class="add-row">
+        <button class="btn small" id="roomPaste" title="Use the room code on your clipboard">📋 Paste</button>
+        <input type="text" id="roomCode" placeholder="A room code, like Q9BD" aria-label="Room code">
+        <button class="btn small" id="roomSaveCode">Save</button>
+        <button class="btn small primary" id="roomJoinCode">Join</button>
+      </div>
+    </div>
+    <p class="hint" style="padding: 0 4px">Save rooms you like and see how full they are before you jump in. Counts come from the game and refresh every 45 seconds while this tab is open.</p>
+  </section>
+
+  <!-- ============================ SCRIPTS ============================ -->
+  <section id="tab-scripts" hidden>
+    <h2 style="margin-top:4px">Playing on another device</h2>
+    <div class="card">
+      <div class="row">
+        <span>Come back after I play elsewhere<div class="rule-desc">Log in on your phone and the game here gets logged out. With this on, it waits a while, then comes back (which logs the phone out).</div></span>
+        <button class="switch" role="switch" id="reclaimOn" aria-label="Come back after I play elsewhere"></button>
+      </div>
+      <div class="row">
+        <label for="reclaimDelay">Wait before coming back</label>
+        <select id="reclaimDelay">
+          <option value="60">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
+        </select>
+      </div>
+      <div id="reclaimNow"></div>
+      <p class="hint" style="margin-bottom:0">A countdown shows on the game screen with <b>Come back now</b> and <b>Stay away</b>. If you go back to the other device within 10 minutes of the app coming back, it stops and waits for you instead of taking turns. Finish anything important on the other device before the countdown ends: whatever it's in the middle of when it's logged out may not be saved.</p>
+    </div>
+
+    <h2 style="margin-top:4px">Seed deleter</h2>
+    <div class="card">
+      <div class="form-grid">
+        <label for="seedPick">Seed</label>
+        <select id="seedPick"></select>
+        <label for="seedCount">How many</label>
+        <span class="add-row" style="margin:0">
+          <input type="number" id="seedCount" min="1" value="1" style="width:90px" aria-label="How many seeds">
+          <button class="link" id="seedAll">all</button>
+          <button class="link" id="seedKeep1">all but 1</button>
+        </span>
+      </div>
+      <div class="button-row">
+        <button class="btn small danger" id="seedGo">Throw into the wishing well</button>
+        <button class="btn small" id="seedStop" hidden>Stop</button>
+      </div>
+      <div id="seedProgress"></div>
+      <p class="hint" style="margin-bottom:0" id="seedHint">Throws seeds from your inventory into the wishing well, one at a time, exactly like doing it by hand. It can't be undone. Seeds in your Seed Silo are never touched.</p>
+    </div>
+
+    <h2 style="margin-top:4px">Just for fun</h2>
+    <div class="card">
+      <div class="fun-grid" id="funButtons">
+        <button class="btn small" data-fun="confetti">🎉 Confetti</button>
+        <button class="btn small" data-fun="hearts">💜 Hearts</button>
+        <button class="btn small" data-fun="disco">🪩 Disco</button>
+        <button class="btn small" data-fun="spin">🌀 Spin</button>
+        <button class="btn small" data-fun="wobble">🍮 Wobble</button>
+        <button class="btn small" data-fun="flip">🙃 Upside down</button>
+        <button class="btn small" data-fun="glitch">🕹️ Glitch</button>
+        <button class="btn small" data-fun="rainbow" aria-pressed="false">🌈 Rainbow mode</button>
+      </div>
+      <p class="hint" style="margin-bottom:0">Only on your screen: nothing is sent to the game and nobody else sees it. The game keeps working underneath.</p>
+    </div>
+
+    <div class="card" id="scriptList"></div>
+    <p class="hint" style="padding: 0 4px">Switching a script on or off takes effect the next time the game loads.</p>
+    <div class="button-row">
+      <button class="btn primary" id="scriptsRun">Run them now</button>
+      <button class="btn" id="scriptsReload">Reload game</button>
+      <button class="btn" id="scriptsFolder">Open scripts folder</button>
+      <button class="btn" id="scriptsConsole">Game console</button>
+    </div>
+  
+    <details class="dev" id="devBox">
+      <summary>🛠 Troubleshooting</summary>
+      <p class="hint">Details only needed when something's being fixed. When reporting a problem, a sample file helps a lot: press the button and attach the file it saves.</p>
+      <div id="devDetails"></div>
+      <div class="button-row"><button class="btn small" id="gardenSample">Save a sample</button></div>
+    </details>
+  </section>
+
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+
+/* ================================================================== *
+ * State
+ * ================================================================== */
+
+let S = null;          // settings, mirrored from the main process
+let RULES = [];
+let STATUS = null;
+const undoStack = [];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+let saveTimer = null;
+function save(refreshRules) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    await window.app.setSettings(S);
+    if (refreshRules) {
+      RULES = await window.app.getRules();
+      renderRules();
+    }
+  }, 250);
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function setSwitch(el, on) {
+  el.setAttribute('aria-checked', String(Boolean(on)));
+}
+
+function switchOn(el) {
+  return el.getAttribute('aria-checked') === 'true';
+}
+
+/* ================================================================== *
+ * Sound engine
+ * ================================================================== */
+
+let ctx = null;
+let master = null;
+let voiceBus = null;
+
+// Two independent volumes: sounds (chimes, sirens, the cash register) and
+// the voice. They run on separate buses so either can be turned down to
+// nothing without touching the other.
+function level() {
+  if (!S || S.alerts.muted) return 0;
+  return Math.pow(S.alerts.volume / 100, 1.6);
+}
+
+function speechLevel() {
+  if (!S || S.alerts.muted) return 0;
+  const v = S.alerts.voiceVolume == null ? 35 : S.alerts.voiceVolume;
+  return Math.min(1, v / 100);
+}
+
+function audio() {
+  if (!ctx) {
+    ctx = new AudioContext();
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.ratio.value = 8;
+    limiter.connect(ctx.destination);
+    master = ctx.createGain();      // sounds
+    master.connect(limiter);
+    voiceBus = ctx.createGain();    // voice
+    voiceBus.connect(limiter);
+  }
+  master.gain.value = level();
+  voiceBus.gain.value = speechLevel();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+// Bluetooth speakers (an Echo especially) drop into standby after a few
+// minutes of silence; the next sound wakes them up with an announcement that
+// talks over the alert. An 18 Hz tone at about -48 dB is far below what
+// anyone can hear, or what a small speaker can reproduce, but it keeps the
+// audio stream, and so the Bluetooth link, busy.
+let keepAwakeNode = null;
+
+function updateKeepAwake() {
+  const want = Boolean(S) && S.alerts.keepAwake !== false;
+  if (want && !keepAwakeNode) {
+    const c = audio();
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = 18;
+    const g = c.createGain();
+    g.gain.value = 0.004;
+    o.connect(g);
+    g.connect(c.destination);
+    o.start();
+    keepAwakeNode = o;
+  } else if (!want && keepAwakeNode) {
+    try {
+      keepAwakeNode.stop();
+    } catch (err) {
+      /* already stopped */
+    }
+    keepAwakeNode = null;
+  }
+}
+
+function now() {
+  return audio().currentTime + 0.03;
+}
+
+function envelope(gain, t0, peak, attack, hold, release) {
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t0 + attack);
+  gain.gain.setValueAtTime(Math.max(peak, 0.0002), t0 + attack + hold);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + hold + release);
+  return attack + hold + release;
+}
+
+function tone(type, freq, t0, dur, peak, opts = {}) {
+  const c = audio();
+  const attack = opts.attack ?? 0.01;
+  const release = opts.release ?? 0.2;
+  const hold = Math.max(0, dur - attack - release);
+
+  const o = c.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (opts.glideTo) o.frequency.exponentialRampToValueAtTime(opts.glideTo, t0 + dur);
+  if (opts.detune) o.detune.value = opts.detune;
+
+  const g = c.createGain();
+  const total = envelope(g, t0, peak, attack, hold, release);
+
+  if (opts.lowpass) {
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = opts.lowpass;
+    o.connect(f);
+    f.connect(g);
+  } else {
+    o.connect(g);
+  }
+  g.connect(master);
+  o.start(t0);
+  o.stop(t0 + total + 0.05);
+}
+
+function bell(freq, t0, peak = 0.16, len = 1.4) {
+  [[1, 1], [2.01, 0.32], [3.03, 0.14], [4.2, 0.06]].forEach(([mult, amp]) => {
+    tone('sine', freq * mult, t0, len / Math.sqrt(mult), peak * amp, { attack: 0.004, release: len / Math.sqrt(mult) - 0.005 });
+  });
+}
+
+function brass(freq, t0, dur, peak = 0.08) {
+  tone('sawtooth', freq, t0, dur, peak, { attack: 0.03, release: 0.14, lowpass: 2300 });
+  tone('sawtooth', freq, t0, dur, peak * 0.7, { attack: 0.03, release: 0.14, lowpass: 2300, detune: 9 });
+  tone('square', freq / 2, t0, dur, peak * 0.35, { attack: 0.03, release: 0.14, lowpass: 900 });
+}
+
+const noiseCache = {};
+function noise(color, seconds) {
+  const c = audio();
+  const key = color + seconds;
+  if (noiseCache[key]) return noiseCache[key];
+  const n = Math.floor(c.sampleRate * seconds);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0, b0 = 0, b1 = 0, b2 = 0;
+  for (let i = 0; i < n; i += 1) {
+    const w = Math.random() * 2 - 1;
+    if (color === 'brown') {
+      last = (last + 0.02 * w) / 1.02;
+      d[i] = last * 3.5;
+    } else if (color === 'pink') {
+      b0 = 0.99765 * b0 + w * 0.099046;
+      b1 = 0.963 * b1 + w * 0.2965164;
+      b2 = 0.57 * b2 + w * 1.0526913;
+      d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.11;
+    } else {
+      d[i] = w;
+    }
+  }
+  noiseCache[key] = buf;
+  return buf;
+}
+
+function noiseSource(color, seconds, t0) {
+  const c = audio();
+  const src = c.createBufferSource();
+  src.buffer = noise(color, seconds);
+  src.start(t0);
+  src.stop(t0 + seconds);
+  return src;
+}
+
+const SFX = {
+  // The secret rainbow celebration: a sparkly run up, a bouncy brass tune,
+  // and a big finish.
+  rainbowSecret() {
+    const t = now();
+    [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568.0, 2093.0].forEach((f, i) => bell(f, t + i * 0.07, 0.1, 1.0));
+    const tune = [
+      [783.99, 0.22], [880.0, 0.22], [783.99, 0.22], [659.25, 0.44],
+      [698.46, 0.22], [783.99, 0.22], [659.25, 0.22], [523.25, 0.44],
+      [587.33, 0.22], [659.25, 0.22], [698.46, 0.22], [880.0, 0.44],
+      [783.99, 0.3], [987.77, 0.3], [1046.5, 1.4],
+    ];
+    let at = t + 0.62;
+    const bass = [130.81, 130.81, 174.61, 174.61, 146.83, 196.0, 130.81];
+    tune.forEach(([f, d], i) => {
+      brass(f, at, d * 0.92, 0.11);
+      if (i % 2 === 0) tone('triangle', bass[Math.floor(i / 2) % bass.length], at, d * 1.8, 0.09);
+      if (i % 4 === 3) bell(f * 2, at + 0.05, 0.05, 0.8);
+      at += d;
+    });
+    // The big finish: a chord and sparkles.
+    const end = at - 1.4;
+    [523.25, 659.25, 783.99].forEach((f) => brass(f, end, 1.4, 0.06));
+    [2093.0, 2637.0, 3136.0].forEach((f, i) => bell(f, end + 0.15 + i * 0.12, 0.05, 1.2));
+    return at - t + 0.3;
+  },
+  // Bad Luck Protection primed: a rising four-note sparkle.
+  lucky() {
+    const t = now();
+    [1046.5, 1318.5, 1568.0, 2093.0].forEach((f, i) => bell(f, t + i * 0.11, 0.14, 1.3));
+    bell(2637.0, t + 0.5, 0.08, 1.6);
+    return 1.9;
+  },
+  tick() {
+    const t = now();
+    bell(1567.98, t, 0.08, 0.35);
+    return 0.35;
+  },
+
+  ding() {
+    const t = now();
+    bell(1318.5, t, 0.16, 1.2);
+    bell(987.77, t + 0.15, 0.15, 1.4);
+    return 1.4;
+  },
+
+  chime() {
+    const t = now();
+    [783.99, 987.77, 1174.66, 1567.98].forEach((f, i) => bell(f, t + i * 0.11, 0.15, 1.3));
+    return 1.6;
+  },
+
+  fanfare(big) {
+    const t = now();
+    brass(392.0, t, 0.15);
+    brass(523.25, t + 0.17, 0.15);
+    brass(659.25, t + 0.34, 0.15);
+    const hold = big ? 1.1 : 0.7;
+    brass(783.99, t + 0.51, hold);
+    if (big) {
+      brass(523.25, t + 0.51, hold, 0.05);
+      brass(659.25, t + 0.51, hold, 0.05);
+      brass(1046.5, t + 0.51, hold, 0.04);
+      bell(2093, t + 0.51, 0.06, 1.2);
+    }
+    return 0.51 + hold + 0.15;
+  },
+
+  siren(seconds) {
+    const c = audio();
+    const t = now();
+    const o = c.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = 820;
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 1.15;
+    const depth = c.createGain();
+    depth.gain.value = 330;
+    lfo.connect(depth);
+    depth.connect(o.frequency);
+    const g = c.createGain();
+    envelope(g, t, 0.15, 0.2, Math.max(0, seconds - 0.6), 0.4);
+    o.connect(g);
+    g.connect(master);
+    o.start(t);
+    lfo.start(t);
+    o.stop(t + seconds + 0.1);
+    lfo.stop(t + seconds + 0.1);
+    return seconds;
+  },
+
+  klaxon(times) {
+    const t = now();
+    for (let i = 0; i < times; i += 1) {
+      const s = t + i * 0.62;
+      tone('sawtooth', 250, s, 0.5, 0.11, { attack: 0.02, release: 0.1, glideTo: 520, lowpass: 1900 });
+      tone('square', 125, s, 0.5, 0.045, { attack: 0.02, release: 0.1, glideTo: 260, lowpass: 900 });
+    }
+    return times * 0.62;
+  },
+
+  // Distant, soft thunder: a low rumble that swells and fades.
+  thunder() {
+    const c = audio();
+    const t = now();
+    const len = 6;
+
+    const rumble = noiseSource('brown', len, t);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 170;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.7, t + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 1.2);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 1.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len - 0.2);
+    rumble.connect(lp);
+    lp.connect(g);
+    g.connect(master);
+
+    const crack = noiseSource('pink', 0.9, t + 0.12);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 480;
+    bp.Q.value = 0.7;
+    const cg = c.createGain();
+    envelope(cg, t + 0.12, 0.14, 0.02, 0.05, 0.7);
+    crack.connect(bp);
+    bp.connect(cg);
+    cg.connect(master);
+
+    return len;
+  },
+
+  // A shower that fades in, patters for a few seconds, and fades out.
+  rain() {
+    const c = audio();
+    const t = now();
+    const len = 9;
+
+    const hiss = noiseSource('pink', len, t);
+    const hp = c.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 500;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 6500;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 2);
+    g.gain.setValueAtTime(0.3, t + 6.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len - 0.1);
+    hiss.connect(hp);
+    hp.connect(lp);
+    lp.connect(g);
+    g.connect(master);
+
+    for (let i = 0; i < 70; i += 1) {
+      const at = t + 0.6 + Math.random() * 7.2;
+      const f = 1600 + Math.random() * 2600;
+      tone('sine', f, at, 0.05, 0.015 + Math.random() * 0.03, { attack: 0.002, release: 0.045, glideTo: f * 0.55 });
+    }
+    return len;
+  },
+
+  blip() {
+    const t = now();
+    bell(1567.98, t, 0.15, 0.9);
+    return 0.7;
+  },
+
+  // An old-fashioned cash register: two key clacks, the lever clunk, the
+  // bright bell, the drawer sliding out, and coins rattling in the tray.
+  // Rainbow adds a sparkle on the end.
+  register(rainbow) {
+    const c = audio();
+    const t = now();
+    const clack = (at, freq, peak) => {
+      const n = noiseSource('white', 0.06, at);
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = freq;
+      bp.Q.value = 4;
+      const g = c.createGain();
+      envelope(g, at, peak, 0.002, 0.006, 0.04);
+      n.connect(bp);
+      bp.connect(g);
+      g.connect(master);
+    };
+    clack(t, 2500, 0.32);
+    clack(t + 0.07, 2150, 0.28);
+    clack(t + 0.16, 950, 0.45);
+    tone('sine', 115, t + 0.16, 0.13, 0.22, { attack: 0.003, release: 0.11, glideTo: 70 });
+
+    // The bell: a bright struck bell with inharmonic overtones, and a
+    // slightly detuned twin for that metallic shimmer.
+    const b = t + 0.19;
+    [[1, 1], [1.004, 0.55], [2.41, 0.45], [3.17, 0.3], [4.62, 0.16]].forEach(([mult, amp]) => {
+      tone('sine', 2250 * mult, b, 1.7, 0.16 * amp, { attack: 0.002, release: 1.65 });
+    });
+
+    // The drawer sliding out.
+    const slide = noiseSource('pink', 0.45, t + 0.24);
+    const sbp = c.createBiquadFilter();
+    sbp.type = 'bandpass';
+    sbp.Q.value = 2.5;
+    sbp.frequency.setValueAtTime(450, t + 0.24);
+    sbp.frequency.linearRampToValueAtTime(1500, t + 0.62);
+    const sg = c.createGain();
+    envelope(sg, t + 0.24, 0.16, 0.05, 0.22, 0.14);
+    slide.connect(sbp);
+    sbp.connect(sg);
+    sg.connect(master);
+    clack(t + 0.66, 700, 0.3); // drawer hits its stop
+
+    // Coins settling in the tray.
+    for (let i = 0; i < 8; i += 1) {
+      const at = t + 0.62 + Math.random() * 0.4;
+      const f = 3800 + Math.random() * 2800;
+      tone('sine', f, at, 0.09, 0.035, { attack: 0.001, release: 0.085 });
+      tone('sine', f * 1.49, at, 0.07, 0.018, { attack: 0.001, release: 0.065 });
+    }
+
+    if (rainbow) {
+      [1318.5, 1567.98, 2093.0, 2637.0, 3135.96].forEach((f, i) => bell(f, t + 1.1 + i * 0.07, 0.07, 0.8));
+      return 2.0;
+    }
+    return 1.6;
+  },
+
+  // Three bouncy wobbles and a crack, for the Mythical Egg.
+  egg() {
+    const c = audio();
+    const t = now();
+    [0, 0.28, 0.56].forEach((d, i) => {
+      tone('sine', 300 + i * 60, t + d, 0.22, 0.14, { attack: 0.01, release: 0.12, glideTo: 620 + i * 90 });
+    });
+    const crack = noiseSource('white', 0.25, t + 0.9);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2400;
+    const cg = c.createGain();
+    envelope(cg, t + 0.9, 0.18, 0.005, 0.02, 0.18);
+    crack.connect(bp);
+    bp.connect(cg);
+    cg.connect(master);
+    return 1.2;
+  },
+
+  // A cartoon tummy rumble, for a hungry pet.
+  rumble() {
+    const c = audio();
+    const t = now();
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(78, t);
+    o.frequency.linearRampToValueAtTime(52, t + 1.1);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 280;
+    const g = c.createGain();
+    envelope(g, t, 0.24, 0.08, 0.8, 0.3);
+    const wobble = c.createOscillator();
+    wobble.frequency.value = 9;
+    const depth = c.createGain();
+    depth.gain.value = 0.12;
+    wobble.connect(depth);
+    depth.connect(g.gain);
+    o.connect(lp);
+    lp.connect(g);
+    g.connect(master);
+    o.start(t);
+    wobble.start(t);
+    o.stop(t + 1.3);
+    wobble.stop(t + 1.3);
+    return 1.25;
+  },
+
+  // Icy shimmer, for snow.
+  frost() {
+    const c = audio();
+    const t = now();
+    [2093.0, 2637.0, 3135.96, 3520.0].forEach((f, i) => bell(f, t + i * 0.09, 0.09, 1.3));
+    const air = noiseSource('pink', 2, t);
+    const hp = c.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 4000;
+    const g = c.createGain();
+    envelope(g, t, 0.06, 0.3, 0.6, 0.9);
+    air.connect(hp);
+    hp.connect(g);
+    g.connect(master);
+    return 1.8;
+  },
+
+  sunrise() {
+    const t = now();
+    [261.63, 392.0, 523.25].forEach((f) => tone('sine', f, t, 2.8, 0.045, { attack: 1.0, release: 1.2 }));
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => bell(f, t + 0.25 + i * 0.17, 0.13, 1.5));
+    return 2.6;
+  },
+
+  amber() {
+    const t = now();
+    [220, 277.18, 329.63].forEach((f) => tone('triangle', f, t, 2.2, 0.06, { attack: 0.4, release: 0.9, lowpass: 1300 }));
+    bell(880, t + 0.3, 0.14, 1.6);
+    bell(1318.5, t + 0.55, 0.12, 1.6);
+    return 2.2;
+  },
+};
+
+async function play(seconds) {
+  await wait(seconds * 1000 + 80);
+}
+
+/* ---- Voice ---- */
+
+let voices = [];
+
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+  preferBritish();
+  renderVoices();
+}
+
+const BRITISH_ORDER = [/libby/i, /sonia/i, /maisie/i, /hazel/i, /susan/i, /ryan/i, /george/i];
+
+function britishVoices() {
+  return voices.filter((v) => /^en[-_]GB/i.test(v.lang));
+}
+
+function bestBritish() {
+  const gb = britishVoices();
+  for (const re of BRITISH_ORDER) {
+    const v = gb.find((x) => re.test(x.name));
+    if (v) return v;
+  }
+  return gb[0] || null;
+}
+
+function chosenVoice() {
+  if (!voices.length) return null;
+  return (
+    voices.find((v) => v.name === (S && S.alerts.voice)) ||
+    bestBritish() ||
+    voices.find((v) => /^en[-_]US/i.test(v.lang)) ||
+    voices.find((v) => /^en/i.test(v.lang)) ||
+    null
+  );
+}
+
+// Switch to a British voice once, as soon as one is available. After that,
+// whatever is picked in the Voice menu sticks.
+function preferBritish() {
+  if (!S || S.alerts.voicePref === 'british') return;
+  const gb = bestBritish();
+  if (!gb) return;
+  S.alerts.voice = gb.name;
+  S.alerts.voicePref = 'british';
+  save();
+}
+
+/* ---- Output device ---- */
+
+let ROUTE_SPEECH = false;   // can the voice be sent to a chosen speaker here?
+let routeFailures = 0;
+
+async function listOutputs() {
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    return all.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+  } catch (err) {
+    return [];
+  }
+}
+
+// Point the sound engine at the chosen speaker, or the default one if it's
+// not plugged in right now.
+async function applyDevice() {
+  const want = (S && S.alerts.outputDevice) || '';
+  if (!ctx && !want) return;
+  const c = audio();
+  if (typeof c.setSinkId !== 'function') return;
+  const outs = await listOutputs();
+  const target = outs.some((d) => d.deviceId === want) ? want : '';
+  try {
+    if (c.sinkId !== target) await c.setSinkId(target);
+  } catch (err) {
+    console.warn('Could not switch speaker:', err);
+    try {
+      await c.setSinkId('');
+    } catch (e) {
+      /* stay where we are */
+    }
+    toast("Couldn't use that speaker, so alerts are on the default one.");
+  }
+}
+
+async function renderDevices() {
+  const sel = $('outputDevice');
+  if (!sel || !S) return;
+  const outs = await listOutputs();
+  let id = S.alerts.outputDevice;
+
+  // Device ids can change; find the same speaker again by its name.
+  if (id && !outs.some((d) => d.deviceId === id)) {
+    const same = outs.find((d) => d.label && d.label === S.alerts.outputDeviceLabel);
+    if (same) {
+      id = same.deviceId;
+      S.alerts.outputDevice = id;
+      save();
+    }
+  }
+
+  sel.innerHTML =
+    '<option value="">Default speaker</option>' +
+    outs.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || 'Speaker ' + (i + 1))}</option>`).join('');
+  const present = outs.some((d) => d.deviceId === id);
+  sel.value = present ? id : '';
+
+  const note = $('deviceNote');
+  if (S.alerts.outputDevice && !present) {
+    note.hidden = false;
+    note.textContent = `${S.alerts.outputDeviceLabel || 'Your chosen speaker'} isn't connected, so alerts play on the default speaker until it's back.`;
+  } else if (S.alerts.outputDevice && !ROUTE_SPEECH) {
+    note.hidden = false;
+    note.textContent = 'On this computer the voice still comes from the default speaker. The sounds follow your choice.';
+  } else if (S.alerts.outputDevice && routeFailures >= 3) {
+    note.hidden = false;
+    note.textContent = "Couldn't send the voice to that speaker, so the voice is using the default one. Please report it if this keeps happening.";
+  } else {
+    note.hidden = true;
+  }
+
+  await applyDevice();
+}
+
+function systemVoiceNamed(name) {
+  return (name && voices.find((v) => v.name === name)) || chosenVoice();
+}
+
+async function speakRouted(text, pitch, rate, voiceName) {
+  const v = systemVoiceNamed(voiceName);
+  const bytes = await window.app.synthesize({ text, voice: v ? v.name : '', pitch, rate });
+  await playClip(bytes, 1);
+}
+
+// Plays a rendered voice line through the sound engine, so it follows the
+// chosen speaker and the alert volume.
+async function playClip(bytes, playbackRate, effect) {
+  const c = audio();
+  const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const clip = await c.decodeAudioData(data);
+  const rate = playbackRate || 1;
+  const seconds = clip.duration / rate;
+  const src = c.createBufferSource();
+  src.buffer = clip;
+  src.playbackRate.value = rate;
+  // The master volume uses a curve meant for tones; give speech the same
+  // straight volume it has when Windows speaks it directly.
+  const g = c.createGain();
+  g.gain.value = 1;
+  g.connect(voiceBus);
+  const t0 = c.currentTime + 0.02;
+  const fx = wireEffect(c, src, effect, g, t0, seconds);   // effects feed the voice bus
+  src.start(t0);
+  await wait((seconds + fx.tail) * 1000 + 80);
+  for (const o of fx.stops) {
+    try {
+      o.stop();
+    } catch (err) {
+      /* already stopped */
+    }
+  }
+}
+
+/* ---- Voices (Windows and natural, in one menu) ---- */
+
+let VOICES = { available: false, engineInstalled: false, voices: [] };
+let naturalFailures = 0;
+const downloads = {};   // id -> { phase, pct }
+let PICK = null;        // the voice being looked at in the menu
+
+const GROUP_ORDER = ['Characters', 'Storytellers', 'Scottish', 'Showtime'];
+
+/* ------------------------------------------------------------------ *
+ * Personalities. A voice becomes a character by how it says things, so
+ * the character voices wrap each alert in their own words: a little
+ * something before, sometimes a little something after, never the same
+ * one twice in a row. Previews and tests are already written in
+ * character, so they're left as they are.
+ * ------------------------------------------------------------------ */
+
+const PERSONAS = {
+  poppy: {
+    tag: 'cheerful',
+    before: ['Ooh!', 'Oh my gosh!', 'Yay!', 'Eee!', 'Ooh, ooh!', 'Guess what!'],
+    after: ['Quick quick quick!', 'Go go go!', 'Hurry!', 'Yay!', ''],
+    style: (t) => t.replace(/\.(\s|$)/g, '!$1'),
+  },
+  spike: {
+    tag: 'grumpy',
+    before: ['Ugh.', 'Oh great.', 'Seriously?', 'Right. Fine.', 'Here we go again.', 'Oh, wonderful.'],
+    after: ['Go on then.', "Don't make me say it twice.", 'You\'re welcome, I suppose.', 'Whatever.', ''],
+    style: (t) => t.replace(/!+/g, '.'),
+  },
+  obadiah: {
+    tag: 'gloomy',
+    before: ['Oh.', 'Well.', 'Hm.', 'Oh dear.', 'I suppose I should tell you.'],
+    after: ['Not that it matters.', "I'm sure it'll be fine.", 'Nothing lasts forever.', 'How nice for you.', ''],
+    style: (t) => t.replace(/!+/g, '.').replace(/, /g, '... '),
+  },
+  prudence: {
+    tag: 'sensible',
+    before: ['Just so you know,', 'A quick note:', 'Heads up:', 'Right then.', ''],
+    after: ['Best be quick.', 'Thought you should know.', '', ''],
+  },
+  storybook: {
+    tag: 'storyteller',
+    before: ['Once upon a time,', 'And then, quite suddenly,', 'In a garden not far from here,', 'Meanwhile,', 'Now, as it happened,'],
+    after: ['And they all lived happily ever after.', 'The end.', 'But that is another story.', '', ''],
+  },
+  stadium: {
+    before: ['Ladies and gentlemen!', 'Put your hands together!', 'And now!', 'Are you ready?', ''],
+    after: ['What a moment!', 'The crowd goes wild!', 'Unbelievable!', ''],
+  },
+  radio: {
+    before: ['This just in.', 'We interrupt this broadcast.', 'Garden bulletin.', 'Breaking news.'],
+    after: ['Over.', 'Back to you in the studio.', 'Stay tuned.', ''],
+  },
+  trailer: {
+    before: ['In a world...', 'This summer...', 'One garden...', 'When all hope was lost...', 'Coming soon...'],
+    after: ['Rated G for Garden.', 'Only in theatres.', 'This time, it\'s personal.', ''],
+    style: (t) => t.replace(/\. /g, '... '),
+  },
+};
+
+const lastPersonaPick = {};
+function personaPick(key, list) {
+  const options = list.length > 1 ? list.filter((x) => x !== lastPersonaPick[key]) : list;
+  const pick = options[Math.floor(Math.random() * options.length)];
+  lastPersonaPick[key] = pick;
+  return pick;
+}
+
+function inCharacter(v, text) {
+  const p = v && v.persona && PERSONAS[v.persona];
+  if (!p || !text) return text;
+  let body = String(text).trim();
+  if (p.style) body = p.style(body);
+  const before = Math.random() < 0.8 ? personaPick(v.persona + ':b', p.before) : '';
+  const after = Math.random() < 0.5 ? personaPick(v.persona + ':a', p.after) : '';
+  if (!/[.!?…]$/.test(body)) body += '.';
+  return [before, body, after].filter(Boolean).join(' ');
+}
+
+function naturalVoice() {
+  if (!S || S.alerts.voiceEngine !== 'natural') return null;
+  const v = VOICES.voices.find((x) => x.id === S.alerts.naturalVoice);
+  return v && v.installed && VOICES.engineInstalled ? v : null;
+}
+
+// Natural voices don't take a pitch setting, so a higher "pitch" is played
+// a little faster instead. That's what makes the Starweaver alarm sound
+// excited.
+function naturalRate(pitch, rate) {
+  const r = (rate || 1) * (1 + ((pitch || 1) - 1) * 0.35);
+  return Math.min(1.35, Math.max(0.8, r));
+}
+
+function speakerFor(v) {
+  const list = v.speakers || [];
+  const saved = S.alerts.voiceSpeakers && S.alerts.voiceSpeakers[v.id];
+  return list.includes(saved) ? saved : list[0];
+}
+
+function previewLine(v) {
+  return v.preview || `Hi, I'm ${v.name}. Ooh, Moonbinder is in the shop!`;
+}
+
+// How fast each fun voice plays, on top of the alert's own pace.
+const EFFECT_RATE = { stadium: 0.95, trailer: 0.86 };
+
+// A cinema-sized echo: a burst of noise that fades over a few seconds,
+// used as the room the trailer voice is speaking in.
+function hallImpulse(c, seconds) {
+  const len = Math.floor(c.sampleRate * seconds);
+  const buf = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch += 1) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i += 1) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+  }
+  return buf;
+}
+
+function distortionCurve(amount) {
+  const n = 1024;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const x = (i * 2) / n - 1;
+    curve[i] = ((3 + amount) * x * 20 * (Math.PI / 180)) / (Math.PI + amount * Math.abs(x));
+  }
+  return curve;
+}
+
+// Wires a voice clip through its fun effect into `out`. Returns anything that
+// needs stopping afterwards, and how long the effect rings on (echoes).
+function wireEffect(c, src, effect, out, t0, seconds) {
+  const stops = [];
+  const osc = (type, freq) => {
+    const o = c.createOscillator();
+    o.type = type;
+    o.frequency.value = freq;
+    o.start(t0);
+    stops.push(o);
+    return o;
+  };
+  const gain = (v) => {
+    const g = c.createGain();
+    g.gain.value = v;
+    return g;
+  };
+  const filter = (type, freq, q) => {
+    const f = c.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    if (q) f.Q.value = q;
+    return f;
+  };
+  let tail = 0;
+
+  switch (effect) {
+    case 'stadium': {
+      src.connect(out);
+      const echo = c.createDelay(1);
+      echo.delayTime.value = 0.23;
+      const tone = filter('lowpass', 2800);
+      const feedback = gain(0.38);
+      const wet = gain(0.55);
+      src.connect(echo);
+      echo.connect(tone);
+      tone.connect(feedback);
+      feedback.connect(echo);
+      tone.connect(wet);
+      wet.connect(out);
+      tail = 1.4;
+      break;
+    }
+    case 'radio': {
+      const hp = filter('highpass', 450);
+      const lp = filter('lowpass', 2600);
+      const crunch = c.createWaveShaper();
+      crunch.curve = distortionCurve(30);
+      src.connect(hp);
+      hp.connect(lp);
+      lp.connect(crunch);
+      crunch.connect(gain(2.2)).connect(out);
+      const hiss = noiseSource('pink', 12, t0);
+      hiss.stop(t0 + seconds + 0.2);
+      const hissHp = filter('highpass', 2500);
+      hiss.connect(hissHp);
+      hissHp.connect(gain(0.05)).connect(out);
+      break;
+    }
+    case 'trailer': {
+      // Deep and dramatic: a warm low boost, a gentle squeeze so it sounds
+      // big and close, and a cinema-sized echo behind it.
+      const low = c.createBiquadFilter();
+      low.type = 'lowshelf';
+      low.frequency.value = 180;
+      low.gain.value = 7;
+      const presence = c.createBiquadFilter();
+      presence.type = 'peaking';
+      presence.frequency.value = 2400;
+      presence.gain.value = 2;
+      const squeeze = c.createDynamicsCompressor();
+      squeeze.threshold.value = -24;
+      squeeze.ratio.value = 3;
+      src.connect(low);
+      low.connect(presence);
+      presence.connect(squeeze);
+      squeeze.connect(gain(1.1)).connect(out);
+      const hall = c.createConvolver();
+      hall.buffer = hallImpulse(c, 2.8);
+      const wet = gain(0.32);
+      squeeze.connect(hall);
+      hall.connect(wet);
+      wet.connect(out);
+      tail = 2.8;
+      break;
+    }
+    default:
+      src.connect(out);
+  }
+  return { stops, tail };
+}
+
+async function speakNatural(v, text, pitch, rate) {
+  const bytes = await window.app.voiceSynthesize(v.id, text, speakerFor(v));
+  await playClip(bytes, naturalRate(pitch, rate) * (EFFECT_RATE[v.effect] || 1), v.effect);
+}
+
+function cleanError(err) {
+  return String((err && err.message) || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+}
+
+function systemVoiceList() {
+  const english = voices.filter((v) => /^en/i.test(v.lang));
+  const pool = english.length ? english : voices;
+  return [...britishVoices(), ...pool.filter((v) => !/^en[-_]GB/i.test(v.lang))];
+}
+
+function shortSystemName(name) {
+  return name
+    .replace(/^Microsoft /, '')
+    .replace(/ Desktop\b/, '')
+    .replace(/ - English \((.+)\)$/, ' ($1)');
+}
+
+function currentVoiceValue() {
+  const nv = naturalVoice();
+  if (nv) return 'nat:' + nv.id;
+  const sv = chosenVoice();
+  return 'sys:' + (sv ? sv.name : '');
+}
+
+function valueLabel(value) {
+  if (value.startsWith('nat:')) {
+    const v = VOICES.voices.find((x) => 'nat:' + x.id === value);
+    return v ? v.name : 'a natural voice';
+  }
+  const name = value.slice(4);
+  return name ? shortSystemName(name) + ', built into Windows' : 'the Windows voice';
+}
+
+function renderVoicePicker() {
+  const sel = $('voicePicker');
+  if (!sel || !S) return;
+  const current = currentVoiceValue();
+  if (!PICK) PICK = current;
+
+  const groups = [];
+  const sys = systemVoiceList();
+  groups.push(['Built into Windows', sys.length
+    ? sys.map((v) => ({ value: 'sys:' + v.name, label: shortSystemName(v.name) }))
+    : [{ value: 'sys:', label: 'Windows default voice' }]]);
+  if (VOICES.available) {
+    for (const g of GROUP_ORDER) {
+      const list = VOICES.voices.filter((v) => v.group === g);
+      if (!list.length) continue;
+      groups.push([g, list.map((v) => ({
+        value: 'nat:' + v.id,
+        label: `${v.name}${v.group === 'Showtime' ? '' : v.persona && PERSONAS[v.persona] && PERSONAS[v.persona].tag ? ` (${PERSONAS[v.persona].tag})` : ` (${v.accent}${v.gender ? ', ' + v.gender.toLowerCase() : ''})`}${v.installed ? '' : '  ⤓'}`,
+      }))]);
+    }
+  }
+  sel.innerHTML = groups
+    .map(([g, items]) => `<optgroup label="${esc(g)}">${items
+      .map((i) => `<option value="${esc(i.value)}">${esc(i.label)}${i.value === current ? '  ✓' : ''}</option>`)
+      .join('')}</optgroup>`)
+    .join('');
+  if (![...sel.options].some((o) => o.value === PICK)) PICK = current;
+  sel.value = PICK;
+  $('voiceInUse').textContent = `Alerts are using ${valueLabel(current)}.  ⤓ means not downloaded yet.`;
+  renderVoiceDetail();
+}
+
+// Older code calls this when the Windows voice list loads.
+function renderVoices() {
+  renderVoicePicker();
+}
+
+function renderVoiceDetail() {
+  const box = $('voiceDetail');
+  if (!box || !S) return;
+  // The voice lineup changed in v0.18; say so once if theirs was retired.
+  const note = $('voiceRetiredNote');
+  if (note) {
+    note.hidden = !S.alerts.retiredVoice;
+    note.innerHTML = S.alerts.retiredVoice
+      ? `🎭 New voices! The voice you were using isn't offered any more, so alerts ${naturalVoice() ? 'use Prudence' : 'use the Windows voice'} for now. Pick one from the Voice menu (⤓ ones download first). Poppy, Spike and Obadiah talk in character. <button class="link" data-act="dismissRetired">OK</button>`
+      : '';
+  }
+  const value = PICK || '';
+  const inUse = value === currentVoiceValue();
+  const useBtn = inUse
+    ? '<span class="in-use">In use</span>'
+    : '<button class="btn small primary" data-act="use">Use this voice</button>';
+
+  if (value.startsWith('sys:')) {
+    const noBritish = voices.length > 0 && britishVoices().length === 0;
+    box.innerHTML = `
+      <div class="rule-name">${esc(value.slice(4) ? shortSystemName(value.slice(4)) : 'Windows default voice')}</div>
+      <div class="rule-desc">Built into Windows, so it's always there. Plainer than the natural voices.</div>
+      ${noBritish ? '<div class="rule-desc" style="margin-top:6px">No British Windows voice is installed. In Windows: Settings → Time &amp; language → Speech → Add voices → English (United Kingdom).</div>' : ''}
+      <div class="button-row"><button class="btn small" data-act="preview">Preview</button>${useBtn}</div>`;
+    return;
+  }
+
+  const v = VOICES.voices.find((x) => 'nat:' + x.id === value);
+  if (!v) {
+    box.innerHTML = '';
+    return;
+  }
+  const d = downloads[v.id];
+  const busy = Object.keys(downloads).length > 0;
+  const tags = v.group === 'Showtime' ? 'Showtime voice' : `${v.accent}${v.gender ? ' · ' + v.gender : ''}${v.persona ? ' · speaks in character' : ''}`;
+  const others = v.sharesDownloadWith || [];
+  const shares = others.length === 0 ? ''
+    : others.length <= 2 ? `Shares one download with ${others.join(' and ')}.`
+    : `One download unlocks this and ${others.length} other voices.`;
+
+  let actions;
+  if (d) {
+    actions = `
+      <div class="voice-progress">
+        <span class="bar"><span style="width:${d.pct}%"></span></span>
+        <div class="voice-progress-label">${d.phase === 'engine' ? 'Getting the voice engine' : 'Downloading ' + esc(v.name)}… ${d.pct}%</div>
+      </div>`;
+  } else if (!v.installed) {
+    actions = `<div class="button-row"><button class="btn small primary" data-act="download" ${busy ? 'disabled' : ''}>Download</button>
+      <span class="rule-desc">${VOICES.engineInstalled ? 'About 60 to 80 MB.' : 'About 85 to 100 MB, including the voice engine.'}</span></div>`;
+  } else {
+    actions = `
+      <div class="button-row">
+        <button class="btn small" data-act="preview">Preview</button>
+        ${useBtn}
+        ${v.speakers && v.speakers.length > 1 ? `<button class="link" data-act="next">Try another speaker (${v.speakers.indexOf(speakerFor(v)) + 1} of ${v.speakers.length})</button>` : ''}
+        ${inUse ? '' : '<button class="link" data-act="remove">Remove</button>'}
+      </div>`;
+  }
+
+  box.innerHTML = `
+    <div class="rule-name">${esc(v.name)} <span class="pet-species">${esc(tags)}</span></div>
+    <div class="rule-desc">${esc(v.note)}${shares ? ' ' + esc(shares) : ''}</div>
+    ${actions}`;
+}
+
+async function previewPicked() {
+  if (speechLevel() === 0) return toast('The voice is turned down or muted.');
+  const value = PICK || '';
+  try {
+    if (value.startsWith('nat:')) {
+      const v = VOICES.voices.find((x) => 'nat:' + x.id === value);
+      await speak(previewLine(v), 1.05, 0.97, { natural: v });
+    } else {
+      await speak("Hi! This is how your alerts will sound. Ooh, Moonbinder is in the shop!", 1.05, 0.97, { system: value.slice(4) });
+    }
+  } catch (err) {
+    toast(`Couldn't play that voice: ${cleanError(err)}`);
+  }
+}
+
+function usePicked() {
+  const value = PICK || '';
+  if (value.startsWith('nat:')) {
+    const v = VOICES.voices.find((x) => 'nat:' + x.id === value);
+    S.alerts.voiceEngine = 'natural';
+    S.alerts.naturalVoice = v.id;
+    naturalFailures = 0;
+    window.app.voiceWarm(v.id);
+  } else {
+    S.alerts.voiceEngine = 'system';
+    if (value.slice(4)) S.alerts.voice = value.slice(4);
+  }
+  save();
+  renderVoicePicker();
+  toast(`Alerts will use ${valueLabel(value)}.`);
+  previewPicked();
+}
+
+function wireVoicePicker() {
+  window.app.onVoiceProgress((p) => {
+    if (!downloads[p.id]) return;
+    downloads[p.id] = { phase: p.phase, pct: Math.min(100, Math.round((p.received / (p.total || 1)) * 100)) };
+    renderVoiceDetail();
+  });
+
+  $('voicePicker').addEventListener('change', (e) => {
+    PICK = e.target.value;
+    renderVoiceDetail();
+  });
+
+  $('voiceRetiredNote').addEventListener('click', (e) => {
+    if (!e.target.closest('[data-act="dismissRetired"]')) return;
+    delete S.alerts.retiredVoice;
+    save();
+    renderVoiceDetail();
+  });
+  $('voiceDetail').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const v = VOICES.voices.find((x) => 'nat:' + x.id === PICK);
+
+    if (act === 'preview') return previewPicked();
+    if (act === 'use' && S.alerts.retiredVoice) delete S.alerts.retiredVoice;
+    if (act === 'use') return usePicked();
+
+    if (act === 'next' && v) {
+      const list = v.speakers || [];
+      const i = list.indexOf(speakerFor(v));
+      S.alerts.voiceSpeakers = Object.assign({}, S.alerts.voiceSpeakers, { [v.id]: list[(i + 1) % list.length] });
+      save();
+      renderVoiceDetail();
+      return previewPicked();
+    }
+
+    if (act === 'download' && v) {
+      downloads[v.id] = { phase: VOICES.engineInstalled ? 'voice' : 'engine', pct: 0 };
+      renderVoiceDetail();
+      try {
+        VOICES = await window.app.voiceDownload(v.id);
+        delete downloads[v.id];
+        renderVoicePicker();
+        // Your first natural voice becomes the one in use.
+        if (!naturalVoice()) usePicked();
+        else {
+          toast(`${v.name} is ready. Press Preview to hear it.`);
+          previewPicked();
+        }
+      } catch (err) {
+        delete downloads[v.id];
+        renderVoiceDetail();
+        toast(`Couldn't download ${v.name}: ${cleanError(err)}. Check your internet and try again.`);
+      }
+      return;
+    }
+
+    if (act === 'remove' && v) {
+      const others = v.sharesDownloadWith || [];
+      const shared = others.length ? ` This also removes ${others.length <= 2 ? others.join(' and ') : others.length + ' other voices'}, which share the same download.` : '';
+      if (!confirm(`Remove ${v.name}?${shared} You can download it again any time.`)) return;
+      VOICES = await window.app.voiceRemove(v.id);
+      if (S.alerts.voiceEngine === 'natural' && !naturalVoice()) {
+        S.alerts.voiceEngine = 'system';
+        save();
+      }
+      renderVoicePicker();
+    }
+  });
+}
+
+// `override` previews a voice without switching to it:
+// { natural: voice } or { system: 'Windows voice name' }.
+async function speak(text, pitch = 1, rate = 0.97, override) {
+  if (speechLevel() === 0) return;
+  const nv = override ? override.natural || null : naturalVoice();
+  if (nv && (override || naturalFailures < 3)) {
+    try {
+      await speakNatural(nv, override ? text : inCharacter(nv, text), pitch, rate);
+      if (!override) naturalFailures = 0;
+      return;
+    } catch (err) {
+      if (override) throw err;
+      naturalFailures += 1;
+      console.warn('Natural voice failed; using the Windows voice for this line.', err);
+    }
+  }
+  const sysName = override && override.system ? override.system : null;
+  if (ROUTE_SPEECH && S.alerts.outputDevice && routeFailures < 3) {
+    try {
+      await speakRouted(text, pitch, rate, sysName);
+      routeFailures = 0;
+      return;
+    } catch (err) {
+      routeFailures += 1;
+      console.warn('Voice could not go to the chosen speaker; using the default one.', err);
+      if (routeFailures >= 3) await renderDevices();
+    }
+  }
+  return speakSystem(text, pitch, rate, sysName);
+}
+
+function speakSystem(text, pitch = 1, rate = 0.97, voiceName) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window) || speechLevel() === 0) return resolve();
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = pitch;
+    u.rate = rate;
+    u.volume = speechLevel();
+    const v = systemVoiceNamed(voiceName);
+    if (v) u.voice = v;
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(guard);
+      resolve();
+    };
+    const guard = setTimeout(done, 3000 + (text.length * 110) / rate);
+    u.onend = done;
+    u.onerror = done;
+    speechSynthesis.speak(u);
+  });
+}
+
+/* ---- What each alert sounds like ---- */
+
+const LINES = {
+  moonbinder: [
+    ["Ooh, it's happening! Moonbinder is in the shop!", "This is not a drill, love. Moonbinder. Off you pop!"],
+    ['Attention, lovely gardeners. A Moonbinder has appeared.', 'Once more, for luck. Moonbinder is in stock!'],
+    ['Well I never. Moonbinder is in stock!', 'Honestly, go and get it. Moonbinder!'],
+  ],
+  dawnbinder: [
+    'Oh, brilliant! Dawnbinder is in the shop. Go on then!',
+    'Big news, everyone. Dawnbinder is in stock!',
+    'Rise and shine, Dawnbinder has arrived!',
+  ],
+  dawnbreaker: ['Dawnbreaker is in stock. Lovely!', 'Ooh, Dawnbreaker in the shop!', 'Heads up, Dawnbreaker is in!'],
+  emberbloom: ['Emberbloom is in stock. Toasty!', 'Ooh, Emberbloom in the shop!', 'Emberbloom is in. Go on, treat yourself.'],
+  thunderspire: ['Thunderspire is in stock!', 'Ooh, Thunderspire in the shop. Smashing!', 'Thunderspire is in. Get it while it lasts!'],
+  mythicalegg: [
+    'A Mythical Egg! In the shop! Oh my goodness!',
+    'Egg-cellent news! A Mythical Egg is in stock!',
+    "Stop everything, it's a Mythical Egg! Go go go!",
+  ],
+  starweaver: ['Starweaver alert! Starweaver alert!', 'Starweaver alert! All hands on deck!', 'Starweaver alert! Chop chop!'],
+  windturner: ['Windturner alert!'],
+  firepit: ['Firepit alert!'],
+  legendaryegg: ['Legendary egg in stock.', 'Legendary egg alert.'],
+  dawn: ['Dawn shop!', 'Morning! Dawn shop!', 'Dawn shop! Rise and shine.'],
+  amber: ['Amber alert!', 'Amber alert! The amber shop is open.'],
+};
+
+async function perform(a) {
+  const id = a.ruleId;
+  const name = a.itemName || a.label;
+
+  if (id === 'pethungry') {
+    await play(SFX.rumble());
+    const names = a.names || [];
+    const who = names.length === 1 ? `${names[0]} is hungry` : 'your pets are hungry';
+    const foods = (a.diet || []).slice(0, 2);
+    const suggest = foods.length ? ` Try ${foods.join(' or ')} in the trough.` : '';
+    return speak(pick([`Heads up, ${who}.`, `Tummy alert! ${who}.`]) + suggest, 1.05, 0.97);
+  }
+  if (id === 'hatchgold' || id === 'hatchrainbow') {
+    await play(SFX.egg());
+    await play(SFX.fanfare(true));
+    const rb = id === 'hatchrainbow';
+    return speak(pick(rb
+      ? [`Rainbow pet! A rainbow ${a.itemName.replace(/^Rainbow /, '')}!`, `Oh wow, a rainbow ${a.itemName.replace(/^Rainbow /, '')}!`]
+      : [`Gold pet! A gold ${a.itemName.replace(/^Gold /, '')}!`, `Ooh, a golden ${a.itemName.replace(/^Gold /, '')}!`]), 1.08, 1.02);
+  }
+  if (id === 'petgrown') {
+    const t = now();
+    [659.25, 830.61, 987.77, 1318.5].forEach((f, i) => bell(f, t + i * 0.12, 0.12, 1.2));
+    await play(1.1);
+    return speak(pick([`${a.itemName} is fully grown!`, `${a.itemName} has reached full strength!`, `${a.itemName} is all grown up!`]), 1.05, 1);
+  }
+  if (id === 'luckprimed') {
+    await play(SFX.lucky());
+    return speak(`Lucky! ${a.itemName.replace(/ \(estimated\)$/, '')}.`, 1.04, 1);
+  }
+  if (id === 'hatchspecies') {
+    await play(SFX.fanfare(false));
+    return speak(pick([`You hatched a ${a.itemName}!`, `There it is, a ${a.itemName}!`]), 1.05, 1);
+  }
+  if (id === 'petgold') return play(SFX.register(false));
+  if (id === 'petrainbow') return play(SFX.register(true));
+  if (id === 'decor') {
+    await play(SFX.blip());
+    return speak('Decor alert!', 1.05, 1);
+  }
+  if (id === 'mythicalegg') {
+    await play(SFX.egg());
+    await play(SFX.fanfare(true));
+    return speak(pick(LINES.mythicalegg), 1.12, 1.03);
+  }
+  if (id === 'snow') {
+    await play(SFX.frost());
+    return speak(pick(['Snow!', 'Snow is falling!', 'Snow! Wrap up warm.']), 1.05, 0.97);
+  }
+  if (id === 'thunder') return play(SFX.thunder());
+  if (id === 'rain') return play(SFX.rain());
+  if (id === 'dawn') {
+    await play(SFX.sunrise());
+    return speak(pick(LINES.dawn), 1.05, 1);
+  }
+  if (id === 'amber') {
+    await play(SFX.amber());
+    return speak(pick(LINES.amber), 1, 1);
+  }
+
+  switch (a.tier) {
+    case 'legendary': {
+      const [first, second] = LINES[id]
+        ? pick(LINES[id])
+        : [`${a.label} in stock! This is not a drill!`, `Repeat. ${a.label} in stock!`];
+      await play(SFX.siren(2.4));
+      await play(SFX.fanfare(true));
+      await speak(first, 1.05, 0.97);
+      await play(SFX.fanfare(false));
+      return speak(second, 1.05, 0.97);
+    }
+    case 'epic':
+      await play(SFX.siren(1.4));
+      await play(SFX.fanfare(true));
+      return speak(LINES[id] ? pick(LINES[id]) : `${a.label} is in stock! Go on then!`, 1.05, 1);
+    case 'big':
+      await play(SFX.fanfare(false));
+      return speak(LINES[id] ? pick(LINES[id]) : `Ooh, ${a.label} is in stock!`, 1.05, 1);
+    case 'alarm':
+      await play(SFX.klaxon(3));
+      await speak(LINES[id] ? pick(LINES[id]) : `${a.label} alert! ${a.label} alert!`, 1.7, 1.25);
+      return play(SFX.klaxon(1));
+    case 'weather':
+      await play(SFX.chime());
+      return speak(`${a.label} weather has started.`, 1.05, 0.97);
+    case 'named':
+      await play(SFX.chime());
+      return speak(LINES[id] ? pick(LINES[id]) : `${a.label} alert!`, 1.05, 1);
+    default:
+      await play(SFX.ding());
+      return speak(LINES[id] ? pick(LINES[id]) : pick([`${a.label} alert.`, `${a.label}'s in stock.`]), 1, 0.97);
+  }
+}
+
+const queue = [];
+let playing = false;
+
+async function enqueue(list) {
+  if (level() === 0) return;
+  for (const a of list) if (queue.length < 8) queue.push(a);
+  if (playing) return;
+  playing = true;
+  while (queue.length) {
+    const next = queue.shift();
+    try {
+      await perform(next);
+    } catch (err) {
+      console.error('Alert sound failed:', err);
+    }
+    await wait(500);
+  }
+  playing = false;
+}
+
+function sampleAlert(rule) {
+  return {
+    ruleId: rule.id,
+    tier: rule.tier,
+    kind: rule.kind,
+    label: rule.label,
+    itemName: rule.kind === 'decor' ? 'Mini Fairy Castle'
+      : rule.id === 'petgrown' ? 'Nutty'
+      : rule.id === 'hatchgold' ? 'Gold Worm' : rule.id === 'hatchrainbow' ? 'Rainbow Bee' : rule.id === 'hatchspecies' ? 'Capybara'
+        : rule.id === 'luckprimed' ? 'Your next Mythical Egg is a guaranteed Capybara'
+        : rule.kind === 'pet' ? 'Your Snail' : rule.label,
+    names: rule.id === 'pethungry' ? ['Your Snail'] : undefined,
+    diet: rule.id === 'pethungry' ? ['Blueberry', 'Tomato'] : undefined,
+    stock: 1,
+  };
+}
+
+/* ================================================================== *
+ * Alerts tab
+ * ================================================================== */
+
+const DESCRIBE = {
+  legendary: 'Siren, fanfare, announced twice',
+  epic: 'Short siren, fanfare, announcement',
+  big: 'Fanfare and announcement',
+  alarm: 'Klaxon and an excited alarm voice',
+  named: 'Chime and a callout',
+  basic: 'Soft ding and a quick mention',
+};
+
+const PET_DESCRIBE = {
+  petgold: 'Cash register',
+  petrainbow: 'Cash register with a sparkle',
+  hatchgold: 'Egg wobble, fanfare, and "Gold pet!"',
+  hatchrainbow: 'Egg wobble, fanfare, and "Rainbow pet!"',
+  hatchspecies: 'Fanfare and "You hatched a…" for an egg\'s rare pet (like a Capybara)',
+  petgrown: 'Chime and "Nutty is fully grown!" when a pet that\'s out reaches its max strength',
+  luckprimed: 'Sparkle and "Lucky! Your next … is guaranteed" when a Bad Luck Protection counter is one pull away',
+  pethungry: "Tummy rumble and a heads-up when a pet hits 10% with none of its food in the trough, like the game's warning. One alert for all your pets, and never more than one every 15 minutes",
+};
+
+const SPECIAL_DESCRIBE = {
+  mythicalegg: 'Egg wobble, fanfare, and a very excited announcement',
+  decor: 'Quick ping and "Decor alert!"',
+};
+
+const WEATHER_DESCRIBE = {
+  thunder: 'A soft roll of distant thunder, no voice',
+  rain: 'A rain shower, no voice',
+  dawn: 'Sunrise chime and "Dawn shop!"',
+  snow: 'Icy shimmer and "Snow!"',
+  weatherother: 'Chime and the weather\'s name, for anything not listed above',
+  amber: 'Warm glow chime and "Amber alert!"',
+};
+
+function ruleRow(rule) {
+  const on = !S.alerts.disabled.includes(rule.id);
+  const desc =
+    rule.kind === 'weather' ? WEATHER_DESCRIBE[rule.id] || ''
+    : rule.kind === 'pet' ? PET_DESCRIBE[rule.id] || ''
+    : SPECIAL_DESCRIBE[rule.id] || DESCRIBE[rule.tier] || '';
+  return `
+    <div class="rule tier-${esc(rule.tier)}">
+      <div class="rule-text">
+        <div class="rule-name">${esc(rule.label)}</div>
+        <div class="rule-desc">${esc(desc)}${rule.custom ? ' · <button class="link" data-remove="' + esc(rule.label) + '">Remove</button>' : ''}</div>
+      </div>
+      <button class="moon" aria-pressed="${(S.alerts.always || []).includes(rule.id)}" data-always="${esc(rule.id)}" title="${(S.alerts.always || []).includes(rule.id) ? 'Rings even during quiet hours and snooze. Click to go back to normal.' : 'Click to make this ring even during quiet hours and snooze'}" aria-label="${esc(rule.label)}: ring during quiet hours">🌙</button>
+      <button class="btn small" data-test="${esc(rule.id)}">Test</button>
+      <button class="switch" role="switch" aria-checked="${on}" aria-label="${esc(rule.label)} alert" data-rule="${esc(rule.id)}"></button>
+    </div>`;
+}
+
+function renderRules() {
+  $('itemRules').innerHTML = RULES.filter((r) => r.kind === 'item' || r.kind === 'decor').map(ruleRow).join('');
+  $('weatherRules').innerHTML = RULES.filter((r) => r.kind === 'weather').map(ruleRow).join('');
+  $('petRules').innerHTML = RULES.filter((r) => r.kind === 'pet').map(ruleRow).join('');
+}
+
+function renderAlertSettings() {
+  $('volume').value = S.alerts.volume;
+  $('volumeValue').textContent = S.alerts.volume + '%';
+  const vv = S.alerts.voiceVolume == null ? 35 : S.alerts.voiceVolume;
+  $('voiceVolume').value = vv;
+  $('voiceVolumeValue').textContent = vv + '%';
+  setSwitch($('muted'), S.alerts.muted);
+  setSwitch($('popups'), S.alerts.popups);
+  setSwitch($('keepAwake'), S.alerts.keepAwake !== false);
+  setSwitch($('quiet'), S.alerts.quietHours.enabled);
+  $('quietTimes').hidden = !S.alerts.quietHours.enabled;
+  $('quietFrom').value = S.alerts.quietHours.from;
+  $('quietTo').value = S.alerts.quietHours.to;
+}
+
+function clockTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function ago(ms) {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return `${s}s ago`;
+  return `${Math.floor(s / 60)}m ago`;
+}
+
+function until(ms) {
+  const s = Math.max(0, Math.round((ms - Date.now()) / 1000));
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/* Weather names, emoji and the schedule list, shared by the Alerts and
+ * Weather tabs. KINDS comes from weather.js in the main process. */
+let KINDS = [];
+const kindInfo = (id) => KINDS.find((k) => k.id === id) || null;
+const kindEmoji = (id) => (kindInfo(id) ? kindInfo(id).emoji : '🌦️');
+const kindLabel = (id) => (id === 'clear' ? 'Clear skies' : kindInfo(id) ? kindInfo(id).label : 'Unknown weather');
+
+// 8:00pm rather than 8:00 PM, which reads better in a list.
+function fmtClock(when) {
+  const d = typeof when === 'number' ? new Date(when) : new Date(String(when));
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?([AP])M/i, (m, a) => a.toLowerCase() + 'm');
+}
+
+function eventTags(e) {
+  const tags = [];
+  const kinds = e.announced ? [e.kind] : [];
+  const logoffOn = S.logoff && S.logoff.enabled;
+  if (logoffOn) {
+    const off = new Set(S.logoff.kinds || []);
+    if (kinds.some((k) => off.has(k))) tags.push('<span class="tag off">log off</span>');
+    else if (!e.announced && (e.possible || []).some((k) => off.has(k))) {
+      const which = (e.possible || []).filter((k) => off.has(k)).map(kindLabel).join(' or ');
+      tags.push(`<span class="tag off">log off if ${esc(which)}</span>`);
+    }
+  }
+  if (S.weatherTeams && S.weatherTeams.enabled && e.announced && S.weatherTeams[e.kind]) {
+    const team = LAST_TEAMS.find((t) => t.id === S.weatherTeams[e.kind]);
+    tags.push(`<span class="tag team">🐾 ${esc(team ? team.name : 'team')}</span>`);
+  }
+  return tags.join('');
+}
+
+function eventWhat(e) {
+  if (e.announced) return `${kindEmoji(e.kind)} ${esc(e.name)}`;
+  const maybe = (e.possible || []).length && (e.possible || []).length < KINDS.length
+    ? ` <small>(${esc(e.possible.map(kindLabel).join(' or '))})</small>` : '';
+  return `🌙 ${esc(e.name)}${maybe}`;
+}
+
+function scheduleHtml(st, withTags) {
+  if (!st || (!st.lastCheck && !st.current && !(st.upcoming || []).length)) {
+    return '<div class="note">Waiting for the forecast…</div>';
+  }
+  const rows = [];
+  if (st.current) {
+    rows.push(`<span class="t now">Now</span><span class="what now">${eventWhat(st.current)} <small>until ${esc(fmtClock(st.current.endsAt))}</small></span><span class="tags">${withTags ? eventTags(st.current) : ''}</span>`);
+  }
+  for (const e of st.upcoming || []) {
+    rows.push(`<span class="t">${esc(fmtClock(e.startsAt))}</span><span class="what">${eventWhat(e)}</span><span class="tags">${withTags ? eventTags(e) : ''}</span>`);
+  }
+  if (!rows.length) return '<div class="note">☀️ Clear skies, and nothing on the forecast yet.</div>';
+  return `<div class="sched">${rows.join('')}</div>`;
+}
+
+// Shop restock countdowns: one little box per shop.
+const SHOP_ICONS = { seed: '🌱', seeds: '🌱', egg: '🥚', eggs: '🥚', tool: '🔧', tools: '🔧', decor: '🪑' };
+const SHOP_NAMES = { seed: 'Seeds', seeds: 'Seeds', egg: 'Eggs', eggs: 'Eggs', tool: 'Tools', tools: 'Tools', decor: 'Decor' };
+function restockHtml(st) {
+  const list = ((st && st.restocks) || []).filter((r) => Date.parse(r.at) > Date.now());
+  if (!list.length) return '';
+  const order = ['seed', 'seeds', 'egg', 'eggs', 'tool', 'tools', 'decor'];
+  list.sort((a, b) => (order.indexOf(a.id.toLowerCase()) + 1 || 99) - (order.indexOf(b.id.toLowerCase()) + 1 || 99));
+  const left = (iso) => {
+    const s = Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 1000));
+    return s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  return `<div class="subhead" style="margin-top:12px">Restocks</div><div class="restocks">${list.map((r) => {
+    const id = r.id.toLowerCase();
+    const soon = Date.parse(r.at) - Date.now() < 60000;
+    return `<div class="restock ${soon ? 'soon' : ''}"><span class="ico">${SHOP_ICONS[id] || '🛒'}</span><span class="nm">${esc(SHOP_NAMES[id] || r.id.replace(/^\w/, (c) => c.toUpperCase()))}</span><span class="tm">${left(r.at)}</span></div>`;
+  }).join('')}</div>`;
+}
+
+function renderStatus() {
+  const st = STATUS;
+  if (!st || !st.lastCheck) {
+    $('statusMain').textContent = st && st.error ? '⏳ Waiting for the shop…' : 'Starting up…';
+  } else {
+    $('statusMain').textContent = `✅ Watching the shops · checked ${ago(st.lastCheck)}`;
+  }
+  $('statusWeather').innerHTML = scheduleHtml(st, false) + restockHtml(st);
+  $('statusNext').textContent = '';
+
+  renderSnooze();
+  renderWeatherSchedule();
+
+  const err = $('statusErr');
+  if (st && st.error) {
+    err.hidden = false;
+    err.textContent = `Can't reach the shop right now (${st.error}). Trying again by itself.`;
+  } else {
+    err.hidden = true;
+  }
+}
+
+function wireAlerts() {
+  $('volume').addEventListener('input', (e) => {
+    S.alerts.volume = Number(e.target.value);
+    $('volumeValue').textContent = S.alerts.volume + '%';
+    if (master) master.gain.value = level();
+    save();
+  });
+  $('volume').addEventListener('change', () => SFX.ding());
+
+  $('voiceVolume').addEventListener('input', (e) => {
+    S.alerts.voiceVolume = Number(e.target.value);
+    $('voiceVolumeValue').textContent = S.alerts.voiceVolume + '%';
+    if (voiceBus) voiceBus.gain.value = speechLevel();
+    save();
+  });
+  $('voiceVolume').addEventListener('change', () => {
+    if (speechLevel() > 0) speak('This is the voice level.');
+  });
+
+  $('muted').addEventListener('click', () => {
+    S.alerts.muted = !S.alerts.muted;
+    renderAlertSettings();
+    if (master) master.gain.value = level();
+    if (voiceBus) voiceBus.gain.value = speechLevel();
+    if (S.alerts.muted) {
+      queue.length = 0;
+      speechSynthesis.cancel();
+    }
+    save();
+  });
+
+  $('keepAwake').addEventListener('click', () => {
+    S.alerts.keepAwake = S.alerts.keepAwake === false;
+    renderAlertSettings();
+    updateKeepAwake();
+    save();
+    toast(S.alerts.keepAwake ? 'Keeping your speaker awake.' : 'Speaker keep-awake is off.');
+  });
+
+  $('popups').addEventListener('click', () => {
+    S.alerts.popups = !S.alerts.popups;
+    renderAlertSettings();
+    save();
+  });
+
+  $('quiet').addEventListener('click', () => {
+    S.alerts.quietHours.enabled = !S.alerts.quietHours.enabled;
+    renderAlertSettings();
+    save();
+  });
+
+  $('quietFrom').addEventListener('change', (e) => {
+    S.alerts.quietHours.from = e.target.value || '23:00';
+    save();
+  });
+  $('quietTo').addEventListener('change', (e) => {
+    S.alerts.quietHours.to = e.target.value || '08:00';
+    save();
+  });
+
+  $('outputDevice').addEventListener('change', async (e) => {
+    const sel = e.target;
+    S.alerts.outputDevice = sel.value;
+    S.alerts.outputDeviceLabel = sel.value ? sel.options[sel.selectedIndex].textContent : '';
+    routeFailures = 0;
+    save();
+    await renderDevices();
+    if (sel.value && ROUTE_SPEECH) window.app.warmSpeech();
+    toast(sel.value ? `Alerts will play on ${S.alerts.outputDeviceLabel}.` : 'Alerts will play on the default speaker.');
+  });
+
+  $('testSpeaker').addEventListener('click', async () => {
+    if (level() === 0) return toast('Alerts are muted.');
+    await play(SFX.ding());
+    await speak("Testing, testing. This is where your alerts will play.", 1, 0.97);
+  });
+
+  $('testVoice').addEventListener('click', () => {
+    if (speechLevel() === 0) return toast('The voice is turned down or muted.');
+    speak('This is the voice your alerts will use.');
+  });
+
+  $('checkNow').addEventListener('click', async () => {
+    $('statusMain').textContent = 'Checking.';
+    STATUS = await window.app.checkNow();
+    renderStatus();
+  });
+
+  const onRuleClick = (e) => {
+    const test = e.target.closest('[data-test]');
+    const sw = e.target.closest('[data-rule]');
+    const remove = e.target.closest('[data-remove]');
+    const moon = e.target.closest('[data-always]');
+    if (moon) {
+      const id = moon.dataset.always;
+      const always = new Set(S.alerts.always || []);
+      const rule = RULES.find((r) => r.id === id);
+      if (always.has(id)) always.delete(id);
+      else always.add(id);
+      S.alerts.always = [...always];
+      if (always.has(id) && S.alerts.disabled.includes(id)) {
+        S.alerts.disabled = S.alerts.disabled.filter((x) => x !== id);
+      }
+      save();
+      renderRules();
+      toast(always.has(id)
+        ? `🌙 ${rule ? rule.label : 'This alert'} will ring even during quiet hours and snooze.`
+        : `${rule ? rule.label : 'This alert'} follows quiet hours and snooze again.`);
+      return;
+    }
+    if (test) {
+      const rule = RULES.find((r) => r.id === test.dataset.test);
+      if (!rule) return;
+      if (level() === 0) return toast('Alerts are muted.');
+      enqueue([sampleAlert(rule)]);
+    } else if (sw) {
+      const id = sw.dataset.rule;
+      const off = new Set(S.alerts.disabled);
+      if (off.has(id)) off.delete(id);
+      else off.add(id);
+      S.alerts.disabled = [...off];
+      setSwitch(sw, !off.has(id));
+      save();
+    } else if (remove) {
+      const name = remove.dataset.remove;
+      S.alerts.custom = S.alerts.custom.filter((c) => c.name !== name);
+      save(true);
+      toast(`Removed ${name}.`);
+    }
+  };
+  $('itemRules').addEventListener('click', onRuleClick);
+  $('weatherRules').addEventListener('click', onRuleClick);
+  $('petRules').addEventListener('click', onRuleClick);
+
+  const addCustom = () => {
+    const name = $('customName').value.trim();
+    if (!name) return;
+    if (S.alerts.custom.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      return toast(`${name} is already on the list.`);
+    }
+    S.alerts.custom.push({ name, tier: $('customTier').value });
+    $('customName').value = '';
+    save(true);
+    toast(`Added ${name}.`);
+  };
+  $('customAdd').addEventListener('click', addCustom);
+  $('customName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addCustom();
+  });
+}
+
+/* ================================================================== *
+ * Snooze and recent alerts
+ * ================================================================== */
+
+let HISTORY = [];
+
+function snoozedUntil() {
+  const t = (S && S.alerts.snoozeUntil) || 0;
+  return t > Date.now() ? t : 0;
+}
+
+function snooze(minutes) {
+  S.alerts.snoozeUntil = minutes > 0 ? Date.now() + minutes * 60000 : 0;
+  if (minutes > 0) {
+    queue.length = 0;
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+  save();
+  renderSnooze();
+  toast(minutes > 0 ? `Alerts snoozed for ${minutes >= 60 ? minutes / 60 + ' hour' + (minutes > 60 ? 's' : '') : minutes + ' minutes'}.` : 'Alerts are back on.');
+}
+
+let lastSnoozeState = null;
+function renderSnooze() {
+  const row = $('snoozeRow');
+  if (!row || !S) return;
+  const until = snoozedUntil();
+  const state = until ? 'on:' + until : 'off';
+  if (state === lastSnoozeState) return;
+  lastSnoozeState = state;
+  row.innerHTML = until
+    ? `<span class="hungry">Snoozed until ${esc(new Date(until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}.</span>
+       <button class="btn small primary" data-snooze="0">Turn alerts back on</button>`
+    : `<button class="btn small" data-snooze="30">Snooze 30 min</button>
+       <button class="btn small" data-snooze="60">Snooze 1 hour</button>`;
+}
+
+function renderHistory() {
+  const box = $('historyList');
+  if (!box) return;
+  const items = HISTORY.slice(-8).reverse();
+  box.innerHTML = items.length
+    ? items
+        .map((h) => `
+          <div class="history-item ${h.muted ? 'muted' : ''}">
+            <span>${esc(h.text)}${h.muted ? ' <span class="tag">silent</span>' : ''}</span>
+            <span class="history-when">${esc(fmtClock(h.at))}</span>
+          </div>`)
+        .join('')
+    : '<div class="empty">Nothing yet. Every alert shows up here, including ones that went off while you were away or snoozed.</div>';
+}
+
+function wireExtras() {
+  $('snoozeRow').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-snooze]');
+    if (btn) snooze(Number(btn.dataset.snooze));
+  });
+  window.app.onSnooze((minutes) => snooze(Number(minutes) || 0));
+  window.app.onHistory((list) => {
+    HISTORY = list || [];
+    renderHistory();
+  });
+  $('clearHistory').addEventListener('click', async () => {
+    HISTORY = (await window.app.clearHistory()) || [];
+    renderHistory();
+  });
+}
+
+/* ================================================================== *
+ * Pity tab
+ * ================================================================== */
+
+let PITY = null;   // { pity, stats, eggs, species, catalog } from the main process
+
+function eggName(id) {
+  if (!id) return 'any egg';
+  const e = PITY && PITY.eggs.find((x) => x.id === id);
+  return e ? e.name : String(id).replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function speciesName(sp) {
+  return String(sp || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^White /, '');
+}
+
+let LUCK = null;   // luck.js view from the main process
+
+function luckRow(r) {
+  const pct = Math.min(100, (r.value / r.threshold) * 100);
+  const chance = r.chance < 1 ? r.chance : Math.round(r.chance * 10) / 10;
+  const left = r.primed ? '🍀 next!' : `${r.left.toLocaleString()} to go`;
+  return `<div class="luck-row ${r.primed ? 'primed' : ''}" title="${chance}% a pull · guaranteed by pull ${r.threshold.toLocaleString()}${r.estimated ? ' · estimated (started halfway)' : ''}">
+    <span class="nm">${esc(r.name)} <small>${chance}%</small><div class="luck"><span style="width:${pct}%"></span></div></span>
+    <span class="nm" style="text-align:right">${esc(left)}</span>
+    <input type="number" min="0" max="${r.threshold - 1}" value="${r.value}" data-luck="${esc(r.key)}" aria-label="${esc(r.name)} misses so far">
+  </div>`;
+}
+
+// One collapsible line per egg/plant/capsule, showing its closest
+// guarantee; it opens by itself when something is within a quarter of it.
+const LUCK_OPEN = {};
+function luckGroup(list, emptyText, onlySeen) {
+  const shown = (list || []).filter((g) => !onlySeen || g.rows.some((r) => r.seen));
+  if (!shown.length) return `<div class="empty">${emptyText}</div>`;
+  return shown.map((g) => {
+    const closest = g.rows.slice().sort((a, b) => a.left / a.threshold - b.left / b.threshold)[0];
+    const near = g.rows.some((r) => r.primed || r.left / r.threshold <= 0.25);
+    const key = g.source;
+    const open = LUCK_OPEN[key] != null ? LUCK_OPEN[key] : near;
+    // Eggs with more than one rare pet (Amber: Fire Horse and Phoenix) show
+    // each one; everything else shows its closest guarantee.
+    const rares = g.rows.filter((r) => !/^(gold|rainbow)$/.test(r.target));
+    const list = rares.length > 1 && !/gold|rainbow/.test(closest.target) ? rares : [closest];
+    const sum = list.map((r) => (r.primed ? `🍀 ${r.name} next!` : `${r.name}: ${r.left.toLocaleString()} to go`)).join(' · ');
+    return `<details class="luck-src" data-src="${esc(key)}"${open ? ' open' : ''}>
+      <summary><b>${esc(g.name)}</b><span class="where">${g.rows.some((r) => r.estimated) ? ' ≈' : ''}</span><span class="luck-sum ${closest.primed ? 'primed' : ''}">${esc(sum)}</span></summary>
+      ${g.rows.map(luckRow).join('')}
+    </details>`;
+  }).join('');
+}
+
+function renderLuck() {
+  if (!LUCK || !$('luckEggs')) return;
+  const a = document.activeElement;
+  const typing = a && a.matches && a.matches('input[data-luck]');
+  setSwitch($('luckHalf'), LUCK.startHalf);
+  $('luckNotify').innerHTML = [['egg', '🥚 Eggs'], ['plant', '🌱 Plants'], ['capsule', '💊 Capsules']]
+    .map(([k, l]) => `<button class="chip" aria-pressed="${LUCK.notify[k] !== false}" data-notify="${k}" style="${LUCK.notify[k] !== false ? 'background:var(--moss-dim);border-color:var(--moss-dim);color:#eafbec' : ''}">${l}</button>`).join('');
+  $('luckPrimed').innerHTML = LUCK.primed.length
+    ? LUCK.primed.map((p) => `<div class="primed-item">🍀 ${esc(p.text)}${p.estimated ? ' <span class="where">(estimated)</span>' : ''}</div>`).join('')
+    : '<div class="empty">Nothing is one pull away right now. You\'ll get a heads-up the moment something is.</div>';
+  if (typing) return;
+  $('luckEggs').innerHTML = luckGroup(LUCK.groups.pet || [], '') + luckGroup(LUCK.groups.egg, 'No eggs yet.');
+  $('luckPlants').innerHTML = luckGroup(LUCK.groups.plant, 'Plants show up here once the app sees them grow a crop (with the game open here).', true);
+  $('luckCapsules').innerHTML = luckGroup(LUCK.groups.capsule, 'No capsules yet.');
+  const hits = LUCK.hits || [];
+  $('history').innerHTML = hits.length
+    ? hits.map((h) => `<div class="history-item"><span>${esc(h.targetName === 'Gold' || h.targetName === 'Rainbow' ? h.targetName + ' ' + (h.type === 'pet' ? 'pet' : 'crop') : h.targetName)} <span class="where">from ${esc(h.sourceName)} after ${Number(h.after).toLocaleString()}</span></span><span class="history-when">${esc(new Date(h.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</span></div>`).join('')
+    : '<div class="empty">Every rare result shows up here with how many pulls it took.</div>';
+}
+
+// The game's own lifetime hatch count (the one number that can't be off).
+function gameHatchTotal() {
+  const n = GARDEN_STATUS && Number(GARDEN_STATUS.eggsHatched);
+  if (Number.isFinite(n) && n > 0) return n;
+  const k = PITY && PITY.pity && Number(PITY.pity.lastEggsHatched);
+  return Number.isFinite(k) && k > 0 ? k : null;
+}
+
+function renderPity() {
+  if (!PITY) return;
+  const p = PITY.pity;
+  setSwitch($('pityAuto'), p.autoCount);
+  renderLuck();
+
+  const recent = (p.recent || []).slice().reverse().slice(0, 12);
+  $('recentHatches').innerHTML = recent.length
+    ? recent.map((h) => {
+        const muts = (h.mutations || []).filter((m) => /gold|rainbow/i.test(m));
+        const badge = muts.length ? ` <span class="badge ${/rainbow/i.test(muts[0]) ? 'rainbow' : 'gold'}">${esc(muts[0])}</span>` : '';
+        return `<div class="hatch-row"><span>${esc(speciesName(h.species))}${badge} <span class="where">${esc(eggName(h.eggId))}${h.max ? ` · max STR ${h.max}` : ''}${h.source === 'catch-up' ? ' · caught up' : ''}</span></span><span class="history-when">${esc(fmtClock(h.at))}</span></div>`;
+      }).join('')
+    : '<div class="empty">Hatch an egg and it shows up here, with the pet\'s max strength.</div>';
+
+  const eggs = Object.entries(p.byEgg || {}).sort((a, b) => b[1].hatched - a[1].hatched);
+  $('byEgg').innerHTML = eggs.length
+    ? `<div class="note" style="margin-top:0">${p.totalHatches.toLocaleString()} hatches tracked.${gameHatchTotal() != null ? ` The game's own count: <b>${gameHatchTotal().toLocaleString()}</b> eggs hatched, all time.` : ''}</div>` + eggs.map(([id, e]) => {
+        const odds = (PITY.eggs.find((x) => x.id === id) || {}).odds || null;
+        const parts = Object.entries(e.species || {}).sort((a, b) => b[1] - a[1]).map(([sp, n]) => {
+          const key = odds && Object.keys(odds).find((k) => k.toLowerCase() === sp.toLowerCase());
+          const expect = key ? ` <span class="where">(${Math.round((odds[key] / 100) * e.hatched * 10) / 10} expected)</span>` : '';
+          return `${esc(speciesName(sp))} ${n}${expect}`;
+        });
+        return `<div class="hatch-row" style="display:block"><b>${esc(eggName(id))}</b> <span class="where">${e.hatched} hatched · ${e.gold} Gold · ${e.rainbow} Rainbow</span><div class="rule-desc">${parts.join(' · ')}</div></div>`;
+      }).join('')
+    : '<div class="empty">Shows what each kind of egg has given you, next to what the odds say to expect.</div>';
+}
+
+function wirePity() {
+  $('pityAuto').addEventListener('click', async () => {
+    const r = await window.app.pityAct({ type: 'setAuto', on: !PITY.pity.autoCount });
+    if (r && r.view) PITY = r.view;
+    renderPity();
+    toast(PITY.pity.autoCount ? 'Counting automatically.' : 'Automatic counting is off.');
+  });
+  $('luckHalf').addEventListener('click', async () => {
+    LUCK = await window.app.luckOptions({ startHalf: !LUCK.startHalf });
+    renderLuck();
+  });
+  $('luckNotify').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-notify]');
+    if (!b) return;
+    const k = b.dataset.notify;
+    LUCK = await window.app.luckOptions({ notify: { [k]: LUCK.notify[k] === false } });
+    renderLuck();
+  });
+  for (const id of ['luckEggs', 'luckPlants', 'luckCapsules']) {
+    $(id).addEventListener('toggle', (e) => {
+      const d = e.target.closest && e.target.closest('details[data-src]');
+      if (d) LUCK_OPEN[d.dataset.src] = d.open;
+    }, true);
+    $(id).addEventListener('change', async (e) => {
+      const input = e.target.closest('[data-luck]');
+      if (!input) return;
+      LUCK = await window.app.luckSet(input.dataset.luck, input.value);
+      input.blur();
+      renderLuck();
+      toast('Saved.');
+    });
+  }
+  window.app.onPity((view) => {
+    PITY = view;
+    renderPity();
+  });
+  window.app.onLuck((view) => {
+    LUCK = view;
+    renderLuck();
+  });
+}
+
+/* ================================================================== *
+ * Garden tab
+ * ================================================================== */
+
+let GARDEN_STATUS = null;
+let GARDEN_STATS = null;
+
+// 1.2B, 45.2M, 12.3K
+function shortNumber(n) {
+  const v = Number(n) || 0;
+  for (const [size, suffix] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']]) {
+    if (v >= size) return (v / size).toFixed(v / size >= 100 ? 0 : 1).replace(/\.0$/, '') + suffix;
+  }
+  return String(Math.round(v));
+}
+
+function pct(part, total) {
+  if (!total) return '0%';
+  const v = (part / total) * 100;
+  return (v >= 10 || v === 0 ? v.toFixed(0) : v.toFixed(1)) + '%';
+}
+
+function barRow(label, cls, part, total) {
+  const width = total ? Math.max(part ? 1.5 : 0, (part / total) * 100) : 0;
+  return `
+    <div class="bar-row">
+      <span class="bar-label">${label}</span>
+      <span class="bar ${cls}"><span style="width:${width.toFixed(2)}%"></span></span>
+      <span class="bar-pct">${pct(part, total)}</span>
+    </div>`;
+}
+
+function minutesText(seconds) {
+  if (seconds <= 0) return 'Hungry now';
+  const m = Math.round(seconds / 60);
+  if (m < 1) return 'Hungry in under a minute';
+  if (m < 60) return `Hungry in about ${m} min`;
+  const h = Math.floor(m / 60);
+  return `Hungry in about ${h} hr${m % 60 >= 10 ? ' ' + (m % 60) + ' min' : ''}`;
+}
+
+function strLine(p) {
+  if (!p.strength) return '';
+  const max = p.maxStrength || p.strength;
+  const pct = Math.max(0, Math.min(100, (p.strength / 100) * 100));
+  const grow = p.maxStrength && p.strength < p.maxStrength && p.hoursToMax
+    ? `grows to ${max} in about ${p.hoursToMax < 48 ? Math.round(p.hoursToMax) + ' h' : Math.round(p.hoursToMax / 24) + ' days'} out`
+    : p.maxStrength && p.strength >= p.maxStrength ? 'fully grown' : '';
+  const fill = Math.max(0, Math.min(100, (p.strength / max) * 100));
+  return `<div class="str-line">
+      <span>STR</span>
+      <input class="str-input" type="number" min="1" max="100" value="${p.strength}" data-strength="${esc(p.id)}" title="${p.strengthOverride ? 'You typed this in. Clear it to use the worked-out strength.' : 'Worked out from size and XP. Type over it if it\'s wrong.'}" aria-label="Strength">
+      <span>/ ${max}${p.strengthEstimated ? '≈' : ''}${p.strengthOverride ? ' ✎' : ''}</span>
+      <span class="bar"><span style="width:${fill}%"></span></span>
+    </div>
+    ${grow ? `<div class="where" style="margin:-2px 0 4px">${esc(grow)}${p.strengthEstimated ? ' · max is an estimate' : ''}</div>` : ''}`;
+}
+
+// A pet's own name if it has one, otherwise its species. The game sends the
+// species in the name field for unnamed pets that are out, so compare both.
+function petTitle(p) {
+  const sp = p.speciesName || p.species || 'Pet';
+  const n = p.name && String(p.name).replace(/\s/g, '').toLowerCase() !== String(p.species || '').toLowerCase() ? p.name : null;
+  return n || sp;
+}
+
+function mutationBadge(p) {
+  const m = (p.mutations || []).find((x) => /gold|rainbow/i.test(x));
+  return m ? `<span class="badge ${/rainbow/i.test(m) ? 'rainbow' : 'gold'}">${esc(m)}</span>` : '';
+}
+
+function abilityLines(p, weatherKind) {
+  return (p.abilityInfo || []).map((a) => {
+    const waiting = a.weather && kindOfLabel(a.weather) !== weatherKind;
+    const when = a.weather ? ` <span class="where">${waiting ? 'only during' : 'now, during'} ${esc(a.weather)}</span>` : '';
+    return `<div class="ab ${waiting ? 'off' : ''} ${a.unknown ? 'unknown' : ''}"><span class="n">${esc(a.name)}${when}</span><span class="t">${esc(a.text || '')}</span></div>`;
+  }).join('');
+}
+
+// weather.js's names for the ability weather labels ("Thunderstorms", "Amber Moon").
+function kindOfLabel(label) {
+  const s = String(label || '').toLowerCase();
+  if (/thunder|storm/.test(s)) return 'thunder';
+  if (/rain/.test(s)) return 'rain';
+  if (/snow|frost/.test(s)) return 'snow';
+  if (/dawn/.test(s)) return 'dawn';
+  if (/amber/.test(s)) return 'amber';
+  return null;
+}
+
+function summaryLines(sum) {
+  if (!sum || (!sum.totals.length && !sum.waiting.length)) return '<div class="empty">Nothing to add up.</div>';
+  const now = sum.totals.map((t) => `<div class="goal-line"><span>${esc(t.label)}</span><span>${esc(t.text)}</span></div>`).join('');
+  const later = sum.waiting.map((w) => `<div class="goal-line" style="opacity:.6"><span>${esc(w.label)}</span><span>during ${esc(w.weather)}: ${esc(w.text)}</span></div>`).join('');
+  return now + later;
+}
+
+let GOAL = null;
+let PRESET = null;
+
+function renderTeamIdeas(st) {
+  const recs = (st && st.recommendations) || [];
+  if (!recs.length) {
+    $('presetChips').innerHTML = '';
+    $('presetBody').innerHTML = '<div class="empty">Shows up once the app can see your pets.</div>';
+    return;
+  }
+  if (!PRESET || !recs.some((r) => r.id === PRESET)) {
+    // Start on the current weather's team if there is one, else Money.
+    const wk = st.weatherKind;
+    PRESET = (recs.find((r) => r.weather && r.weather === wk) || recs.find((r) => r.id === 'money') || recs[0]).id;
+  }
+  $('presetChips').innerHTML = recs.map((r) => `<button class="chip ${r.id === PRESET ? 'on' : ''}" data-preset="${esc(r.id)}">${esc(r.label)}</button>`).join('');
+  const r = recs.find((x) => x.id === PRESET);
+  const byId = Object.fromEntries((st.allPets || []).map((p) => [p.id, p]));
+  const out = new Set((st.pets || []).map((p) => String(p.id)));
+  const whereText = { out: 'out now', inventory: 'in your inventory', hutch: 'in the hutch', storage: 'in storage' };
+  const picks = r.picks.map((x, i) => {
+    const p = byId[x.id];
+    if (!p) return '';
+    return `<div class="rec"><span class="num">${i + 1}</span><span><b>${esc(petTitle(p))}</b> ${mutationBadge(p)} <span class="where">STR ${p.strength} · ${esc(out.has(p.id) ? 'out now' : whereText[p.where] || p.where || '')}</span>
+      <div class="rule-desc">${x.reasons.map(esc).join('<br>')}</div></span></div>`;
+  }).join('');
+  const nOut = r.picks.filter((x) => out.has(x.id)).length;
+  const short = r.picks.length < 3 ? `<div class="note">Only ${r.picks.length} of your pets help with this, so ${3 - r.picks.length === 1 ? 'one slot is' : 'two slots are'} free for anything.</div>` : '';
+  $('presetBody').innerHTML = `<div class="note" style="margin-top:2px">Best for ${esc(r.why)}${r.weather ? ` (counts the ${esc(kindLabel(r.weather))}-only abilities)` : ''}.</div>
+    ${picks}${short}
+    <div class="subhead" style="margin-top:10px">What this team does</div>
+    ${summaryLines(r.summary)}
+    ${nOut === r.picks.length && nOut ? '<div class="note">✅ That\'s the team you have out right now.</div>' : nOut ? `<div class="note">${nOut} of these ${nOut === 1 ? 'is' : 'are'} out right now.</div>` : ''}`;
+}
+
+// The Troubleshooting box (Extras tab): details only needed while something
+// is being fixed, kept out of the way of everyday play.
+function renderDevDetails() {
+  const box = $('devDetails');
+  if (!box) return;
+  const rows = [];
+  const add = (k, v) => rows.push(`<div class="goal-line"><span>${esc(k)}</span><span>${esc(v)}</span></div>`);
+  const c = PITY && PITY.catalog;
+  add('Game data', c && c.abilities ? `from the game (${c.abilities} abilities, ${c.pets} pets, ${c.eggs} eggs${c.at ? ', ' + new Date(c.at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''})` : 'from the wiki (the game\'s own couldn\'t be read yet)');
+  const st = GARDEN_STATUS;
+  const b = st && (st.crops || []).find((x) => /garden/i.test(x.name));
+  const raw = (b && b.rawMutations) || {};
+  const renamed = [];
+  if (raw.ambershine) renamed.push(`Ambershine ×${raw.ambershine} → Amberlit`);
+  if (raw.dawncharged) renamed.push(`Dawncharged ×${raw.dawncharged} → Dawnbound`);
+  if (raw.ambercharged) renamed.push(`Ambercharged ×${raw.ambercharged} → Amberbound`);
+  if (renamed.length) add('Game names used', renamed.join(', '));
+  if (raw.ambershine && raw.amberlit) add('⚠️ Check', `both "Amberlit" (${raw.amberlit}) and "Ambershine" (${raw.ambershine}) seen: they may not be the same`);
+  if (b && (b.unknownMutations || []).length) add('Mutations not priced', b.unknownMutations.join(', '));
+  if (b && Object.keys(b.unpricedSpecies || {}).length) add('Crops not priced', Object.entries(b.unpricedSpecies).map(([k, n]) => `${k} ×${n}`).join(', '));
+  if (st && st.abilities && st.abilities.unknown && st.abilities.unknown.length) add('Abilities not recognised', st.abilities.unknown.join(', '));
+  if (st && st.foundSelf && !st.hasActivityLog) add('Pet ability log', "can't be seen");
+  const check = ROOMS && ROOMS.check;
+  if (check) add('Room lookups', check.ok ? 'working' : check.text);
+  const ss = ROOMS && ROOMS.sharedStats;
+  if (ss) add("Arie's room list", `${ss.total} listed · ${ss.isPrivate} private · ${ss.withPlayers} public with players · ${ss.recent} updated lately · ${ROOMS.sharedChecked || 0} checked with the game · ${(ROOMS.shared || []).length} shown`);
+  else if (ROOMS && ROOMS.sharedError) add("Arie's room list", `couldn't be read: ${ROOMS.sharedError}`);
+  add('App version', ($('appVersion') && $('appVersion').textContent) || '?');
+  box.innerHTML = rows.join('');
+}
+
+function renderPets() {
+  renderDevDetails();
+  const st = GARDEN_STATUS;
+  const live = st && st.foundSelf && Date.now() - st.at < 45000;
+  if (!st || !st.pets) {
+    for (const id of ['teamNow', 'teamCompare', 'goalRank']) $(id).innerHTML = '<div class="empty">Shows up once the game is connected.</div>';
+    $('petCards').innerHTML = '';
+    return;
+  }
+  const active = document.activeElement;
+  const typing = active && active.matches && active.matches('input[data-strength]');
+  const wk = st.weatherKind;
+
+  renderTeamIdeas(st);
+
+  $('teamNow').innerHTML = (live ? '' : '<div class="note" style="margin-top:0">From the last time the game was connected.</div>') +
+    summaryLines(st.abilities) +
+    '';
+
+  if (!typing) {
+    $('petCards').innerHTML = st.pets.length
+      ? st.pets.map((p) => `
+        <div class="pet-card">
+          <div class="pet-top"><span class="who">${esc(petTitle(p))}${petTitle(p) !== (p.speciesName || p.species) ? `<small>${esc(p.speciesName || p.species)}</small>` : ''}</span>${mutationBadge(p)}</div>
+          ${strLine(p)}
+          ${abilityLines(p, wk)}
+        </div>`).join('')
+      : '<div class="card empty">No pets are out.</div>';
+  }
+
+  // Goal picker: only goals someone you own can help with.
+  const all = st.allPets || [];
+  const goals = (st.goals || []).filter((g) => all.some((p) => (p.abilityInfo || []).some((a) => a.goal === g.id)));
+  const pick = $('goalPick');
+  if (!GOAL || !goals.some((g) => g.id === GOAL)) GOAL = goals.length ? goals[0].id : null;
+  const optHtml = goals.map((g) => `<option value="${esc(g.id)}"${g.id === GOAL ? ' selected' : ''}>${esc(g.label)}</option>`).join('');
+  if (pick.dataset.html !== optHtml && document.activeElement !== pick) {
+    pick.innerHTML = optHtml;
+    pick.dataset.html = optHtml;
+  }
+  const whereText = { out: 'out now', inventory: 'inventory', hutch: 'hutch', storage: 'storage' };
+  const teamOf = (id) => (st.teams || []).filter((t) => t.members.some((m) => m.petId === id)).map((t) => t.name);
+  const ranked = [];
+  for (const p of all) {
+    for (const a of p.abilityInfo || []) {
+      if (a.goal === GOAL && a.score != null) ranked.push({ p, a });
+    }
+  }
+  ranked.sort((x, y) => (y.a.score || 0) - (x.a.score || 0));
+  $('goalRank').innerHTML = ranked.length
+    ? ranked.slice(0, 15).map(({ p, a }, i) => {
+        const teams = teamOf(p.id);
+        return `<div class="rank">
+          <span class="num">${i + 1}</span>
+          <span>${esc(petTitle(p))} ${mutationBadge(p)} <span class="where">STR ${p.strength} · ${esc(whereText[p.where] || p.where || '')}${teams.length ? ' · in ' + esc(teams.slice(0, 2).join(', ')) : ''}</span><div class="rule-desc">${esc(a.name)}: ${esc(a.text)}${a.weather ? ` (only during ${esc(a.weather)})` : ''}</div></span>
+          <span class="val"></span>
+        </div>`;
+      }).join('')
+    : '<div class="empty">None of your pets help with this.</div>';
+
+  const out = new Set(st.pets.map((p) => String(p.id)));
+  const teams = st.teamSummaries || [];
+  const openIds = new Set([...document.querySelectorAll('#teamCompare details[open]')].map((d) => d.dataset.team));
+  $('teamCompare').innerHTML = teams.length
+    ? teams.map((t) => {
+        const team = (st.teams || []).find((x) => x.id === t.id) || { members: [] };
+        const isOut = team.members.length && team.members.every((m) => out.has(m.petId));
+        const who = team.members.map((m) => {
+          const pet = all.find((x) => x.id === m.petId);
+          return pet ? `${petTitle(pet)} (${pet.strength})` : (m.name || m.species || 'pet');
+        }).join(', ');
+        const top = t.summary.totals.slice(0, 2).map((x) => `${x.label.split(' ')[0]} ${x.text}`).join(' · ');
+        return `<details class="team" data-team="${esc(t.id)}"${openIds.has(t.id) ? ' open' : ''}>
+          <summary><span class="rule-text"><span class="rule-name">${esc(t.name)}${isOut ? ' <span class="live">· out now</span>' : ''}</span><div class="rule-desc">${esc(top || who)}</div></span>
+          <button class="btn small" data-apply-team="${esc(t.id)}"${isOut || PARKED ? ' disabled' : ''}>Apply</button></summary>
+          <div class="rule-desc" style="margin:6px 0 4px">${esc(who)}${t.missing ? ` · ${t.missing} pet${t.missing === 1 ? '' : 's'} not found` : ''}</div>
+          ${summaryLines(t.summary)}
+        </details>`;
+      }).join('')
+    : '<div class="empty">Save teams in the game (Pet Teams, the T key) and they show up here to compare.</div>';
+}
+
+function renderPetFood(st, stale) {
+  const box = $('petFood');
+  if (!box) return;
+  const pets = (st && !stale && st.pets) || [];
+  if (!pets.length) {
+    box.innerHTML = '<div class="empty">Shows your active pets once the game is connected.</div>';
+    return;
+  }
+  const noTrough = st.trough && !st.trough.present;
+  box.innerHTML = pets
+    .map((p) => {
+      const time = p.secondsLeft == null ? '' : ' · ' + minutesText(p.secondsLeft).replace(/^Hungry/, 'hungry');
+      let line;
+      if (p.known) {
+        const pct = Math.round(p.pct * 100);
+        const food = p.troughHasFood
+          ? 'Trough has its food.'
+          : `No food it eats in the trough. It eats ${p.diet.join(', ')}.`;
+        line = `<span class="${p.needsFood ? 'hungry' : ''}">${pct}% full${esc(time)}</span><div class="rule-desc">${esc(food)}</div>`;
+      } else {
+        line = `<span>${esc(p.secondsLeft == null ? 'Measuring… (about 30 seconds)' : minutesText(p.secondsLeft))}</span><div class="rule-desc">Shown as time until hungry.</div>`;
+      }
+      return `
+        <div class="pet-row" style="align-items:flex-start">
+          <span class="pet-name">${esc(p.name)}${p.species && p.species !== p.name ? ` <span class="pet-species">${esc(p.species)}</span>` : ''}</span>
+          <span class="pet-counts" style="text-align:right;white-space:normal">${line}</span>
+        </div>`;
+    })
+    .join('') +
+    `<p class="hint" style="margin:8px 0 0">${noTrough
+      ? "No feeding trough found in your garden."
+      : "You get a spoken heads-up when a pet drops to 10% and nothing it eats is in the trough, same as the game's warning."}</p>`;
+}
+
+function prettyBucket(name) {
+  const spaced = String(name).replace(/([a-z])([A-Z])/g, '$1 $2');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function durationText(h) {
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
+  if (h < 48) return `${h < 10 ? h.toFixed(1) : Math.round(h)} hours`;
+  return `${(h / 24).toFixed(1)} days`;
+}
+
+// How long until the whole garden is Gold or Rainbow, from the Granter
+// rates of the pets that are out.
+function etaLine(st) {
+  const eta = st && st.eta;
+  if (!eta) return '';
+  if (eta.done) return '<div class="note">✨ Every crop is Gold or Rainbow.</div>';
+  if (!eta.hours) {
+    return `<div class="note">${eta.remaining.toLocaleString()} crops are still plain. No Gold or Rainbow pet is out, so nothing is converting them.</div>`;
+  }
+  return `<div class="note">${eta.remaining.toLocaleString()} still plain. At about ${eta.perHour.toFixed(1)} an hour from your pets, every crop could be Gold or Rainbow in <b>${durationText(eta.hours)}</b>.</div>`;
+}
+
+function gardenBucket(st) {
+  return ((st && st.crops) || []).find((b) => /garden/i.test(b.name)) || null;
+}
+
+function renderCropCard(st, b) {
+  if (!b) {
+    $('cropStats').innerHTML = `<div class="empty">${
+      st && st.foundSelf ? 'No crops found.'
+        : st && st.connected ? 'Shows up once your garden is found.'
+          : 'Shows up once the game is connected.'
+    }</div>`;
+    return;
+  }
+  const ready = b.matureKnown ? ` · <strong>${b.mature.toLocaleString()}</strong> ready to harvest` : '';
+  const unpriced = Object.entries(b.unpricedSpecies || {}).sort((x, y) => y[1] - x[1]);
+  const lines = [];
+  lines.push(`<div class="big-line"><strong>${b.total.toLocaleString()}</strong> crops growing${ready}</div>`);
+  if (b.value) {
+    lines.push(`<div class="worth">💰 Worth about <strong>${shortNumber(Math.round(b.value))}</strong> if you harvested and sold everything now.</div>`);
+    // What you'd actually get: the room's friend bonus and your pets' sell
+    // boosts (on average) both multiply the sale.
+    const room = st && st.room;
+    const roomPct = room && room.players ? Math.min(50, Math.max(0, room.players - 1) * 10) : 0;
+    const rows = ((st && st.abilities && st.abilities.rows) || []).filter((r) => !r.weather);
+    const sellPct = rows.filter((r) => r.goal === 'sell' && r.sellChance).reduce((a, r) => a + (r.score || 0), 0);
+    // Double Harvest: that chance of an extra crop at each harvest.
+    // Crop Refund: that chance the sold crops come back, to be sold again,
+    // which on average is 1 / (1 - chance). Both are averages.
+    const chanceOf = (id) => rows.filter((r) => r.id === id).reduce((a, r) => a + (r.chance || 0), 0);
+    const dh = Math.min(100, chanceOf('DoubleHarvest'));
+    const refund = Math.min(90, chanceOf('CropRefund'));
+    const extra = (1 + dh / 100) / (1 - refund / 100);
+    const bits = [];
+    if (roomPct) bits.push(`your room's +${roomPct}%`);
+    if (sellPct) bits.push(`your pets' sell boost (≈ +${sellPct.toFixed(1)}%)`);
+    if (dh) bits.push(`Double Harvest (≈ +${dh.toFixed(1)}%)`);
+    if (refund) bits.push(`Crop Refund (≈ +${((1 / (1 - refund / 100) - 1) * 100).toFixed(1)}%)`);
+    const petPart = (1 + sellPct / 100) * extra;
+    if (bits.length) {
+      const total = b.value * (1 + roomPct / 100) * petPart;
+      const list = bits.length > 1 ? bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1] : bits[0];
+      lines.push(`<div class="note">With ${list}: about <b>${shortNumber(Math.round(total))}</b> on average.</div>`);
+    }
+    // The most it could fetch: a full room of 6 (+50%), with the same pets.
+    if (roomPct < 50) {
+      const full = b.value * 1.5 * petPart;
+      lines.push(`<div class="note">🎉 In a full room (+50%)${petPart > 1.0001 ? ' with your pets' : ''}: about <b style="color:var(--gold)">${shortNumber(Math.round(full))}</b>. The Rooms tab finds busy rooms.</div>`);
+    }
+  }
+  if (unpriced.length) {
+    lines.push(`<div class="note">Not counted in that (no price for these yet): ${unpriced.map(([name, n]) => `<b>${esc(prettyBucket(name))}</b> ×${n}`).join(', ')}.</div>`);
+  }
+
+  lines.push('<div class="subhead" style="margin-top:14px">Gold and Rainbow</div>');
+  lines.push(barRow('🟡 Gold', 'gold', b.gold, b.total));
+  lines.push(barRow('🌈 Rainbow', 'rainbow', b.rainbow, b.total));
+  lines.push(barRow('Either', 'total', b.special != null ? b.special : b.gold + b.rainbow, b.total));
+  lines.push(etaLine(st));
+  $('cropStats').innerHTML = lines.join('');
+}
+
+function renderMutationCard(b) {
+  const box = $('mutStats');
+  if (!b) {
+    box.innerHTML = '<div class="empty">Shows up once your garden is found.</div>';
+    return;
+  }
+  const m = b.mutations || {};
+  const n = (k) => m[k] || 0;
+  const row = (label, cls, k) => barRow(label, cls, n(k), b.total);
+  const hydroAny = n('wet') + n('chilled') + n('frozen') + n('thunderstruck') + n('thundercharged');
+  const lunarAny = n('dawnlit') + n('amberlit') + n('dawnbound') + n('amberbound');
+  const out = [];
+  out.push('<div class="subhead">Hydro (a crop can hold one)</div>');
+  out.push(row('💧 Wet', 'hydro', 'wet'));
+  out.push(row('❄️ Chilled', 'hydro', 'chilled'));
+  out.push(row('🧊 Frozen', 'hydro', 'frozen'));
+  out.push(row('⚡ Thunderstruck', 'thunder', 'thunderstruck'));
+  if (n('thundercharged')) out.push(row('⚡ Charged', 'thunder', 'thundercharged'));
+  out.push(barRow('Any hydro', 'total', hydroAny, b.total));
+  out.push('<div class="subhead" style="margin-top:14px">Lunar (Dawn and Amber can\'t share a crop)</div>');
+  out.push(row('🌅 Dawnlit', 'dawn', 'dawnlit'));
+  out.push(row('🌕 Amberlit', 'amber', 'amberlit'));
+  if (n('dawnbound')) out.push(row('🌅 Dawnbound', 'dawn', 'dawnbound'));
+  if (n('amberbound')) out.push(row('🌕 Amberbound', 'amber', 'amberbound'));
+  out.push(barRow('Any lunar', 'total', lunarAny, b.total));
+  const bits = [`Out of all ${b.total.toLocaleString()} crops growing.`];
+  if (b.matureKnown && b.mature < b.total) bits.push(`${b.mature.toLocaleString()} are ready. Growing crops catch weather too, just less often.`);
+  out.push(`<div class="note">${bits.join(' ')}</div>`);
+  box.innerHTML = out.join('');
+}
+
+function renderSizeCard(st, b) {
+  const box = $('sizeStats');
+  const sz = st && st.size;
+  if (!b || !sz) {
+    box.innerHTML = '<div class="empty">Shows up once your garden is found.</div>';
+    return;
+  }
+  const out = [];
+  out.push(`<div class="big-line"><strong>${sz.atMax.toLocaleString()}</strong> of ${sz.total.toLocaleString()} crops are full size</div>`);
+  out.push(barRow('📏 Full size', 'size', sz.atMax, sz.total));
+  out.push(`<div class="note">Average size <b>${sz.average.toFixed(1)}</b> out of 100. The smallest is <b>${Number(sz.smallest).toFixed(1)}</b>.</div>`);
+  if (sz.done) {
+    out.push('<div class="note">🎉 Every crop is full size.</div>');
+  } else if (sz.hours) {
+    out.push(`<div class="note">Your Crop Size Boost pets add about ${sz.pointsPerHour.toFixed(1)} size an hour to every crop, so everything should be full size in about <b>${durationText(sz.hours)}</b>.</div>`);
+  } else if (sz.boosters) {
+    const when = [...new Set(sz.waitingFor || [])].join(' or ');
+    out.push(`<div class="note">Your Crop Size Boost pet${sz.boosters === 1 ? ' only works' : 's only work'} during ${esc(when || 'certain weather')}, so sizes aren't growing right now.</div>`);
+  } else {
+    out.push('<div class="note">No Crop Size Boost pet is out, so sizes aren\'t changing. (Bee, Butterfly and Ostrich have it, and Caribou during Snow.)</div>');
+  }
+  box.innerHTML = out.join('');
+}
+
+// What one pet has made: only the kinds it actually makes (a Gold Granter
+// shows Gold, a Coin Finder shows coins).
+function madeBy(p) {
+  const bits = [];
+  if (p.gold) bits.push(`🟡 ${p.gold.toLocaleString()} Gold`);
+  if (p.rainbow) bits.push(`🌈 ${p.rainbow.toLocaleString()} Rainbow`);
+  if (p.coins) bits.push(`🪙 ${shortNumber(p.coins)} coins`);
+  return bits.join(' · ') || 'nothing yet';
+}
+
+function renderLifeStats(st) {
+  const box = $('lifeStats');
+  if (!box) return;
+  const out = [];
+  const se = st && st.session;
+  if (se) {
+    const sign = se.change >= 0 ? '+' : '−';
+    out.push(`<div class="big-line"><strong>${sign}${shortNumber(Math.abs(Math.round(se.change)))}</strong> coins this session${se.perHour != null ? ` · about <b>${se.perHour >= 0 ? '' : '−'}${shortNumber(Math.abs(Math.round(se.perHour)))}</b> an hour` : ''}</div>`);
+    out.push(`<div class="note" style="margin-top:2px">Since ${esc(fmtClock(se.since))}, counting everything you earn and spend.</div>`);
+  }
+  const p = st && st.lifetime && st.lifetime.player;
+  if (p) {
+    const rows = [
+      ['💰 Earned selling crops', p.totalEarningsSellCrops, true],
+      ['🐾 Earned selling pets', p.totalEarningsSellPet, true],
+      ['🧺 Crops harvested', p.numCropsHarvested],
+      ['🌱 Seeds planted', p.numSeedsPlanted],
+      ['🥚 Eggs hatched', p.numEggsHatched],
+      ['🐾 Pets sold', p.numPetsSold],
+      ['✨ Magic dust collected', p.totalMagicDustCollected],
+      ['🍖 Hunger refilled from the trough', p.totalHungerReplenishedFromTrough, true],
+      ['🪴 Plants potted', p.numPlantsPotted],
+      ['💧 Plants watered', p.numPlantsWatered],
+      ['🧼 Crops cleansed', p.numCropsCleansed],
+      ['🧪 Potions used', (Number(p.numReplenishPotionsUsed) || 0) + (Number(p.numXPPotionsUsed) || 0)],
+    ].filter((r) => Number(r[1]) > 0);
+    if (rows.length) {
+      out.push('<div class="subhead" style="margin-top:12px">All time</div>');
+      out.push(rows.map(([label, v, short]) => `<div class="goal-line"><span>${label}</span><span>${short ? shortNumber(Number(v)) : Number(v).toLocaleString()}</span></div>`).join(''));
+    }
+  }
+  // What pets have produced, in coins, time, XP and hunger...
+  const totals = (st && st.abilityTotals) || [];
+  if (totals.length) {
+    const fmt = (t) => {
+      const v = Number(t.value) || 0;
+      if (t.unit === 'coins') return `${shortNumber(v)} coins`;
+      if (t.unit === 'xp') return `${shortNumber(v)} XP`;
+      if (t.unit === 'hunger') return shortNumber(Math.round(v));
+      if (t.unit === 'time') {
+        const h = v / 3600;
+        return h >= 48 ? `${(h / 24).toFixed(1)} days` : h >= 1 ? `${h.toFixed(1)} hours` : `${Math.round(v / 60)} min`;
+      }
+      return shortNumber(Math.round(v));
+    };
+    out.push('<div class="subhead" style="margin-top:12px">What your pets have done for you</div>');
+    out.push(totals.map((t) => `<div class="goal-line"><span>${esc(t.label)}</span><span>${esc(fmt(t))}</span></div>`).join(''));
+  }
+  // ...and how often each ability has triggered.
+  const procs = (st && st.abilityProcs) || [];
+  if (procs.length) {
+    out.push('<div class="subhead" style="margin-top:12px">Most-triggered abilities</div>');
+    out.push(procs.slice(0, 8).map((a) => `<div class="goal-line"><span>${esc(a.name)}</span><span>${a.count.toLocaleString()} times</span></div>`).join(''));
+  }
+  box.innerHTML = out.join('') || '<div class="empty">Shows up once the game is connected.</div>';
+}
+
+/* Garden worth over time: a simple line, drawn here as SVG. */
+let WORTH = [];
+let WORTH_DAYS = 1;
+let worthFetchedAt = 0;
+
+async function refreshWorth(force) {
+  if (!force && Date.now() - worthFetchedAt < 60000) return;
+  worthFetchedAt = Date.now();
+  try {
+    WORTH = (await window.app.worthGet()) || [];
+  } catch (err) {
+    WORTH = [];
+  }
+  renderWorth();
+}
+
+function renderWorth() {
+  const box = $('worthChart');
+  if (!box) return;
+  const since = Date.now() - WORTH_DAYS * 86400000;
+  const pts = WORTH.filter((p) => p.t >= since);
+  if (pts.length < 2) {
+    box.innerHTML = '<div class="empty">The app notes your garden\'s worth every half hour while the game is open here. The line fills in as it goes.</div>';
+    return;
+  }
+  const W = 400, H = 150, L = 4, R = 4, T = 10, B = 18;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  let lo = Math.min(...pts.map((p) => p.v)), hi = Math.max(...pts.map((p) => p.v));
+  if (hi === lo) { hi += 1; lo = Math.max(0, lo - 1); }
+  const x = (t) => L + ((t - t0) / Math.max(1, t1 - t0)) * (W - L - R);
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(t1).toFixed(1)},${H - B} L${x(t0).toFixed(1)},${H - B} Z`;
+  const day = (t) => new Date(t).toLocaleString([], WORTH_DAYS === 1 ? { hour: 'numeric' } : { month: 'short', day: 'numeric' });
+  const lastV = pts[pts.length - 1].v;
+  // Compared with about a day ago (or the start of the range).
+  const dayAgo = WORTH.filter((p) => p.t <= Date.now() - 86400000).slice(-1)[0] || pts[0];
+  const diff = lastV - dayAgo.v;
+  const sign = diff >= 0 ? 'up' : 'down';
+  box.innerHTML = `<svg class="worth-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Garden worth over time">
+      <defs><linearGradient id="wg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--moss)" stop-opacity=".45"/><stop offset="1" stop-color="var(--moss)" stop-opacity="0"/></linearGradient></defs>
+      <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--edge)" stroke-width="1"/>
+      <path d="${area}" fill="url(#wg)"/>
+      <path d="${line}" fill="none" stroke="var(--moss)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      <text x="${L}" y="${H - 4}" fill="var(--faint)" font-size="10">${esc(day(t0))}</text>
+      <text x="${W - R}" y="${H - 4}" fill="var(--faint)" font-size="10" text-anchor="end">${esc(day(t1))}</text>
+      <text x="${W - R}" y="${T + 2}" fill="var(--faint)" font-size="10" text-anchor="end">${esc(shortNumber(hi))}</text>
+    </svg>
+    <div class="worth-sum">Now <b>${shortNumber(lastV)}</b> · <span class="${sign}">${diff >= 0 ? '▲' : '▼'} ${shortNumber(Math.abs(diff))}</span> since ${dayAgo === pts[0] && WORTH_DAYS === 1 ? 'the start of the line' : 'yesterday'}</div>
+    <div class="note" style="margin-top:2px">Big drops are where you sold. The worth is before room and pet bonuses.</div>`;
+}
+
+/* Open spots: every garden spot (0-199, row by row, 20 across: two 10x10
+ * beds side by side), open ones glowing. */
+const SPOT_KIND = { p: 'a plant', e: 'an egg', d: 'a decoration', o: 'something' };
+function spotWhere(i) {
+  const row = Math.floor(i / 20) + 1;
+  const col = i % 20;
+  const left = col < 10;
+  const n = (left ? col : col - 10) + 1;
+  const nth = n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`;
+  return `${left ? 'Left' : 'Right'} bed, row ${row}, ${nth} from the left`;
+}
+
+let spotHtml = '';
+function renderSpots(st) {
+  const map = $('spotMap');
+  if (!map) return;
+  const tiles = st && st.gardenTiles;
+  if (!tiles) {
+    $('spotCount').textContent = 'Waiting for the game…';
+    return;
+  }
+  const open = [];
+  let html = '';
+  for (let r = 0; r < 10; r += 1) {
+    for (let c = 0; c < 20; c += 1) {
+      if (c === 10) html += '<b></b>';
+      const i = r * 20 + c;
+      const t = tiles[i] || tiles[String(i)];
+      if (!t) open.push(i);
+      const title = t ? `${spotWhere(i)}: ${SPOT_KIND[t[0]] || 'something'}${t[1] ? ' (' + seedLabel(t[1]) + ')' : ''}` : `${spotWhere(i)}: open`;
+      html += `<i class="${t ? t[0] : 'open'}" title="${esc(title)}"></i>`;
+    }
+  }
+  if (html !== spotHtml) {
+    map.innerHTML = html;
+    spotHtml = html;
+  }
+  $('spotCount').innerHTML = open.length
+    ? `<strong>${open.length}</strong> open spot${open.length === 1 ? '' : 's'}`
+    : 'No open spots: every spot has something in it';
+  $('spotWhere').innerHTML = open.length
+    ? open.slice(0, 4).map((i) => `✨ ${esc(spotWhere(i))}`).join('<br>') + (open.length > 4 ? `<br>…and ${open.length - 4} more (they glow on the map)` : '')
+    : '';
+}
+
+function renderGarden() {
+  const st = GARDEN_STATUS;
+  const stale = st && Date.now() - st.at > 45000;
+
+  let main = 'Waiting for the game to connect…';
+  let sub = "If this doesn't change once the game has loaded, reload the game with Ctrl+R.";
+  if (PARKED) {
+    main = `🚪 Logged off for ${PARKED.label}`;
+    sub = PARKED.until && !PARKED.manual && S.logoff.rejoin
+      ? `Back about ${fmtClock(PARKED.until + 10000)}. These numbers are from just before you stepped out.`
+      : 'Rejoin from the Weather tab whenever you like.';
+  } else if (st && stale) {
+    main = 'Lost contact with the game.';
+    sub = 'Reload the game with Ctrl+R if this sticks around.';
+  } else if (st && st.connected && !st.foundSelf) {
+    main = "Connected, but I can't find your garden yet.";
+    sub = 'To report it: Extras tab, 🛠 Troubleshooting, "Save a sample".';
+  } else if (st && st.foundSelf) {
+    const kind = st.weatherKind;
+    main = '✅ Connected to your garden';
+    sub = kind && kind !== 'clear' ? `${kindEmoji(kind)} ${kindLabel(kind)} right now` : '☀️ Clear skies right now';
+  }
+  $('gardenMain').textContent = main;
+  const wallet = st && !stale && st.wallet;
+  $('gardenSub').textContent = wallet && (wallet.coins || wallet.dust)
+    ? `${sub}  ·  🪙 ${shortNumber(wallet.coins)}  ·  ✨ ${wallet.dust.toLocaleString()} dust`
+    : sub;
+
+  const shown = PARKED ? st : stale ? null : st;
+  const b = gardenBucket(shown);
+  renderCropCard(shown, b);
+  renderMutationCard(b);
+  renderSizeCard(shown, b);
+  renderLifeStats(shown);
+  renderSpots(shown);
+  refreshWorth(false);
+  renderPetFood(st, stale);
+  renderPets();
+
+  const g = GARDEN_STATS || { pets: {}, totals: { gold: 0, rainbow: 0 } };
+  $('petGoldTotal').textContent = g.totals.gold.toLocaleString();
+  $('petRainbowTotal').textContent = g.totals.rainbow.toLocaleString();
+  $('petCoinsTotal').textContent = shortNumber(g.totals.coins || 0);
+  $('petSince').textContent = g.since
+    ? 'Counting since ' + new Date(g.since).toLocaleDateString([], { month: 'short', day: 'numeric' }) + '.'
+    : '';
+
+  const score = (p) => (p.gold || 0) * 1e9 + (p.rainbow || 0) * 1e9 + (p.coins || 0);
+  const pets = Object.entries(g.pets).sort((a, b2) => score(b2[1]) - score(a[1]));
+  $('petList').innerHTML = pets.length
+    ? pets
+        .map(([key, p]) => `
+          <div class="pet-row">
+            <span class="pet-name">${esc(p.name)}${p.species && p.species !== p.name ? ` <span class="pet-species">${esc(p.species)}</span>` : ''}</span>
+            <span class="pet-counts">${madeBy(p)}</span>
+            <button class="link" data-pet-reset="${esc(key)}">Reset</button>
+          </div>`)
+        .join('')
+    : '<div class="empty">No pet procs yet. Each one gets a cha-ching and shows up here.</div>';
+
+  renderTeams();
+  renderTriggers();
+  renderSeeds();
+  renderLock();
+  renderReclaim();
+}
+
+/* ================================================================== *
+ * Weather tab: schedule, weather teams, logging off
+ * ================================================================== */
+
+let PARKED = null;
+let LAST_TEAMS = [];   // remembered so the tab still makes sense while logged off
+
+function renderWeatherSchedule() {
+  if (!$('wxSchedule') || !S) return;
+  $('wxSchedule').innerHTML = scheduleHtml(STATUS, true);
+  const bits = [];
+  const hasEvents = STATUS && (STATUS.current || (STATUS.upcoming || []).length);
+  if (!hasEvents) { $('wxLegend').innerHTML = ''; }
+  else if (S.logoff.enabled && (S.logoff.kinds || []).length) bits.push('<span class="tag off">log off</span> the app steps out for this one');
+  if (S.weatherTeams.enabled) bits.push('<span class="tag team">🐾</span> swaps to that team');
+  const anything = STATUS && (STATUS.current || (STATUS.upcoming || []).length);
+  $('wxLegend').innerHTML = anything ? bits.join(' · ') : '';
+
+  const banner = $('parkedBanner');
+  if (PARKED) {
+    const back = PARKED.until && !PARKED.manual && S.logoff.rejoin
+      ? `Back automatically about ${esc(fmtClock(PARKED.until + 10000))}.` : 'Press Rejoin now when you\'re ready.';
+    banner.innerHTML = `<div class="banner"><div class="status-main">🚪 Logged off for ${esc(PARKED.label)}</div><div class="status-sub">${back}</div></div>`;
+  } else {
+    banner.innerHTML = '';
+  }
+  $('logoffNow').hidden = Boolean(PARKED);
+  $('rejoinNow').hidden = !PARKED;
+}
+
+function renderTeams() {
+  if (!$('teamPicks') || !S) return;
+  const st = GARDEN_STATUS;
+  if (st && Array.isArray(st.teams) && st.foundSelf) LAST_TEAMS = st.teams;
+  const teams = LAST_TEAMS;
+  const wt = S.weatherTeams;
+  setSwitch($('teamsOn'), wt.enabled);
+
+  // Don't rebuild the menus while one is open, or it snaps shut.
+  const active = document.activeElement;
+  if (!(active && active.closest && active.closest('#teamPicks'))) {
+    const rows = [{ id: 'clear', label: '☀️ Clear skies', hint: 'The team to go back to afterwards' }]
+      .concat(KINDS.map((k) => ({ id: k.id, label: `${k.emoji} ${k.label}` })));
+    $('teamPicks').innerHTML = rows.map((r) => {
+      const chosen = wt[r.id] || '';
+      const missing = chosen && teams.length && !teams.some((t) => t.id === chosen);
+      const opts = ['<option value="">Leave my pets alone</option>']
+        .concat(teams.map((t) => `<option value="${esc(t.id)}"${t.id === chosen ? ' selected' : ''}>${esc(t.name)}</option>`))
+        .concat(missing ? [`<option value="${esc(chosen)}" selected>(team not found)</option>`] : [])
+        .concat(chosen && !teams.length ? [`<option value="${esc(chosen)}" selected>(saved team)</option>`] : []);
+      return `<div class="team-pick"><span>${r.label}${r.hint ? `<div class="rule-desc">${r.hint}</div>` : ''}</span><select data-team-kind="${r.id}" aria-label="Team for ${esc(r.label)}">${opts.join('')}</select></div>`;
+    }).join('');
+  }
+
+  const out = new Set(((st && st.pets) || []).map((p) => String(p.id)));
+  $('teamList').innerHTML = teams.length
+    ? teams.map((t) => {
+        const isOut = t.members.length && t.members.every((m) => out.has(m.petId));
+        const who = t.members.map((m) => m.name || prettyBucket(m.species || 'pet')).join(', ');
+        return `<div class="team-card">
+          <div class="rule-text"><div class="rule-name">${esc(t.name)} ${isOut ? '<span class="live">· out now</span>' : ''}</div><div class="rule-desc">${esc(who || 'no pets')}</div></div>
+          <button class="btn small" data-apply-team="${esc(t.id)}"${isOut || PARKED ? ' disabled' : ''}>Apply</button>
+        </div>`;
+      }).join('')
+    : `<div class="empty">${st && st.foundSelf ? 'No saved teams yet. Make one in the game (Pet Teams) and it shows up here.' : 'Your teams show up once the game is connected.'}</div>`;
+}
+
+function renderLogoff() {
+  if (!$('logoffKinds') || !S) return;
+  const l = S.logoff;
+  setSwitch($('logoffOn'), l.enabled);
+  setSwitch($('logoffRejoin'), l.rejoin);
+  const on = new Set(l.kinds || []);
+  $('logoffKinds').innerHTML = KINDS.map((k) =>
+    `<button class="chip" aria-pressed="${on.has(k.id)}" data-logoff-kind="${k.id}" title="Keeps ${esc(k.gives)} off your crops">${k.emoji} ${esc(k.label)}</button>`
+  ).join('');
+}
+
+/* Team triggers: "when N% of ready crops are X, switch to team T". */
+
+const TRIGGER_METRICS = [
+  ['thunderstruck', '⚡ Thunderstruck'], ['wet', '💧 Wet'], ['chilled', '❄️ Chilled'], ['frozen', '🧊 Frozen'],
+  ['hydro', 'any hydro mutation'], ['dawnlit', '🌅 Dawnlit'], ['amberlit', '🌕 Amberlit'], ['lunar', 'Dawnlit or Amberlit'],
+  ['gold', '🟡 Gold'], ['rainbow', '🌈 Rainbow'], ['special', 'Gold or Rainbow'], ['fullsize', '📏 full size'],
+];
+const WEATHERISH = new Set(['thunderstruck', 'wet', 'chilled', 'frozen', 'hydro', 'dawnlit', 'amberlit', 'lunar']);
+
+function renderTriggers() {
+  if (!$('triggerList') || !S) return;
+  const active = document.activeElement;
+  if (active && active.closest && active.closest('#triggerList') && active.tagName !== 'BUTTON') {
+    // Only refresh the live numbers while someone is editing.
+    for (const r of S.teamTriggers || []) updateTriggerNow(r);
+    return;
+  }
+  const rules = S.teamTriggers || [];
+  const teams = LAST_TEAMS;
+  const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+  $('triggerList').innerHTML = rules.length ? rules.map((r) => {
+    const teamOpts = ['<option value="">(pick a team)</option>']
+      .concat(teams.map((t) => opt(t.id, t.name, r.teamId)))
+      .concat(r.teamId && !teams.some((t) => t.id === r.teamId) ? [opt(r.teamId, teams.length ? '(team not found)' : '(saved team)', r.teamId)] : []);
+    const weatherOpts = [opt('', 'any weather', r.weather || '')].concat(KINDS.map((k) => opt(k.id, `only during ${k.label}`, r.weather || '')));
+    const basis = WEATHERISH.has(r.metric)
+      ? `<select data-t="basis" aria-label="Which crops">${opt('all', 'all crops', r.basis || 'all')}${opt('ready', 'ready crops', r.basis || 'all')}</select>`
+      : '<span>crops</span>';
+    return `<div class="trig ${r.on ? '' : 'off'}" data-rule="${esc(r.id)}">
+      <div class="trig-line"><span>When</span><input type="number" min="1" max="100" data-t="pct" value="${Number(r.pct) || 95}" aria-label="Percent"><span>% of</span>${basis}<span>are</span>
+        <select data-t="metric" aria-label="What">${TRIGGER_METRICS.map(([v, l]) => opt(v, l, r.metric)).join('')}</select></div>
+      <div class="trig-line"><span>switch to</span><select data-t="teamId" aria-label="Team">${teamOpts.join('')}</select>
+        <select data-t="weather" aria-label="When">${weatherOpts.join('')}</select></div>
+      <div class="trig-foot"><span class="now" data-now></span>
+        <button class="link" data-t="remove">Remove</button>
+        <button class="switch" role="switch" data-t="on" aria-checked="${Boolean(r.on)}" aria-label="Trigger on"></button></div>
+    </div>`;
+  }).join('') : '<div class="empty">No triggers yet.</div>';
+  for (const r of rules) updateTriggerNow(r);
+}
+
+function updateTriggerNow(r) {
+  const el = document.querySelector(`#triggerList [data-rule="${CSS.escape(r.id)}"] [data-now]`);
+  if (!el) return;
+  const v = GARDEN_STATUS && GARDEN_STATUS.triggerValues && GARDEN_STATUS.triggerValues[r.id];
+  if (!r.teamId) {
+    el.textContent = 'Pick a team for this to do anything.';
+    return;
+  }
+  if (!v) {
+    el.textContent = GARDEN_STATUS && GARDEN_STATUS.foundSelf ? 'Nothing to measure yet.' : 'Waiting for the game.';
+    return;
+  }
+  const met = v.pct >= (Number(r.pct) || 95);
+  el.innerHTML = `Now ${Math.floor(v.pct)}% (${v.count} of ${v.of})${met ? ' <span class="met">· reached</span>' : ''}`;
+}
+
+function changeTrigger(id, field, value) {
+  const r = (S.teamTriggers || []).find((x) => x.id === id);
+  if (!r) return;
+  if (field === 'pct') r.pct = Math.max(1, Math.min(100, Math.round(Number(value) || 95)));
+  else if (field === 'on') r.on = !r.on;
+  else r[field] = value;
+  save();
+}
+
+function wireTriggers() {
+  $('addTrigger').addEventListener('click', () => {
+    S.teamTriggers = S.teamTriggers || [];
+    const usual = S.weatherTeams && S.weatherTeams.clear;
+    S.teamTriggers.push({
+      id: 't' + Date.now().toString(36),
+      on: true,
+      metric: 'thunderstruck',
+      basis: 'all',
+      pct: 95,
+      teamId: usual || '',
+      weather: 'thunder',
+    });
+    save();
+    renderTriggers();
+  });
+  $('triggerList').addEventListener('change', (e) => {
+    const box = e.target.closest('[data-rule]');
+    const field = e.target.dataset.t;
+    if (!box || !field) return;
+    changeTrigger(box.dataset.rule, field, e.target.value);
+    e.target.blur();
+    renderTriggers();
+  });
+  $('triggerList').addEventListener('click', (e) => {
+    const box = e.target.closest('[data-rule]');
+    const btn = e.target.closest('button[data-t]');
+    if (!box || !btn) return;
+    if (btn.dataset.t === 'on') {
+      changeTrigger(box.dataset.rule, 'on');
+      const r = S.teamTriggers.find((x) => x.id === box.dataset.rule);
+      toast(r && r.on ? 'Trigger on.' : 'Trigger off.');
+    }
+    if (btn.dataset.t === 'remove') {
+      S.teamTriggers = S.teamTriggers.filter((x) => x.id !== box.dataset.rule);
+      save();
+    }
+    renderTriggers();
+  });
+}
+
+/* Seed deleter */
+let SEED_RUN = null;
+
+function seedLabel(sp) {
+  return String(sp).replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function renderSeeds() {
+  if (!$('seedPick')) return;
+  const seeds = (GARDEN_STATUS && GARDEN_STATUS.seeds) || { inventory: {}, silo: {} };
+  const inv = Object.entries(seeds.inventory || {}).sort((a, b) => seedLabel(a[0]).localeCompare(seedLabel(b[0])));
+  const pick = $('seedPick');
+  const keep = pick.value;
+  if (document.activeElement !== pick) {
+    pick.innerHTML = inv.length
+      ? inv.map(([sp, n]) => `<option value="${esc(sp)}"${sp === keep ? ' selected' : ''}>${esc(seedLabel(sp))} (${n.toLocaleString()})</option>`).join('')
+      : '<option value="">No seeds in your inventory</option>';
+  }
+  const running = SEED_RUN && SEED_RUN.running;
+  $('seedGo').disabled = running || !inv.length;
+  $('seedStop').hidden = !running;
+  const silo = Object.keys(seeds.silo || {}).length;
+  $('seedHint').textContent = 'Throws seeds from your inventory into the wishing well, one at a time, exactly like doing it by hand. It can\'t be undone.' +
+    (silo ? ` ${silo} kind${silo === 1 ? ' is' : 's are'} in your Seed Silo: take ${silo === 1 ? 'it' : 'them'} out in the game first to delete ${silo === 1 ? 'it' : 'them'} here. The silo is never touched.` : ' Seeds in your Seed Silo are never touched.');
+  const r = SEED_RUN;
+  $('seedProgress').innerHTML = r
+    ? `<div class="bar-row" style="margin-top:8px"><span>${esc(seedLabel(r.species))}</span><span class="bar size"><span style="width:${Math.min(100, (r.done / r.target) * 100)}%"></span></span><span>${r.done}/${r.target}</span></div>
+       <div class="note">${r.running ? 'Throwing them in…' : r.error ? `⚠️ Stopped after ${r.done}: ${esc(r.error)}.` : r.stopped ? `Stopped after ${r.done}.` : `✅ Done: ${r.done} thrown in.`}</div>`
+    : '';
+}
+
+/* Harvest lock */
+let LOCK = { on: false, species: [] };
+let blockedCount = 0;
+
+function renderLock() {
+  const on = Boolean(LOCK.on);
+  $('lockBtn').setAttribute('aria-pressed', String(on));
+  $('lockBtn').textContent = on ? '🔒' : '🔓';
+  $('lockBtn').title = on ? 'Harvest lock is ON: click to allow harvesting (Ctrl+Shift+L)' : 'Harvest lock (Ctrl+Shift+L)';
+  if (!$('lockOn')) return;
+  setSwitch($('lockOn'), on);
+  const inGarden = (GARDEN_STATUS && GARDEN_STATUS.gardenSpecies) || [];
+  const all = [...new Set([...(LOCK.species || []), ...inGarden])].sort((a, b) => seedLabel(a).localeCompare(seedLabel(b)));
+  const prot = new Set(LOCK.species || []);
+  $('lockSpecies').innerHTML = all.length
+    ? all.map((sp) => `<button class="chip ${prot.has(sp) ? 'protected' : ''}" data-protect="${esc(sp)}">${prot.has(sp) ? '🔒 ' : ''}${esc(cropName(sp))}</button>`).join('')
+    : '<span class="note" style="margin:0">Your crops show up here once the game is connected.</span>';
+  $('lockHint').textContent = 'Tap a crop to protect it: it\'s never harvested by accident, lock or no lock. Tap again to allow it.' +
+    (blockedCount ? ` Stopped ${blockedCount} harvest${blockedCount === 1 ? '' : 's'} this session.` : '');
+}
+
+// A crop id as its name ("ThunderCelestialShroomPlant" -> "Stormcap").
+function cropName(id) {
+  const known = { thundercelestialshroomplant: 'Stormcap', thundercelestial: 'Thunderpeel', dawncelestial: 'Dawnbinder', mooncelestial: 'Moonbinder', starcelestial: 'Starweaver' };
+  return known[String(id).toLowerCase()] || seedLabel(id);
+}
+
+async function setLock(change) {
+  LOCK = (await window.app.harvestSet(change)) || LOCK;
+  renderLock();
+}
+
+function wireLock() {
+  $('lockBtn').addEventListener('click', () => {
+    setLock({ on: !LOCK.on });
+    toast(!LOCK.on ? '🔒 Harvest lock on: nothing gets harvested.' : '🔓 Harvest lock off.');
+  });
+  $('lockOn').addEventListener('click', () => {
+    setLock({ on: !LOCK.on });
+  });
+  $('lockSpecies').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-protect]');
+    if (!b) return;
+    const set = new Set(LOCK.species || []);
+    const sp = b.dataset.protect;
+    if (set.has(sp)) set.delete(sp);
+    else set.add(sp);
+    setLock({ species: [...set] });
+  });
+  window.app.onHarvestLock((l) => {
+    LOCK = l || LOCK;
+    renderLock();
+  });
+  window.app.onHarvestBlocked(() => {
+    blockedCount += 1;
+    renderLock();
+  });
+}
+
+/* Playing on another device */
+let RECLAIM = { on: false, delaySec: 60 };
+let RECLAIM_STATE = null;
+let reclaimTick = null;
+
+function renderReclaim() {
+  if (!$('reclaimOn')) return;
+  setSwitch($('reclaimOn'), RECLAIM.on);
+  if (document.activeElement !== $('reclaimDelay')) $('reclaimDelay').value = String(RECLAIM.delaySec || 60);
+  const st = RECLAIM_STATE;
+  clearInterval(reclaimTick);
+  if (!st) {
+    $('reclaimNow').innerHTML = '';
+    return;
+  }
+  const draw = () => {
+    const left = st.manual ? '' : (() => { const s = Math.max(0, Math.round((st.until - Date.now()) / 1000)); return `Coming back in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}.`; })();
+    $('reclaimNow').innerHTML = `<div class="note" style="margin:6px 0">📱 ${esc(st.manual ? (st.message || 'Waiting for you.') : left)}</div>
+      <div class="button-row" style="margin-top:0"><button class="btn small primary" data-reclaim="now">Come back now</button>${st.manual ? '' : '<button class="btn small" data-reclaim="stay">Stay away</button>'}</div>`;
+  };
+  draw();
+  if (!st.manual) reclaimTick = setInterval(draw, 1000);
+}
+
+function wireSecret() {
+  window.app.onSecret(async (s) => {
+    if (!s || !s.sound || level() <= 0) return;
+    await play(SFX.rainbowSecret());
+    await speak(pick([`Oh my gosh! A rainbow ${s.name}! That's incredibly rare!`, `No way! A rainbow ${s.name}! Look at it!`, `A rainbow ${s.name}! This is the best day ever!`]), 1.1, 1.02);
+  });
+}
+
+function wireReclaim() {
+  $('reclaimOn').addEventListener('click', async () => {
+    RECLAIM = await window.app.reclaimSet({ on: !RECLAIM.on });
+    renderReclaim();
+    toast(RECLAIM.on ? '📱 The game will come back after you play elsewhere.' : 'Coming back after playing elsewhere is off.');
+  });
+  $('reclaimDelay').addEventListener('change', async (e) => {
+    RECLAIM = await window.app.reclaimSet({ delaySec: Number(e.target.value) });
+    renderReclaim();
+  });
+  $('reclaimNow').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-reclaim]');
+    if (b) await window.app.reclaimAct(b.dataset.reclaim);
+  });
+  window.app.onReclaim((st) => {
+    RECLAIM_STATE = st || null;
+    renderReclaim();
+  });
+}
+
+function wireWorth() {
+  $('worthRange').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-range]');
+    if (!b) return;
+    WORTH_DAYS = Number(b.dataset.range);
+    for (const c of document.querySelectorAll('#worthRange .chip')) c.classList.toggle('on', c === b);
+    refreshWorth(true);
+  });
+}
+
+function wireSeeds() {
+  const have = () => {
+    const seeds = (GARDEN_STATUS && GARDEN_STATUS.seeds && GARDEN_STATUS.seeds.inventory) || {};
+    return seeds[$('seedPick').value] || 0;
+  };
+  $('seedAll').addEventListener('click', () => { $('seedCount').value = have(); });
+  $('seedKeep1').addEventListener('click', () => { $('seedCount').value = Math.max(0, have() - 1); });
+  $('seedGo').addEventListener('click', async () => {
+    const sp = $('seedPick').value;
+    const n = Math.floor(Number($('seedCount').value) || 0);
+    if (!sp || n < 1) return toast('Pick a seed and how many.');
+    if (n > have()) return toast(`You only have ${have()}.`);
+    if (!confirm(`Throw ${n} ${seedLabel(sp)} seed${n === 1 ? '' : 's'} into the wishing well?${n === have() ? ' That\'s all of them.' : ` You'll keep ${have() - n}.`}\n\nThis can't be undone.`)) return;
+    const r = await window.app.seedsDelete(sp, n);
+    if (!r || !r.ok) toast((r && r.reason) || "Couldn't start.");
+  });
+  $('seedStop').addEventListener('click', () => window.app.seedsStop());
+  window.app.onSeedRun((r) => {
+    SEED_RUN = r;
+    renderSeeds();
+  });
+}
+
+function wireFun() {
+  $('funButtons').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-fun]');
+    if (!b) return;
+    const r = await window.app.fun(b.dataset.fun);
+    if (!r || !r.ok) return toast('Open the game first.');
+    if (b.dataset.fun === 'rainbow') {
+      b.setAttribute('aria-pressed', String(Boolean(r.result)));
+      toast(r.result ? '🌈 Rainbow mode on. Press again to stop.' : 'Rainbow mode off.');
+    }
+  });
+}
+
+function wireBackups() {
+  $('backupSave').addEventListener('click', async () => {
+    const r = await window.app.backupSave();
+    if (r && r.ok) toast('💾 Backup saved.');
+    else if (r && !r.canceled) toast(`Couldn't save the backup: ${r.reason}`);
+  });
+  $('backupRestore').addEventListener('click', async () => {
+    const r = await window.app.backupRestore();
+    if (r && r.ok) toast('💾 Restored. Reloading the panel…');
+    else if (r && !r.canceled) toast(r.reason || "Couldn't restore that backup.");
+  });
+  $('backupFolder').addEventListener('click', () => window.app.backupFolder());
+}
+
+function wireWeather() {
+  $('teamsOn').addEventListener('click', () => {
+    S.weatherTeams.enabled = !S.weatherTeams.enabled;
+    renderTeams();
+    renderWeatherSchedule();
+    save();
+    toast(S.weatherTeams.enabled ? '🐾 Weather teams on. The next weather change swaps your team.' : 'Weather teams off.');
+  });
+  $('teamPicks').addEventListener('change', (e) => {
+    const sel = e.target.closest('[data-team-kind]');
+    if (!sel) return;
+    S.weatherTeams[sel.dataset.teamKind] = sel.value;
+    save();
+    renderWeatherSchedule();
+    sel.blur();
+    toast(sel.value ? `${kindLabel(sel.dataset.teamKind)}: ${sel.options[sel.selectedIndex].textContent}` : `${kindLabel(sel.dataset.teamKind)}: pets left alone`);
+  });
+  $('teamList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-apply-team]');
+    if (!btn) return;
+    btn.disabled = true;
+    const r = await window.app.applyTeam(btn.dataset.applyTeam);
+    if (!r || !r.ok) {
+      btn.disabled = false;
+      return toast(`Couldn't switch: ${(r && r.reason) || 'no answer from the game'}`);
+    }
+    toast(r.already ? `${r.team} is already out.` : `Switching to ${r.team}…`);
+  });
+
+  $('logoffOn').addEventListener('click', () => {
+    S.logoff.enabled = !S.logoff.enabled;
+    renderLogoff();
+    renderWeatherSchedule();
+    save();
+    if (S.logoff.enabled && !(S.logoff.kinds || []).length) toast('Now pick which weather to step out for.');
+    else toast(S.logoff.enabled ? '🚪 Log-off for weather is on.' : 'Log-off for weather is off.');
+  });
+  $('logoffKinds').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-logoff-kind]');
+    if (!chip) return;
+    const set = new Set(S.logoff.kinds || []);
+    const id = chip.dataset.logoffKind;
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    S.logoff.kinds = [...set];
+    renderLogoff();
+    renderWeatherSchedule();
+    save();
+  });
+  $('logoffRejoin').addEventListener('click', () => {
+    S.logoff.rejoin = !S.logoff.rejoin;
+    renderLogoff();
+    save();
+  });
+  $('logoffNow').addEventListener('click', async () => {
+    PARKED = await window.app.logoffNow();
+    renderWeatherSchedule();
+  });
+  $('rejoinNow').addEventListener('click', async () => {
+    PARKED = await window.app.rejoin();
+    renderWeatherSchedule();
+    renderGarden();
+  });
+  window.app.onParked((p) => {
+    PARKED = p || null;
+    renderWeatherSchedule();
+    renderGarden();
+  });
+}
+
+function wireGarden() {
+  $('gardenReset').addEventListener('click', async () => {
+    if (!confirm('Reset every pet count to zero?')) return;
+    GARDEN_STATS = await window.app.resetGarden(null);
+    renderGarden();
+  });
+  $('petCards').addEventListener('change', async (e) => {
+    const input = e.target.closest('[data-strength]');
+    if (!input) return;
+    await window.app.setStrength(input.dataset.strength, input.value);
+    toast(input.value ? 'Strength saved for this pet.' : 'Back to the worked-out strength.');
+    input.blur();
+  });
+  $('presetChips').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-preset]');
+    if (!b) return;
+    PRESET = b.dataset.preset;
+    renderPets();
+  });
+  $('goalPick').addEventListener('change', (e) => {
+    GOAL = e.target.value;
+    renderPets();
+  });
+  $('teamCompare').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-apply-team]');
+    if (!btn) return;
+    e.preventDefault();
+    btn.disabled = true;
+    const r = await window.app.applyTeam(btn.dataset.applyTeam);
+    if (!r || !r.ok) {
+      btn.disabled = false;
+      return toast(`Couldn't switch: ${(r && r.reason) || 'no answer from the game'}`);
+    }
+    toast(r.already ? `${r.team} is already out.` : `Switching to ${r.team}…`);
+  });
+
+  $('petList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-pet-reset]');
+    if (!btn) return;
+    GARDEN_STATS = await window.app.resetGarden(btn.dataset.petReset);
+    renderGarden();
+  });
+  $('gardenSample').addEventListener('click', async () => {
+    const r = await window.app.gardenSample();
+    toast(r.ok ? 'Saved garden-sample.json. The folder is open: attach that file to your report.' : `Couldn't save a sample: ${r.reason}`);
+  });
+}
+
+/* ================================================================== *
+ * Rooms tab: the Discord's rooms with live player counts
+ * ================================================================== */
+
+let ROOMS = null;
+let roomsTimer = null;
+
+function seats(n) {
+  let out = '';
+  for (let i = 0; i < 6; i += 1) out += `<i class="${n != null && i < n ? 'on' : ''}"></i>`;
+  return `<span class="seats" title="${n == null ? 'unknown' : n + ' of 6'}">${out}</span>`;
+}
+
+function shortRoomId(id) {
+  const s = String(id || '');
+  return s.length > 18 ? s.slice(0, 10) + '…' : s;
+}
+
+function renderRooms() {
+  const here = (GARDEN_STATUS && GARDEN_STATUS.room) || null;
+  const saved = (ROOMS && ROOMS.saved) || [];
+  const hereId = here && here.roomId;
+  if (hereId) {
+    const n = here.players || 1;
+    const bonus = Math.min(50, Math.max(0, n - 1) * 10);
+    $('roomHere').innerHTML = `You're in <b title="${esc(hereId)}">${esc(shortRoomId(hereId))}</b> with ${n} of 6 players · <span style="color:var(--gold)">+${bonus}% when you sell</span>`;
+    const isSaved = saved.some((r) => r.id === hereId);
+    $('roomHereBtns').innerHTML = isSaved ? '<span class="note" style="margin:0">Saved in your rooms.</span>' : '<button class="btn small" id="roomSaveHere">Save this room</button>';
+  } else {
+    $('roomHere').textContent = PARKED ? 'Logged off right now.' : 'Waiting for the game…';
+    $('roomHereBtns').innerHTML = '';
+  }
+  const check = ROOMS && ROOMS.check;
+  // Only worth mentioning when it isn't working (details in Troubleshooting).
+  $('roomCheck').innerHTML = check && !check.ok ? `⚠️ ${esc(check.text)} A sample (Extras tab, 🛠 Troubleshooting) would help when reporting it.` : '';
+
+  if (!ROOMS) return;
+  setSwitch($('sharedOn'), !ROOMS.sharedOff);
+  setSwitch($('clipOn'), !(S.rooms && S.rooms.clipboard === false));
+  const shared = (ROOMS.shared || []).filter((x) => x.id !== hereId)
+    .sort((a, b) => (a.full - b.full) || (b.players - a.players));
+  $('sharedStatus').textContent = ROOMS.sharedOff ? 'Off.'
+    : ROOMS.sharedError && !shared.length ? `Couldn't reach the shared list (${ROOMS.sharedError}).`
+      : `${shared.length} open room${shared.length === 1 ? '' : 's'} · updated ${ago(ROOMS.at)}`;
+  // When nothing shows, say why: an empty list, or only private/empty rooms.
+  const st = ROOMS.sharedStats;
+  let why = 'Nobody is sharing a room right now.';
+  if (st && st.total > 0 && !shared.length) {
+    why = `Arie's list has ${st.total} room${st.total === 1 ? '' : 's'} right now, but ${st.isPrivate === st.total ? (st.total === 1 ? "it's" : 'all are') + ' private' : st.withPlayers === 0 ? 'none have anyone in them' : 'none of the public ones are joinable (gone, or not answering)'}.`;
+  } else if (st && st.total === 0) {
+    why = "Arie's list is empty right now: nobody using his mod is sharing a room.";
+  }
+  const savedIds = new Set(saved.map((r) => r.id));
+  $('sharedList').innerHTML = ROOMS.sharedOff ? ''
+    : shared.length ? shared.map((x) => {
+        const who = (x.names || []).join(', ');
+        return `<div class="room ${x.full ? 'full' : ''}">
+          <span>${esc(/^i-/.test(x.id) ? 'Discord room' : x.id)}<div class="where" title="${esc(who)}">${esc(who ? who.slice(0, 40) + (who.length > 40 ? '…' : '') : shortRoomId(x.id))}${savedIds.has(x.id) ? '' : ` · <button class="link" style="font-size:11px" data-keep="${esc(x.id)}">Save</button>`}</div></span>
+          ${seats(x.players)}
+          <span class="bonus">${x.full ? 'Full' : `+${x.bonusIfJoined}%`}</span>
+          <button class="btn small" data-join="${esc(x.id)}" data-name="${esc(/^i-/.test(x.id) ? 'this Discord room' : x.id)}"${x.full ? ' disabled' : ''}>Join</button>
+        </div>`;
+      }).join('')
+      : `<div class="empty">${esc(why)}</div>`;
+  $('roomsStatus').textContent = saved.length ? `${saved.length} saved · updated ${ago(ROOMS.at)}` : 'No saved rooms yet.';
+  const rankOf = (x) => (x.players == null ? -1 : x.full ? -2 : x.players);
+  const list = saved.slice().sort((a, b) => rankOf(b) - rankOf(a) || String(a.name).localeCompare(String(b.name)));
+  $('roomList').innerHTML = list.length
+    ? list.map((x) => {
+        const bonus = x.full ? 'Full' : x.closed ? 'Empty' : x.bonusIfJoined != null ? `+${x.bonusIfJoined}%` : x.error ? '?' : '';
+        return `<div class="room ${x.full ? 'full' : ''} ${x.id === hereId ? 'here' : ''}">
+          <span>${esc(x.name)}${x.id === hereId ? ' <span class="live">· you\'re here</span>' : ''}<div class="where">${/^i-/.test(x.id) ? 'Discord room' : esc(shortRoomId(x.id))} · <button class="link" style="font-size:11px" data-forget="${esc(x.id)}">Remove</button></div></span>
+          ${seats(x.players)}
+          <span class="bonus" title="${esc(x.error || '')}">${bonus}</span>
+          <button class="btn small" data-join="${esc(x.id)}" data-name="${esc(x.name)}"${x.full || x.id === hereId ? ' disabled' : ''}>Join</button>
+        </div>`;
+      }).join('')
+    : '<div class="empty">Press "Save this room" while you\'re in a room you like, or type a code below. Each saved room shows how full it is and what joining would add to your sell bonus.</div>';
+}
+
+async function refreshRooms() {
+  try {
+    ROOMS = await window.app.roomsRefresh();
+  } catch (err) {
+    ROOMS = ROOMS || { saved: [], check: { ok: false, text: String(err) }, at: Date.now() };
+  }
+  renderRooms();
+}
+
+function startRoomsPolling(on) {
+  clearInterval(roomsTimer);
+  roomsTimer = null;
+  if (!on) return;
+  refreshRooms();
+  roomsTimer = setInterval(refreshRooms, 45000);
+}
+
+async function joinRoom(id, name) {
+  if (!confirm(`Join ${name || id}? The game moves to that room. Your garden comes with you.`)) return;
+  await window.app.roomsJoin(id);
+  toast('Joining…');
+  setTimeout(refreshRooms, 8000);
+}
+
+let CLIP = null;
+function renderClipBanner() {
+  const b = $('clipBanner');
+  if (!CLIP) {
+    b.hidden = true;
+    b.innerHTML = '';
+    return;
+  }
+  const label = /^i-/.test(CLIP.id) ? 'a Discord room' : `room <b>${esc(CLIP.id)}</b>`;
+  b.hidden = false;
+  b.innerHTML = `<span class="t">📋 You copied ${label}.</span>
+    <button class="btn small primary" data-clip="join">Join</button>
+    ${CLIP.saved ? '' : '<button class="btn small" data-clip="save">Save</button>'}
+    <button class="link" data-clip="close" aria-label="Dismiss">✕</button>`;
+}
+
+function wireRooms() {
+  window.app.onRoomClipboard((c) => {
+    CLIP = c;
+    renderClipBanner();
+  });
+  $('clipBanner').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-clip]');
+    if (!b || !CLIP) return;
+    const id = CLIP.id;
+    if (b.dataset.clip === 'join') joinRoom(id, /^i-/.test(id) ? 'this Discord room' : id);
+    if (b.dataset.clip === 'save') {
+      const name = prompt('A name for this room:', /^i-/.test(id) ? 'Discord room' : id);
+      if (name === null) return;
+      await window.app.roomsSave(id, name);
+      toast('Room saved.');
+      if (typeof refreshRooms === 'function') refreshRooms();
+    }
+    CLIP = null;
+    renderClipBanner();
+  });
+  $('clipOn').addEventListener('click', async () => {
+    const on = !(S.rooms && S.rooms.clipboard === false);
+    const now = await window.app.roomsClipboardSetting(!on);
+    S.rooms = Object.assign({}, S.rooms, { clipboard: now });
+    setSwitch($('clipOn'), now);
+  });
+  $('roomPaste').addEventListener('click', async () => {
+    CLIP = null;
+    await window.app.checkClipboard();
+    setTimeout(() => { if (!CLIP) toast('No room code on your clipboard.'); }, 300);
+  });
+  $('roomsRefresh').addEventListener('click', refreshRooms);
+  $('sharedOn').addEventListener('click', async () => {
+    await window.app.roomsShowShared(Boolean(ROOMS && ROOMS.sharedOff));
+    refreshRooms();
+  });
+  $('sharedList').addEventListener('click', async (e) => {
+    const join = e.target.closest('[data-join]');
+    const keep = e.target.closest('[data-keep]');
+    if (join) joinRoom(join.dataset.join, join.dataset.name);
+    if (keep) {
+      const name = prompt('A name for this room:', /^i-/.test(keep.dataset.keep) ? 'Discord room' : keep.dataset.keep);
+      if (name === null) return;
+      await window.app.roomsSave(keep.dataset.keep, name);
+      toast('Room saved.');
+      refreshRooms();
+    }
+  });
+  $('roomHereBtns').addEventListener('click', async (e) => {
+    if (!e.target.closest('#roomSaveHere')) return;
+    const id = GARDEN_STATUS && GARDEN_STATUS.room && GARDEN_STATUS.room.roomId;
+    if (!id) return;
+    const name = prompt('A name for this room:', /^i-/.test(id) ? 'Discord room' : id);
+    if (name === null) return;
+    await window.app.roomsSave(id, name);
+    toast('Room saved.');
+    refreshRooms();
+  });
+  $('roomList').addEventListener('click', async (e) => {
+    const join = e.target.closest('[data-join]');
+    const forget = e.target.closest('[data-forget]');
+    if (join) joinRoom(join.dataset.join, join.dataset.name);
+    if (forget) {
+      await window.app.roomsRemove(forget.dataset.forget);
+      refreshRooms();
+    }
+  });
+  const code = () => $('roomCode').value.trim().replace(/^.*\/r\//, '');
+  $('roomSaveCode').addEventListener('click', async () => {
+    if (!code()) return;
+    await window.app.roomsSave(code(), code());
+    $('roomCode').value = '';
+    toast('Room saved.');
+    refreshRooms();
+  });
+  $('roomJoinCode').addEventListener('click', () => {
+    if (code()) joinRoom(code(), code());
+  });
+  $('roomCode').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && code()) joinRoom(code(), code());
+  });
+}
+
+/* ================================================================== *
+ * The panel itself: attached to the game or in its own window
+ * ================================================================== */
+
+let PANEL = { mode: 'attached', open: true, width: 430 };
+
+function renderPanel() {
+  $('panelMode').value = PANEL.mode;
+  $('panelWidth').value = PANEL.width;
+  $('panelWidthRow').hidden = PANEL.mode !== 'attached';
+  $('panelHide').hidden = PANEL.mode !== 'attached';
+  $('panelPop').textContent = PANEL.mode === 'attached' ? '⧉' : '⇤';
+  $('panelPop').title = PANEL.mode === 'attached' ? 'Pop the panel out into its own window' : 'Attach the panel to the side of the game';
+}
+
+async function setPanel(change) {
+  PANEL = (await window.app.panel(change)) || PANEL;
+  renderPanel();
+}
+
+// A little flower for Hannah: click the sprout by the app's name.
+function wireSprout() {
+  const el = $('sprout');
+  let timer = null;
+  el.addEventListener('click', () => {
+    el.textContent = '🌷';
+    el.classList.add('bloom');
+    toast('🌷 dedicated to my sweet hannah buns');
+    window.app.fun('flowers');
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      el.textContent = '🌱';
+      el.classList.remove('bloom');
+    }, 4000);
+  });
+}
+
+function wirePanel() {
+  $('panelMode').addEventListener('change', (e) => setPanel({ mode: e.target.value, open: true, show: true }));
+  $('panelWidth').addEventListener('change', (e) => setPanel({ width: Number(e.target.value) }));
+  $('panelHide').addEventListener('click', () => setPanel({ open: false }));
+  $('panelPop').addEventListener('click', () => setPanel(PANEL.mode === 'attached' ? { mode: 'window', show: true } : { mode: 'attached', open: true }));
+  window.app.onPanel((p) => {
+    PANEL = p || PANEL;
+    renderPanel();
+  });
+}
+
+/* ================================================================== *
+ * Scripts tab
+ * ================================================================== */
+
+async function renderScripts() {
+  const list = await window.app.listScripts();
+  $('scriptList').innerHTML = list.length
+    ? list
+        .map((s) => `
+          <div class="rule">
+            <div class="rule-text">
+              <div class="script-name">${esc(s.name)}</div>
+              <div class="rule-desc">${(s.size / 1024).toFixed(1)} KB</div>
+            </div>
+            <button class="switch" role="switch" aria-checked="${s.enabled}" aria-label="${esc(s.name)}" data-script="${esc(s.name)}"></button>
+          </div>`)
+        .join('')
+    : '<div class="empty">No scripts. Drop a .js file into the scripts folder and it shows up here.</div>';
+}
+
+function wireScripts() {
+  $('scriptList').addEventListener('click', async (e) => {
+    const sw = e.target.closest('[data-script]');
+    if (!sw) return;
+    const next = !switchOn(sw);
+    await window.app.toggleScript(sw.dataset.script, next);
+    renderScripts();
+    toast(next ? 'On. Reload the game to start it.' : 'Off. Reload the game to stop it.');
+  });
+  $('scriptsRun').addEventListener('click', async () => {
+    const results = await window.app.runScripts();
+    const bad = results.filter((r) => !r.ok).length;
+    toast(bad ? `${bad} script(s) hit an error. Check the game console.` : `Ran ${results.length} script(s).`);
+  });
+  $('scriptsReload').addEventListener('click', () => {
+    window.app.reloadGame();
+    toast('Reloading the game.');
+  });
+  $('scriptsFolder').addEventListener('click', () => window.app.openScriptsFolder());
+  $('scriptsConsole').addEventListener('click', () => window.app.gameConsole());
+}
+
+/* ================================================================== *
+ * Tabs and startup
+ * ================================================================== */
+
+function showTab(name) {
+  for (const btn of document.querySelectorAll('nav [data-tab]')) {
+    btn.setAttribute('aria-selected', String(btn.dataset.tab === name));
+  }
+  for (const sec of document.querySelectorAll('main > section')) {
+    sec.hidden = sec.id !== 'tab-' + name;
+  }
+  if (name === 'scripts') {
+    renderScripts();
+    renderDevDetails();
+  }
+  if (name === 'pets') renderPets();
+  if (name === 'pity') renderPity();
+  startRoomsPolling(name === 'rooms');
+  if (S && S.ui && S.ui.tab !== name) {
+    S.ui.tab = name;
+    save();
+  }
+}
+
+// Keys belong to the game. After any click in the panel (a switch, a button,
+// a tab...), the keyboard goes straight back to the game, so Space harvests
+// instead of pressing whatever was clicked last. Typing in a box (counter
+// numbers, room codes, names) keeps the keyboard here until you're done.
+const TYPING = 'input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select, [contenteditable="true"]';
+function keysToGame() {
+  const a = document.activeElement;
+  if (a && a.matches && a.matches(TYPING)) return;
+  if (a && a !== document.body && a.blur) a.blur();
+  window.app.keysToGame();
+}
+function wireKeysToGame() {
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest(TYPING)) return;
+    // After the click has done its job (and any confirm box has closed).
+    setTimeout(keysToGame, 0);
+  });
+  // Menus and sliders: once a choice is made, back to the game.
+  document.addEventListener('change', (e) => {
+    if (e.target.matches && e.target.matches('select, input[type=range]')) {
+      setTimeout(() => {
+        e.target.blur();
+        window.app.keysToGame();
+      }, 0);
+    }
+  });
+  // Enter or Escape in a box also hands the keyboard back.
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === 'Escape') && e.target.matches && e.target.matches(TYPING) && e.target.tagName !== 'TEXTAREA') {
+      setTimeout(() => {
+        e.target.blur();
+        window.app.keysToGame();
+      }, 0);
+    }
+  });
+}
+
+async function start() {
+  S = await window.app.getSettings();
+  RULES = await window.app.getRules();
+  STATUS = await window.app.getStatus();
+  try {
+    KINDS = (await window.app.weatherKinds()) || [];
+    PARKED = await window.app.getParked();
+    $('appVersion').textContent = 'v' + (await window.app.version());
+  } catch (err) {
+    /* older main process; the Weather tab just stays empty */
+  }
+
+  document.querySelector('nav').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab]');
+    if (btn) showTab(btn.dataset.tab);
+  });
+
+  wireAlerts();
+  wirePity();
+  wireGarden();
+  wireVoicePicker();
+  wireExtras();
+  wireScripts();
+  wireWeather();
+  wireRooms();
+  wirePanel();
+  wireSprout();
+  wireTriggers();
+  wireBackups();
+  wireFun();
+  wireSeeds();
+  wireLock();
+  wireReclaim();
+  wireSecret();
+  wireWorth();
+  wireKeysToGame();
+
+  renderAlertSettings();
+  renderRules();
+  try {
+    LOCK = (await window.app.harvestGet()) || LOCK;
+    RECLAIM = (await window.app.reclaimGet()) || RECLAIM;
+    PITY = await window.app.getPity();
+    LUCK = await window.app.luckGet();
+    PANEL = (await window.app.panel()) || PANEL;
+  } catch (err) {
+    /* older main process */
+  }
+  renderPanel();
+  renderPity();
+  renderLogoff();
+  renderStatus();
+  if (S.ui && S.ui.tab) showTab(S.ui.tab);
+
+  try {
+    HISTORY = (await window.app.getHistory()) || [];
+  } catch (err) {
+    HISTORY = [];
+  }
+  renderHistory();
+  renderSnooze();
+
+  const garden = await window.app.getGarden();
+  GARDEN_STATUS = garden.status;
+  GARDEN_STATS = garden.stats;
+  renderGarden();
+  window.app.onGardenStatus((st) => {
+    GARDEN_STATUS = st;
+    renderGarden();
+  });
+  window.app.onGardenStats((stats) => {
+    GARDEN_STATS = stats;
+    renderGarden();
+  });
+
+  if ('speechSynthesis' in window) {
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+  }
+
+  try {
+    ROUTE_SPEECH = Boolean(await window.app.speechRoutingSupported());
+  } catch (err) {
+    ROUTE_SPEECH = false;
+  }
+  await renderDevices();
+  updateKeepAwake();
+
+  try {
+    VOICES = await window.app.voicesList();
+  } catch (err) {
+    VOICES = { available: false, engineInstalled: false, voices: [] };
+  }
+  renderVoicePicker();
+  const nv = naturalVoice();
+  if (nv) window.app.voiceWarm(nv.id);
+
+  // Speakers take a moment to fully register after being plugged in, so check
+  // again shortly after a change, and every so often while the chosen one is away.
+  if (navigator.mediaDevices) {
+    navigator.mediaDevices.addEventListener('devicechange', () => {
+      renderDevices();
+      setTimeout(renderDevices, 1500);
+      setTimeout(renderDevices, 5000);
+    });
+  }
+  setInterval(() => {
+    if (S.alerts.outputDevice) renderDevices();
+  }, 15000);
+  if (S.alerts.outputDevice && ROUTE_SPEECH) window.app.warmSpeech();
+
+  window.app.onAlerts((list) => enqueue(list));
+  window.app.onStatus((st) => {
+    STATUS = st;
+    renderStatus();
+  });
+  window.app.onTab(showTab);
+  // Ctrl+Shift+H: the main process counted it; just a tick so you know.
+  window.app.onHatch(() => {
+    if (level() > 0) SFX.tick();
+  });
+
+  window.addEventListener('focus', () => {
+    if (!document.querySelector('#tab-scripts').hidden) renderScripts();
+  });
+
+  setInterval(renderStatus, 1000);
+  setInterval(renderGarden, 5000);
+}
+
+start();
+</script>
+</body>
+</html>

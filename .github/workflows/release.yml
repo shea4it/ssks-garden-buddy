@@ -1,0 +1,71 @@
+# Builds the installers whenever a release is published on GitHub, and
+# attaches them to that release's download page:
+#   Windows: SSKs-Garden-Buddy-Setup-<version>.exe
+#   Mac:     SSKs-Garden-Buddy-<version>-arm64.dmg (Apple Silicon)
+#            SSKs-Garden-Buddy-<version>-x64.dmg   (older Intel Macs)
+# It can also be run by hand from the Actions tab (the files then appear as
+# downloads on that run's page instead).
+#
+# The installers aren't code-signed (that needs paid certificates), so
+# Windows shows a "protect your PC" screen on first run and Macs need a
+# right-click > Open the first time.
+
+name: Build installers
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win nsis --x64
+          - os: macos-latest
+            target: --mac dmg --arm64 --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      # BUILD.bat and BUILD.command point electron-builder at a local copy of
+      # Electron; here it downloads the right one for each system itself.
+      - name: Let the builder fetch Electron
+        run: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.build.electronDist;fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+
+      - name: Build
+        run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.dmg
+
+      - name: Keep as downloads (when run by hand)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg

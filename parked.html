@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Magic Garden (logged off)</title>
+<style>
+  :root { --base: #2A1B36; --card: #36224a; --edge: #4b3459; --text: #f6f1f8; --muted: #cbb8d8; --moss: #7fc98a; --moss-dim: #47624c; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(ellipse at top, #3a2550 0%, var(--base) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    display: grid; place-items: center;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--edge); border-radius: 18px;
+    padding: 36px 44px; text-align: center; max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  }
+  .emoji { font-size: 64px; line-height: 1; }
+  h1 { font-size: 24px; margin: 16px 0 6px; font-weight: 650; }
+  p { color: var(--muted); margin: 8px 0; line-height: 1.5; }
+  .back { font-size: 17px; color: var(--text); margin-top: 18px; }
+  .count { font-variant-numeric: tabular-nums; color: var(--moss); font-weight: 600; }
+  a.btn {
+    display: inline-block; margin-top: 22px; padding: 11px 22px; border-radius: 10px;
+    background: var(--moss-dim); color: #eafbec; text-decoration: none; font-weight: 600;
+  }
+  a.btn:hover { background: #55765b; }
+  .small { font-size: 12.5px; margin-top: 18px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="emoji" id="emoji">🌧️</div>
+    <h1 id="title">Stepped out for the weather</h1>
+    <p>Weather can only change your crops while you're in the game, so your garden is safe from it while you're out here.</p>
+    <p class="back" id="back"></p>
+    <a class="btn" href="https://magicgarden.gg">Rejoin now</a>
+    <p class="small">Don't open the game anywhere else while you wait. If you do, it's best to close this app first.</p>
+  </div>
+<script>
+  'use strict';
+  const q = new URLSearchParams(location.search);
+  const name = q.get('weather') || 'the weather';
+  const until = Number(q.get('until')) || 0;
+  const auto = q.get('rejoin') === '1';
+  document.getElementById('emoji').textContent = q.get('emoji') || '🌧️';
+  document.getElementById('title').textContent = name === 'a break' ? 'Taking a break' : `Stepped out for ${name}`;
+  document.title = `Magic Garden (logged off for ${name})`;
+
+  const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    .replace(/\s?([AP])M/i, (m, a) => a.toLowerCase() + 'm');
+
+  function tick() {
+    const el = document.getElementById('back');
+    if (!auto) {
+      el.textContent = 'Press Rejoin whenever you\'re ready.';
+      return;
+    }
+    if (!until) {
+      el.textContent = `Back automatically when ${name} ends.`;
+      return;
+    }
+    const back = until + 10000;
+    const s = Math.max(0, Math.round((back - Date.now()) / 1000));
+    const left = s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+    el.innerHTML = `Back automatically at ${clock(back)} <span class="count">(${left})</span>`;
+  }
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

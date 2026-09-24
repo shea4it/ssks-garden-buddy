@@ -1,0 +1,10 @@
+# Left out of the public repository:
+# build leftovers,
+node_modules/
+release/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+# and Claude's working notes (personal; delete this line to publish them).
+HANDOFF.md
