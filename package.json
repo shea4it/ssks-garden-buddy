@@ -1,7 +1,7 @@
 {
   "name": "magic-garden-loader",
   "productName": "SSK's Garden Buddy",
-  "version": "0.22.1",
+  "version": "0.22.2",
   "description": "SSK's Garden Buddy: a friendly helper for Magic Garden. Shop alerts, weather teams, pet and garden trackers, Bad Luck Protection counters, and more.",
   "author": "Spread Sheet King",
   "main": "main.js",

@@ -991,7 +991,6 @@
 let S = null;          // settings, mirrored from the main process
 let RULES = [];
 let STATUS = null;
-const undoStack = [];
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1796,14 +1795,6 @@ function distortionCurve(amount) {
 // needs stopping afterwards, and how long the effect rings on (echoes).
 function wireEffect(c, src, effect, out, t0, seconds) {
   const stops = [];
-  const osc = (type, freq) => {
-    const o = c.createOscillator();
-    o.type = type;
-    o.frequency.value = freq;
-    o.start(t0);
-    stops.push(o);
-    return o;
-  };
   const gain = (v) => {
     const g = c.createGain();
     g.gain.value = v;
@@ -2215,7 +2206,6 @@ const LINES = {
 
 async function perform(a) {
   const id = a.ruleId;
-  const name = a.itemName || a.label;
 
   if (id === 'pethungry') {
     await play(SFX.rumble());
@@ -2421,20 +2411,10 @@ function renderAlertSettings() {
   $('quietTo').value = S.alerts.quietHours.to;
 }
 
-function clockTime(iso) {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
 function ago(ms) {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
   if (s < 60) return `${s}s ago`;
   return `${Math.floor(s / 60)}m ago`;
-}
-
-function until(ms) {
-  const s = Math.max(0, Math.round((ms - Date.now()) / 1000));
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 /* Weather names, emoji and the schedule list, shared by the Alerts and
@@ -2946,7 +2926,6 @@ function minutesText(seconds) {
 function strLine(p) {
   if (!p.strength) return '';
   const max = p.maxStrength || p.strength;
-  const pct = Math.max(0, Math.min(100, (p.strength / 100) * 100));
   const grow = p.maxStrength && p.strength < p.maxStrength && p.hoursToMax
     ? `grows to ${max} in about ${p.hoursToMax < 48 ? Math.round(p.hoursToMax) + ' h' : Math.round(p.hoursToMax / 24) + ' days'} out`
     : p.maxStrength && p.strength >= p.maxStrength ? 'fully grown' : '';

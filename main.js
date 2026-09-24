@@ -252,15 +252,6 @@ async function injectScripts(contents) {
  * ================================================================== */
 
 // 1.2B, 45.2M, 12.3K
-function shortNumber(n) {
-  const v = Number(n) || 0;
-  const units = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
-  for (const [size, suffix] of units) {
-    if (v >= size) return (v / size).toFixed(v / size >= 100 ? 0 : 1).replace(/\.0$/, '') + suffix;
-  }
-  return String(Math.round(v));
-}
-
 function toastText(a) {
   if (a.kind === 'hunger') {
     const names = a.names || [];
@@ -882,19 +873,6 @@ function sendPity() {
   sendToControl('pity:state', pityView());
 }
 
-// "Your next hatch is a guaranteed Gold pet": once per counter per streak.
-const announcedGuarantee = {};
-function announceGuaranteed(p) {
-  for (const c of pity.guaranteedNext(p)) {
-    const key = `${c.id}:${c.value}`;
-    if (announcedGuarantee[c.id] === key) continue;
-    announcedGuarantee[c.id] = key;
-    const what = c.kind === 'gold' ? 'a Gold pet' : c.kind === 'rainbow' ? 'a Rainbow pet' : `a ${petData.prettySpecies(c.species)}`;
-    const where = c.egg ? ` from your next ${petData.eggInfo(c.egg).name}` : '';
-    recordNote(`🍀 Bad Luck Protection: ${what} is guaranteed${where || ' on your next hatch'}`, 'Guaranteed next hatch');
-  }
-}
-
 /* The secret: hatching a Rainbow version of an egg's rare pet (a Rainbow
  * Capybara, Phoenix, Turkey...) sets off a party: stacked discos, rainbow
  * mode, confetti, hearts and a big banner on the game screen, and a little
@@ -1169,7 +1147,7 @@ function handleGardenMessage(type, payload) {
   if (type === 'hatch') {
     const p = pityState();
     const seen = payload.petId && p.seenIds.includes(payload.petId);
-    const r = pity.onHatch(p, payload);
+    pity.onHatch(p, payload);
     if (!seen && p.autoCount) {
       const events = luck.onEgg(luckState(), payload);
       // A Rainbow version of the egg's rare pet: the secret celebration
@@ -2157,12 +2135,21 @@ async function installUpdate() {
   upd.ready = { path: dest, platform: process.platform };
   sendUpdate();
   if (process.env.MG_TEST_UPDATE_NOINSTALL) return { ok: true, ready: dest };
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' || process.env.MG_TEST_UPDATE_SPAWN) {
     // The installer replaces the app and opens it again; this copy steps
     // aside first. Settings live in their own folder and stay.
     recordNote(`✨ Installing version ${info.display}…`);
+    // The same flags electron-updater gives the installer: --updated makes it
+    // close this app quietly if it's still running (otherwise it can ask "is
+    // running, click OK to close" when it starts faster than we quit), and
+    // --force-run opens the new version when it's done.
+    const args = ['--updated', '--force-run'];
+    if (process.env.MG_TEST_UPDATE_SPAWN) {
+      fs.writeFileSync(process.env.MG_TEST_UPDATE_SPAWN, JSON.stringify({ file: dest, args }));
+      return { ok: true, installing: true, test: true };
+    }
     try {
-      spawn(dest, [], { detached: true, stdio: 'ignore' }).unref();
+      spawn(dest, args, { detached: true, stdio: 'ignore' }).unref();
     } catch (err) {
       upd.error = `Couldn't start the installer (${String(err.message || err).slice(0, 80)}). It's saved at ${dest}.`;
       sendUpdate();
