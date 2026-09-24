@@ -145,6 +145,23 @@ ones worth waking up for, like a Moonbinder at 4am. **Mute alerts** still
 silences everything. The computer has to be awake for any alert to ring,
 so leave it on (the screen can be off).
 
+## Updates
+
+At the top of the Extras tab. The app checks for a new version when it starts
+and every few hours (switch **Check automatically** off if you'd rather not),
+and **Check for updates** (or **Help → Check for updates…**) checks right away.
+When there's one, a banner appears under the tabs and the card shows what's
+new. **Update now** downloads it, checks it's complete and exactly what was
+published, then:
+
+- **Windows:** installs it; the app closes and reopens on the new version.
+- **Mac:** opens it in Finder. Quit the app, drag SSK's Garden Buddy onto
+  Applications, choose Replace, and open it again (right-click → Open the
+  first time).
+
+Nothing is ever installed until you press Update now. Settings, counts and
+history are kept.
+
 ## Harvest lock
 
 For moving pots around without harvesting by accident. Press the 🔓 at the

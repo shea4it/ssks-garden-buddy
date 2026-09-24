@@ -29,6 +29,8 @@ const gameData = require('./game-data');
 const pity = require('./pity');
 const roomsMod = require('./rooms');
 const backup = require('./backup');
+const updater = require('./updater');
+const { spawn } = require('child_process');
 const fun = require('./fun');
 const luck = require('./luck');
 
@@ -1728,6 +1730,16 @@ function buildMenu() {
         },
       ],
     },
+    {
+      label: 'Help',
+      submenu: [
+        { label: 'Check for updates…', click: () => { showControl('scripts'); checkForUpdate(true); } },
+        { label: 'Download page', click: () => shell.openExternal(updater.PAGE_URL) },
+        { label: 'Report a problem', click: () => shell.openExternal(`https://github.com/${updater.REPO}/issues`) },
+        { type: 'separator' },
+        { label: `Version ${app.getVersion()}`, enabled: false },
+      ],
+    },
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -1752,6 +1764,8 @@ ipcMain.handle('settings:set', (event, next) => {
   next.harvestLock = store.get().harvestLock;
   next.reclaim = store.get().reclaim;
   next.worthHistory = store.get().worthHistory;
+  next.updates = store.get().updates;
+  next.lastRunVersion = store.get().lastRunVersion;
   next.rooms = store.get().rooms;
   next.ui = Object.assign({}, next.ui, {
     panel: store.get().ui.panel, panelOpen: store.get().ui.panelOpen, panelWidth: store.get().ui.panelWidth,
@@ -2048,6 +2062,136 @@ ipcMain.handle('seeds:delete', (event, species, count) => {
 ipcMain.handle('seeds:stop', () => {
   if (seedRun && seedRun.running) seedRun.cancel = true;
   return true;
+});
+
+/* ------------------------------------------------------------------ *
+ * Updates (updater.js). Checks GitHub at startup and every 6 hours (if
+ * automatic checks are on) or when asked; never installs without the player
+ * pressing Update now.
+ * ------------------------------------------------------------------ */
+
+const UPDATE_EVERY = 6 * 60 * 60 * 1000;
+const upd = { checking: false, info: null, error: null, downloading: false, progress: 0, total: 0, ready: null, checkedAt: 0 };
+
+function updateSettings() {
+  const s = store.get();
+  s.updates = Object.assign({ auto: true, notified: null }, s.updates);
+  return s.updates;
+}
+
+function sendUpdate() {
+  sendToControl('update:state', updateView());
+}
+
+function updateView() {
+  return {
+    current: app.getVersion(),
+    platform: process.platform,
+    auto: updateSettings().auto,
+    checking: upd.checking,
+    info: upd.info,
+    error: upd.error,
+    downloading: upd.downloading,
+    progress: upd.progress,
+    total: upd.total,
+    ready: upd.ready,
+    checkedAt: upd.checkedAt,
+  };
+}
+
+async function checkForUpdate(byHand) {
+  if (upd.checking || upd.downloading) return updateView();
+  upd.checking = true;
+  upd.error = null;
+  sendUpdate();
+  try {
+    upd.info = await updater.check({ currentVersion: app.getVersion(), platform: process.platform });
+    upd.checkedAt = Date.now();
+    const cfg = updateSettings();
+    if (upd.info.available && cfg.notified !== upd.info.latest) {
+      cfg.notified = upd.info.latest;
+      store.save();
+      recordNote(`✨ Version ${upd.info.display} is out: Extras → Updates`, byHand ? null : `SSK's Garden Buddy ${upd.info.display} is out`);
+    }
+  } catch (err) {
+    upd.error = byHand ? `Couldn't check for updates (${String((err && err.message) || err).slice(0, 80)}).` : null;
+  }
+  upd.checking = false;
+  sendUpdate();
+  return updateView();
+}
+
+async function installUpdate() {
+  const info = upd.info;
+  if (!info || !info.available) return { ok: false, reason: 'No update to install.' };
+  if (!info.asset) {
+    // No download for this system in the release: send them to the page.
+    shell.openExternal(updater.PAGE_URL);
+    return { ok: true, openedPage: true };
+  }
+  if (upd.downloading) return { ok: false, reason: 'Already downloading.' };
+  upd.downloading = true;
+  upd.error = null;
+  upd.progress = 0;
+  upd.total = info.asset.size || 0;
+  sendUpdate();
+  const dir = process.platform === 'darwin' ? app.getPath('downloads') : app.getPath('temp');
+  const dest = path.join(dir, info.asset.name);
+  try {
+    await updater.download({
+      asset: info.asset,
+      dest,
+      onProgress: (got, total) => {
+        upd.progress = got;
+        upd.total = total;
+        sendUpdate();
+      },
+    });
+  } catch (err) {
+    upd.downloading = false;
+    upd.error = String((err && err.message) || err).slice(0, 160);
+    sendUpdate();
+    return { ok: false, reason: upd.error };
+  }
+  upd.downloading = false;
+  upd.ready = { path: dest, platform: process.platform };
+  sendUpdate();
+  if (process.env.MG_TEST_UPDATE_NOINSTALL) return { ok: true, ready: dest };
+  if (process.platform === 'win32') {
+    // The installer replaces the app and opens it again; this copy steps
+    // aside first. Settings live in their own folder and stay.
+    recordNote(`✨ Installing version ${info.display}…`);
+    try {
+      spawn(dest, [], { detached: true, stdio: 'ignore' }).unref();
+    } catch (err) {
+      upd.error = `Couldn't start the installer (${String(err.message || err).slice(0, 80)}). It's saved at ${dest}.`;
+      sendUpdate();
+      return { ok: false, reason: upd.error };
+    }
+    setTimeout(() => {
+      quitting = true;
+      app.quit();
+    }, 600);
+    return { ok: true, installing: true };
+  }
+  if (process.platform === 'darwin') {
+    // Without a paid Apple certificate an app can't replace itself, so the
+    // new version opens for the player to drag into Applications.
+    shell.openPath(dest);
+    return { ok: true, openedDmg: true };
+  }
+  shell.showItemInFolder(dest);
+  return { ok: true };
+}
+
+ipcMain.handle('update:get', () => updateView());
+ipcMain.handle('update:check', () => checkForUpdate(true));
+ipcMain.handle('update:install', () => installUpdate());
+ipcMain.handle('update:auto', (event, on) => {
+  updateSettings().auto = Boolean(on);
+  store.save();
+  sendUpdate();
+  return updateView();
 });
 
 /* ------------------------------------------------------------------ *
@@ -2477,6 +2621,18 @@ if (!gotLock) {
       /* not worth stopping for */
     }
     loadCatalogCache();
+    // "Updated to 0.22.1" once, after an update.
+    {
+      const st = store.get();
+      if (st.lastRunVersion && updater.compareVersions(app.getVersion(), st.lastRunVersion) > 0) {
+        setTimeout(() => recordNote(`🎉 Updated to version ${app.getVersion()}`), 4000);
+      }
+      st.lastRunVersion = app.getVersion();
+      store.save();
+    }
+    // Look for updates a little after starting, then every 6 hours.
+    setTimeout(() => { if (updateSettings().auto) checkForUpdate(false); }, 20000);
+    setInterval(() => { if (updateSettings().auto) checkForUpdate(false); }, UPDATE_EVERY);
     buildMenu();
     createGameWindow();
     createPanel();

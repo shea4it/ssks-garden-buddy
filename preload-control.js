@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('app', {
   onPanel: on('ui:panel'),
 
   fun: (name) => ipcRenderer.invoke('fun:play', name),
+  updateGet: () => ipcRenderer.invoke('update:get'),
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  updateAuto: (on) => ipcRenderer.invoke('update:auto', on),
+  onUpdate: on('update:state'),
   worthGet: () => ipcRenderer.invoke('worth:get'),
   reclaimGet: () => ipcRenderer.invoke('reclaim:get'),
   reclaimSet: (change) => ipcRenderer.invoke('reclaim:set', change),

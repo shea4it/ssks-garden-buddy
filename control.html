@@ -125,6 +125,8 @@
   .clip-banner { margin: 8px 0 0; padding: 8px 10px; border-radius: 9px; background: #2f4a36; border: 1px solid #47624c; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .clip-banner .t { flex: 1; min-width: 140px; }
   .clip-banner[hidden] { display: none; }
+  .clip-banner.upd { background: #3b3160; border-color: #5c4f8f; }
+  .upd-notes { white-space: pre-wrap; font-size: 12.5px; color: var(--muted); background: var(--base); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 10px; margin-top: 8px; max-height: 160px; overflow: auto; }
 
   details.dev { margin: 18px 0 6px; border: 1px dashed var(--edge); border-radius: 10px; padding: 8px 12px; }
   details.dev summary { cursor: pointer; color: var(--faint); font-size: 12.5px; }
@@ -534,6 +536,7 @@
     <button role="tab" data-tab="scripts" aria-selected="false"><i>🧰</i>Extras</button>
   </nav>
   <div id="clipBanner" class="clip-banner" hidden></div>
+  <div id="updBanner" class="clip-banner upd" hidden></div>
 </header>
 
 <main>
@@ -889,6 +892,20 @@
 
   <!-- ============================ SCRIPTS ============================ -->
   <section id="tab-scripts" hidden>
+    <h2 style="margin-top:4px">Updates</h2>
+    <div class="card">
+      <div class="big-line" id="updLine">Version …</div>
+      <div id="updBody"></div>
+      <div class="button-row">
+        <button class="btn small" id="updCheck">Check for updates</button>
+        <button class="btn small primary" id="updInstall" hidden>Update now</button>
+      </div>
+      <div class="row" style="min-height:30px">
+        <span>Check automatically<div class="rule-desc">When the app starts and every few hours. It only tells you; nothing installs until you press Update now.</div></span>
+        <button class="switch" role="switch" id="updAuto" aria-label="Check for updates automatically"></button>
+      </div>
+    </div>
+
     <h2 style="margin-top:4px">Playing on another device</h2>
     <div class="card">
       <div class="row">
@@ -3841,6 +3858,85 @@ function wireSecret() {
   });
 }
 
+/* Updates */
+let UPD = null;
+let updBannerHiddenFor = null;
+
+function mb(n) {
+  return `${Math.round((Number(n) || 0) / 1048576)} MB`;
+}
+
+function renderUpdate() {
+  const u = UPD;
+  if (!u || !$('updLine')) return;
+  const info = u.info;
+  setSwitch($('updAuto'), u.auto);
+  $('updLine').innerHTML = info && info.available
+    ? `✨ <strong>Version ${esc(info.display || info.latest)}</strong> is out <span class="where">(you have ${esc(u.current)})</span>`
+    : `You have version <strong>${esc(u.current)}</strong>`;
+  const bits = [];
+  if (u.checking) bits.push('<div class="note">Checking…</div>');
+  else if (info && !info.available) bits.push(`<div class="note">✅ You're up to date${u.checkedAt ? ` (checked ${esc(fmtClock(u.checkedAt))})` : ''}.${info.reason ? ' ' + esc(info.reason) : ''}</div>`);
+  if (info && info.available && info.notes) bits.push(`<div class="upd-notes">${esc(info.notes)}</div>`);
+  if (u.downloading) {
+    const pct = u.total ? Math.min(100, (u.progress / u.total) * 100) : 0;
+    bits.push(`<div class="bar-row" style="margin-top:8px"><span>Downloading</span><span class="bar size"><span style="width:${pct}%"></span></span><span>${u.total ? Math.round(pct) + '%' : mb(u.progress)}</span></div>`);
+  }
+  if (u.ready && u.platform === 'darwin') {
+    bits.push('<div class="note">📦 The new version is open in a Finder window (and saved in Downloads). <b>Quit this app</b>, drag <b>SSK\'s Garden Buddy</b> onto <b>Applications</b>, choose <b>Replace</b>, then open it again (right-click → Open the first time). Your settings stay.</div>');
+  } else if (u.ready && u.platform === 'win32') {
+    bits.push('<div class="note">Installing… the app will close and reopen by itself.</div>');
+  }
+  if (u.error) bits.push(`<div class="note">⚠️ ${esc(u.error)}</div>`);
+  if (info && info.available && !info.asset) bits.push('<div class="note">This version is on the download page: Update now opens it.</div>');
+  $('updBody').innerHTML = bits.join('');
+  $('updInstall').hidden = !(info && info.available) || u.downloading || (u.ready && u.platform === 'win32');
+  $('updInstall').textContent = info && info.available && !info.asset ? 'Open the download page' : 'Update now';
+  $('updCheck').disabled = u.checking || u.downloading;
+  // The banner: once per version, until dismissed.
+  const banner = $('updBanner');
+  if (info && info.available && updBannerHiddenFor !== info.latest && !u.downloading && !u.ready) {
+    banner.hidden = false;
+    banner.innerHTML = `<span class="t">✨ Version ${esc(info.display || info.latest)} is out!</span><button class="btn small primary" data-upd="now">Update now</button><button class="link" data-upd="later">Later</button>`;
+  } else {
+    banner.hidden = true;
+    banner.innerHTML = '';
+  }
+}
+
+async function startUpdate() {
+  const r = await window.app.updateInstall();
+  if (r && r.openedPage) toast('Opened the download page.');
+  else if (r && !r.ok && r.reason) toast(r.reason);
+}
+
+function wireUpdates() {
+  $('updCheck').addEventListener('click', async () => {
+    UPD = await window.app.updateCheck();
+    renderUpdate();
+  });
+  $('updInstall').addEventListener('click', startUpdate);
+  $('updAuto').addEventListener('click', async () => {
+    UPD = await window.app.updateAuto(!(UPD && UPD.auto));
+    renderUpdate();
+  });
+  $('updBanner').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-upd]');
+    if (!b) return;
+    if (b.dataset.upd === 'now') {
+      showTab('scripts');
+      startUpdate();
+    } else {
+      updBannerHiddenFor = UPD && UPD.info && UPD.info.latest;
+      renderUpdate();
+    }
+  });
+  window.app.onUpdate((u) => {
+    UPD = u;
+    renderUpdate();
+  });
+}
+
 function wireReclaim() {
   $('reclaimOn').addEventListener('click', async () => {
     RECLAIM = await window.app.reclaimSet({ on: !RECLAIM.on });
@@ -4426,6 +4522,7 @@ async function start() {
   wireSeeds();
   wireLock();
   wireReclaim();
+  wireUpdates();
   wireSecret();
   wireWorth();
   wireKeysToGame();
@@ -4435,6 +4532,8 @@ async function start() {
   try {
     LOCK = (await window.app.harvestGet()) || LOCK;
     RECLAIM = (await window.app.reclaimGet()) || RECLAIM;
+    UPD = await window.app.updateGet();
+    renderUpdate();
     PITY = await window.app.getPity();
     LUCK = await window.app.luckGet();
     PANEL = (await window.app.panel()) || PANEL;

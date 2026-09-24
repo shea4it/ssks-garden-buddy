@@ -20,7 +20,10 @@ Or straight to the file:
 - 🪟 **[Download for Windows](https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Windows.exe)**: open it and it installs by itself. If Windows says *"Windows protected your PC"*, click **More info**, then **Run anyway** (that shows for any app without a paid certificate).
 - 🍎 **[Download for Mac](https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Mac.dmg)** (any Mac): open it, drag the app into Applications, then the first time **right-click the app and choose Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/SSK's Garden Buddy.app"` in Terminal and try again.
 
-Updating: download and install again. Your settings, counts and history are kept.
+**Updating:** the app checks for new versions by itself and tells you. Press
+**Update now** (in the banner, or Extras → Updates) and it downloads and installs
+the new one; on a Mac you drag it into Applications. Your settings, counts and
+history are kept. You can also use **Help → Check for updates…**.
 
 ## What it does
 
@@ -72,8 +75,9 @@ and tells you things. Here is everything it does that touches the game:
   (with a countdown and a Stay away button, as Magic Circle asks).
 - **Other places it connects to:** magicgarden.gg (the shop feed and room
   player counts), Arie's Mod's public room list (read only; can be switched
-  off), and GitHub / Hugging Face to download the natural voices when you
-  choose one. No accounts, no tracking; nothing about you is sent anywhere.
+  off), GitHub to check for updates (can be switched off; nothing installs
+  until you press Update now), and GitHub / Hugging Face to download the
+  natural voices when you choose one. No accounts, no tracking; nothing about you is sent anywhere.
 
 All of the code is plain, readable JavaScript, right here.
 
