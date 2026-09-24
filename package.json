@@ -55,14 +55,14 @@
         }
       ],
       "signAndEditExecutable": false,
-      "artifactName": "SSKs-Garden-Buddy-Setup-${version}.${ext}"
+      "artifactName": "SSKs-Garden-Buddy-Windows.${ext}"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
-      "artifactName": "SSKs-Garden-Buddy-Setup-${version}.${ext}"
+      "artifactName": "SSKs-Garden-Buddy-Windows.${ext}"
     },
     "mac": {
       "target": [
@@ -70,8 +70,13 @@
       ],
       "category": "public.app-category.games",
       "identity": null,
-      "artifactName": "SSKs-Garden-Buddy-${version}-${arch}.${ext}"
+      "artifactName": "SSKs-Garden-Buddy-Mac.${ext}"
     }
   },
-  "license": "MIT"
+  "license": "MIT",
+  "homepage": "https://shea4it.github.io/ssks-garden-buddy/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shea4it/ssks-garden-buddy.git"
+  }
 }

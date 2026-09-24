@@ -1,8 +1,11 @@
 # Builds the installers whenever a release is published on GitHub, and
-# attaches them to that release's download page:
-#   Windows: SSKs-Garden-Buddy-Setup-<version>.exe
-#   Mac:     SSKs-Garden-Buddy-<version>-arm64.dmg (Apple Silicon)
-#            SSKs-Garden-Buddy-<version>-x64.dmg   (older Intel Macs)
+# attaches them to that release:
+#   Windows: SSKs-Garden-Buddy-Windows.exe
+#   Mac:     SSKs-Garden-Buddy-Mac.dmg (one "universal" app for every Mac)
+# The names never change, so these links always give the newest version:
+#   https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Windows.exe
+#   https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Mac.dmg
+# (The download page in docs/ uses them.)
 # It can also be run by hand from the Actions tab (the files then appear as
 # downloads on that run's page instead).
 #
@@ -29,7 +32,7 @@ jobs:
           - os: windows-latest
             target: --win nsis --x64
           - os: macos-latest
-            target: --mac dmg --arm64 --x64
+            target: --mac dmg --universal
     runs-on: ${{ matrix.os }}
     steps:
       - name: Get the code

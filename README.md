@@ -13,22 +13,14 @@ counts your eggs toward Bad Luck Protection, and a lot more.
 
 ## Download
 
-Get the newest version from the **[Releases page](../../releases/latest)**.
+### 👉 **[Download page: shea4it.github.io/ssks-garden-buddy](https://shea4it.github.io/ssks-garden-buddy/)**
 
-**Windows:** download `SSKs-Garden-Buddy-Setup-<version>.exe` and open it. It
-installs and starts by itself. The first time, Windows may say *"Windows
-protected your PC"*: click **More info**, then **Run anyway**. (That warning
-shows for any app that doesn't have a paid code-signing certificate.)
+Or straight to the file:
 
-**Mac:** download the `.dmg` for your Mac: **arm64** for Apple Silicon (M1,
-M2, M3, M4…), **x64** for older Intel Macs. Open it and drag the app into
-Applications. The first time, **right-click the app and choose Open** (a
-normal double-click will refuse, since the app isn't from a paid Apple
-developer account). If macOS says the app is "damaged", open Terminal and run
-`xattr -cr "/Applications/SSK's Garden Buddy.app"`, then try again.
+- 🪟 **[Download for Windows](https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Windows.exe)**: open it and it installs by itself. If Windows says *"Windows protected your PC"*, click **More info**, then **Run anyway** (that shows for any app without a paid certificate).
+- 🍎 **[Download for Mac](https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Mac.dmg)** (any Mac): open it, drag the app into Applications, then the first time **right-click the app and choose Open**. If macOS says it's "damaged", run `xattr -cr "/Applications/SSK's Garden Buddy.app"` in Terminal and try again.
 
-**Updating:** download and install the new version the same way. Your
-settings, counts and history are kept.
+Updating: download and install again. Your settings, counts and history are kept.
 
 ## What it does
 

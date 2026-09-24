@@ -1,7 +1,8 @@
 # Building it yourself
 
-Most people should just download the installer from the
-[Releases page](../../releases/latest). This is for building from the code.
+Most people should just use the
+[download page](https://shea4it.github.io/ssks-garden-buddy/). This is for
+building from the code.
 
 ## Windows
 
@@ -11,7 +12,7 @@ Most people should just download the installer from the
 3. Double-click **BUILD.bat**. If Windows warns you, click
    **More info → Run anyway**.
 4. Wait for it to finish. The app installs and opens by itself. The installer
-   it made is in the `release` folder (`SSKs-Garden-Buddy-Setup-<version>.exe`),
+   it made is in the `release` folder (`SSKs-Garden-Buddy-Windows.exe`),
    ready to copy to another computer.
 
 To update, extract the newer code over the same folder (say yes to replacing
@@ -36,6 +37,12 @@ Mac: unzip it, drag the app into Applications, then right-click it and choose
 ## Releases
 
 Publishing a release on GitHub builds the installers automatically
-(`.github/workflows/release.yml`): a Windows installer and Mac disk images for
-Apple Silicon and Intel, attached to the release. They aren't code-signed, so
-Windows and macOS show a warning the first time (see the README).
+(`.github/workflows/release.yml`): `SSKs-Garden-Buddy-Windows.exe` and one
+universal `SSKs-Garden-Buddy-Mac.dmg`, attached to the release. The names never
+change, so `releases/latest/download/<name>` always gives the newest (the
+download page in `docs/` uses those links; GitHub leaves pre-releases out of
+"latest", so don't tick that box). They aren't code-signed, so Windows and
+macOS show a warning the first time (see the README).
+
+The download page is `docs/index.html`, published with GitHub Pages
+(Settings → Pages → Deploy from a branch → main, /docs).

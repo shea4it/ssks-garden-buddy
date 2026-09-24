@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSK's Garden Buddy: download</title>
+<meta name="description" content="A friendly helper for Magic Garden: shop alerts, pet teams, Bad Luck Protection counters and more. Free for Windows and Mac.">
+<style>
+  :root {
+    --base: #2A1B36; --card: #36224a; --edge: #4b3459; --text: #f6f1f8; --muted: #cbb8d8; --faint: #9c86ad;
+    --moss: #7fc98a; --moss-dim: #47624c; --gold: #f2c86b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(ellipse at top, #3d2753 0%, var(--base) 55%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 42px 20px 60px; }
+  .hero { text-align: center; }
+  .logo { font-size: 64px; line-height: 1; }
+  h1 { font-size: clamp(30px, 6vw, 44px); margin: 10px 0 4px; letter-spacing: -0.01em; }
+  .tag { color: var(--muted); font-size: 18px; margin: 0 auto; max-width: 560px; }
+  .beta { display: inline-block; background: #5a4a22; color: #fde9b8; border-radius: 99px; padding: 2px 12px; font-size: 13px; font-weight: 600; margin-top: 12px; }
+
+  .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 30px 0 8px; }
+  .dl {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none;
+    background: var(--card); border: 2px solid var(--edge); border-radius: 18px; padding: 20px 14px;
+    color: var(--text); transition: transform .12s, border-color .12s, background .12s;
+  }
+  .dl:hover { transform: translateY(-2px); border-color: var(--moss); }
+  .dl .ico { font-size: 38px; line-height: 1.1; }
+  .dl .big { font-size: 20px; font-weight: 700; }
+  .dl .small { font-size: 13px; color: var(--muted); }
+  .dl.mine { background: var(--moss-dim); border-color: var(--moss); box-shadow: 0 8px 30px rgba(127, 201, 138, .25); }
+  .dl.mine .small { color: #dff5e2; }
+  .yours { text-align: center; color: var(--faint); font-size: 13.5px; min-height: 1.5em; }
+
+  .note { background: #3f2b2b; border: 1px solid #6a4040; border-radius: 12px; padding: 12px 16px; margin: 18px 0; color: #fde3d6; }
+  section.card { background: var(--card); border: 1px solid var(--edge); border-radius: 16px; padding: 20px 22px; margin-top: 22px; }
+  h2 { font-size: 21px; margin: 0 0 10px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tabs button {
+    background: transparent; color: var(--muted); border: 1px solid var(--edge); border-radius: 99px;
+    padding: 6px 16px; font: inherit; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--moss-dim); border-color: var(--moss); color: #eafbec; }
+  ol.steps { margin: 0; padding-left: 0; list-style: none; counter-reset: s; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 8px 0 8px 44px; border-bottom: 1px solid rgba(75, 52, 89, .6); }
+  ol.steps > li:last-child { border-bottom: none; }
+  ol.steps > li::before {
+    content: counter(s); position: absolute; left: 0; top: 8px; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--moss-dim); color: #eafbec; font-weight: 700; display: grid; place-items: center;
+  }
+  .say { display: inline-block; background: #242a3a; border: 1px solid #3b4660; border-radius: 6px; padding: 0 7px; color: #cfe0ff; font-size: .95em; }
+  .why { color: var(--faint); font-size: 14px; display: block; margin-top: 2px; }
+  code { background: #1f1528; border: 1px solid var(--edge); border-radius: 6px; padding: 2px 6px; font-size: 13px; }
+  .copy { margin-left: 6px; background: var(--edge); color: var(--text); border: none; border-radius: 6px; padding: 3px 9px; font: inherit; font-size: 12.5px; cursor: pointer; }
+
+  .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+  .f { background: var(--base); border: 1px solid var(--edge); border-radius: 12px; padding: 12px 14px; }
+  .f b { display: block; margin-bottom: 2px; }
+  .f span { color: var(--muted); font-size: 14px; }
+  p.soft { color: var(--muted); }
+  a { color: var(--moss); }
+  footer { text-align: center; color: var(--faint); font-size: 13px; margin-top: 34px; }
+  [hidden] { display: none !important; }
+  @media (max-width: 520px) { .buttons { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="hero">
+    <div class="logo">🌱</div>
+    <h1>SSK's Garden Buddy</h1>
+    <p class="tag">A friendly helper for Magic Garden. It tells you when something good is in the shop, helps with pet teams, counts your eggs toward Bad Luck Protection, and lots more.</p>
+    <span class="beta">Free · Beta</span>
+  </div>
+
+  <div class="note" id="phone" hidden>📱 This is an app for computers. Open this page on your Windows PC or Mac to download it.</div>
+
+  <div class="buttons">
+    <a class="dl" id="dl-win" href="https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Windows.exe">
+      <span class="ico">🪟</span><span class="big">Download for Windows</span><span class="small">Windows 10 or 11</span>
+    </a>
+    <a class="dl" id="dl-mac" href="https://github.com/shea4it/ssks-garden-buddy/releases/latest/download/SSKs-Garden-Buddy-Mac.dmg">
+      <span class="ico">🍎</span><span class="big">Download for Mac</span><span class="small">Any Mac, new or old</span>
+    </a>
+  </div>
+  <div class="yours" id="yours"></div>
+
+  <section class="card">
+    <h2>Installing it</h2>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-win" aria-selected="true">🪟 Windows</button>
+      <button role="tab" id="tab-mac" aria-selected="false">🍎 Mac</button>
+    </div>
+
+    <ol class="steps" id="steps-win">
+      <li>Click <b>Download for Windows</b> above.
+        <span class="why">If your browser says the file <span class="say">isn't commonly downloaded</span>, click the <b>⋯</b> (or the little arrow) next to it and choose <b>Keep</b>, then <b>Keep anyway</b>. New apps get that until lots of people have downloaded them.</span></li>
+      <li>Open the file you downloaded: click it at the bottom or top of your browser, or find it in your <b>Downloads</b> folder.</li>
+      <li>If a blue box says <span class="say">Windows protected your PC</span>, click <b>More info</b>, then <b>Run anyway</b>.
+        <span class="why">Windows shows that for any app without a paid security certificate. It's safe, and it only asks the first time.</span></li>
+      <li>That's it! It installs and opens by itself. Log in to Magic Garden like you normally would, and the helper panel appears on the right.</li>
+    </ol>
+
+    <ol class="steps" id="steps-mac" hidden>
+      <li>Click <b>Download for Mac</b> above, then open the file you downloaded (it's in your <b>Downloads</b> folder).</li>
+      <li>In the window that opens, drag <b>SSK's Garden Buddy</b> onto the <b>Applications</b> folder.</li>
+      <li>The first time only: open your <b>Applications</b> folder, <b>right-click</b> (or Control-click) SSK's Garden Buddy, choose <b>Open</b>, then click <b>Open</b> again.
+        <span class="why">Macs only open apps from paid Apple developer accounts with a normal double-click. After this first time, it opens normally.</span></li>
+      <li>If your Mac says the app <span class="say">is damaged</span>: open the <b>Terminal</b> app, paste this in, press Return, then try step 3 again.<br>
+        <code id="fix">xattr -cr "/Applications/SSK's Garden Buddy.app"</code><button class="copy" id="copyFix">Copy</button>
+        <span class="why">It isn't really damaged: that's just how Macs treat apps downloaded from the internet that aren't from the App Store.</span></li>
+      <li>That's it! Log in to Magic Garden like you normally would, and the helper panel appears on the right.</li>
+    </ol>
+    <p class="soft" style="margin-bottom:0">Updating later? Just download and install again the same way. Your settings, egg counts and history are kept.</p>
+  </section>
+
+  <section class="card">
+    <h2>What it does</h2>
+    <div class="features">
+      <div class="f"><b>🔔 Shop alerts</b><span>A sound and a voice when rare seeds or eggs are in, plus weather and hungry pets. Quiet hours too.</span></div>
+      <div class="f"><b>🎭 Fun voices</b><span>Cheerful Poppy, grumpy Spike, gloomy Obadiah, a movie trailer voice…</span></div>
+      <div class="f"><b>🌦️ Weather teams</b><span>Swap to the right pet team when the weather changes, or when your garden hits a goal.</span></div>
+      <div class="f"><b>🌻 Your garden</b><span>What it's worth with your bonuses, a chart over time, and open spots when you're moving plants.</span></div>
+      <div class="f"><b>🐾 Your pets</b><span>Real strength, abilities in plain words, and the best team for what you want.</span></div>
+      <div class="f"><b>🍀 Bad Luck Protection</b><span>Counters for every egg, plant and capsule, and a heads-up when a guarantee is one away.</span></div>
+      <div class="f"><b>🔒 Harvest lock</b><span>Move pots around without harvesting anything by accident.</span></div>
+      <div class="f"><b>🧰 And more</b><span>Anti-AFK, a seed deleter, room finder, backups, and a few surprises.</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Fair play</h2>
+    <p class="soft" style="margin-top:0">No auto-buying, auto-harvesting or auto-selling. It mostly watches and tells you things. The only things it can do in the game are swap to one of your saved pet teams and throw seeds in the wishing well, and only when you set that up or press it. All of its code is open for anyone to read <a href="https://github.com/shea4it/ssks-garden-buddy">on GitHub</a>, where everything it does is listed.</p>
+    <p class="soft" style="margin-bottom:0">Found a bug or have an idea? Tell us in the app's thread on the Magic Garden Discord, or <a href="https://github.com/shea4it/ssks-garden-buddy/issues">report it here</a>. The full <a href="https://github.com/shea4it/ssks-garden-buddy/blob/main/GUIDE.md">guide</a> explains every part of the app.</p>
+  </section>
+
+  <footer>
+    Made by Spread Sheet King · An unofficial, fan-made mod, not made or reviewed by Magic Circle. Use at your own risk.
+  </footer>
+</main>
+<script>
+  'use strict';
+  // Which computer is this? Highlight its button and open its steps.
+  const ua = navigator.userAgent || '';
+  const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  const phone = /Android|iPhone|iPod/i.test(ua) || (/iPad/.test(ua)) || (/Mac/.test(plat) && navigator.maxTouchPoints > 1);
+  const mac = !phone && /Mac/i.test(plat + ' ' + ua);
+  const win = !phone && /Win/i.test(plat + ' ' + ua);
+
+  const show = (which) => {
+    document.getElementById('steps-win').hidden = which !== 'win';
+    document.getElementById('steps-mac').hidden = which !== 'mac';
+    document.getElementById('tab-win').setAttribute('aria-selected', String(which === 'win'));
+    document.getElementById('tab-mac').setAttribute('aria-selected', String(which === 'mac'));
+  };
+  document.getElementById('tab-win').addEventListener('click', () => show('win'));
+  document.getElementById('tab-mac').addEventListener('click', () => show('mac'));
+
+  if (phone) document.getElementById('phone').hidden = false;
+  if (win) {
+    document.getElementById('dl-win').classList.add('mine');
+    document.getElementById('yours').textContent = 'Looks like you’re on Windows, so that one’s highlighted.';
+    show('win');
+  } else if (mac) {
+    document.getElementById('dl-mac').classList.add('mine');
+    document.getElementById('yours').textContent = 'Looks like you’re on a Mac, so that one’s highlighted.';
+    show('mac');
+  }
+
+  document.getElementById('copyFix').addEventListener('click', async (e) => {
+    try {
+      await navigator.clipboard.writeText(document.getElementById('fix').textContent);
+      e.target.textContent = 'Copied!';
+    } catch (err) {
+      e.target.textContent = 'Select it and copy';
+    }
+  });
+</script>
+</body>
+</html>

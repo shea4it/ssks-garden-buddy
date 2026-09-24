@@ -36,7 +36,7 @@ if exist release rmdir /s /q release
 call npm run dist:win
 if errorlevel 1 goto :fail
 
-set "SETUP=release\SSKs-Garden-Buddy-Setup-%AV%.exe"
+set "SETUP=release\SSKs-Garden-Buddy-Windows.exe"
 if not exist "%SETUP%" goto :fail
 
 echo.
