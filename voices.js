@@ -183,6 +183,23 @@ function speakerIdFor(v, speaker) {
  * Downloading
  * ---------------------------------------------------------------- */
 
+// Waits for a write stream to catch up, or fails if the stream does (so a
+// full disk can't leave a download hanging).
+function drained(stream) {
+  return new Promise((resolve, reject) => {
+    const done = (err) => {
+      stream.off('drain', onDrain);
+      stream.off('error', onError);
+      if (err) reject(err);
+      else resolve();
+    };
+    const onDrain = () => done();
+    const onError = (err) => done(err || new Error('write failed'));
+    stream.once('drain', onDrain);
+    stream.once('error', onError);
+  });
+}
+
 async function downloadFile(url, dest, onProgress) {
   const controller = new AbortController();
   let stall = setTimeout(() => controller.abort(), 30000);
@@ -203,7 +220,7 @@ async function downloadFile(url, dest, onProgress) {
       clearTimeout(stall);
       stall = setTimeout(() => controller.abort(), 30000);
       received += value.length;
-      if (!out.write(Buffer.from(value))) await new Promise((r) => out.once('drain', r));
+      if (!out.write(Buffer.from(value))) await drained(out);
       if (onProgress) onProgress(received, total);
     }
     clearTimeout(stall);

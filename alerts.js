@@ -4,7 +4,8 @@
 // what deserves an announcement. Read-only: it never buys anything and never
 // touches the game connection.
 
-const API_URL = 'https://magicgarden.gg/platform/v1/shops';
+// MG_SHOPS_API is a test hook (the harness serves a stand-in feed).
+const API_URL = process.env.MG_SHOPS_API || 'https://magicgarden.gg/platform/v1/shops';
 const weather = require('./weather');
 
 // Order matters: the first rule that matches an item wins, and alerts that
@@ -21,15 +22,22 @@ const weather = require('./weather');
 // Item rules match the start of the item's name or id, ignoring spaces and
 // case, so "firepit" matches "Fire Pit" and "dawnbinder" matches "Dawnbinder Pod".
 const RULES = [
-  { id: 'moonbinder', label: 'Moonbinder', kind: 'item', match: 'moonbinder', tier: 'legendary' },
-  { id: 'dawnbinder', label: 'Dawnbinder', kind: 'item', match: 'dawnbinder', tier: 'epic' },
+  // ids: what the game itself calls the item (its species id), matched
+  // exactly as well as the name, so a renamed shop entry can't slip past.
+  { id: 'moonbinder', label: 'Moonbinder', kind: 'item', match: 'moonbinder', ids: ['MoonCelestial'], tier: 'legendary' },
+  { id: 'dawnbinder', label: 'Dawnbinder', kind: 'item', match: 'dawnbinder', ids: ['DawnCelestial'], tier: 'epic' },
   { id: 'dawnbreaker', label: 'Dawnbreaker', kind: 'item', match: 'dawnbreaker', tier: 'big' },
   { id: 'emberbloom', label: 'Emberbloom', kind: 'item', match: 'emberbloom', tier: 'big' },
-  { id: 'thunderspire', label: 'Thunderspire', kind: 'item', match: 'thunderspire', tier: 'big' },
+  { id: 'thunderspire', label: 'Thunderspire', kind: 'item', match: 'thunderspire', ids: ['ThunderCelestial'], tier: 'big' },
   { id: 'mythicalegg', label: 'Mythical Egg', kind: 'item', match: 'mythicalegg', tier: 'big' },
+  { id: 'amberegg', label: 'Amber Egg', kind: 'item', match: 'amberegg', ids: ['AmberEgg'], tier: 'big' },
   { id: 'starweaver', label: 'Starweaver', kind: 'item', match: 'starweaver', tier: 'alarm' },
   { id: 'windturner', label: 'Windturner', kind: 'item', match: 'windturner', tier: 'named' },
   { id: 'firepit', label: 'Firepit', kind: 'item', match: 'firepit', tier: 'named' },
+  // Late game's must-have.
+  { id: 'xppotion', label: 'XP Potion', kind: 'item', match: 'xppotion', tier: 'named' },
+  // Everyone gets excited about these. They shouldn't. They deserve a spot.
+  { id: 'sunflower', label: 'Sunflower', kind: 'item', match: 'sunflower', tier: 'basic' },
   { id: 'ube', label: 'Ube', kind: 'item', match: 'ube', tier: 'basic' },
   { id: 'milkcap', label: 'Milkcap', kind: 'item', match: 'milkcap', tier: 'basic' },
   { id: 'marigold', label: 'Marigold', kind: 'item', match: 'marigold', tier: 'basic' },
@@ -65,15 +73,27 @@ function normalise(text) {
   return String(text || '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
 }
 
-function nameMatches(item, match) {
+// An item's name, prepared once for matching: its id and every tail of its
+// name's words ("Dawnbinder Pod" → "dawnbinderpod", "pod"), squashed.
+// Callers matching many rules against the same items keep these.
+function nameKeys(item) {
+  const words = normalise(item && item.name).split(/\s+/).filter(Boolean);
+  const tails = [];
+  for (let i = 0; i < words.length; i += 1) tails.push(words.slice(i).join(''));
+  return { id: String((item && item.itemId) || ''), idKey: normalise(item && item.itemId).replace(/ /g, ''), tails };
+}
+
+// Does a rule's match (or one of its exact game ids) cover prepared keys?
+function keysMatch(keys, match, ids) {
+  if (Array.isArray(ids) && keys.id && ids.some((id) => String(id).toLowerCase() === keys.id.toLowerCase())) return true;
   const want = normalise(match).replace(/ /g, '');
   if (!want) return false;
-  if (normalise(item.itemId).replace(/ /g, '').startsWith(want)) return true;
-  const words = normalise(item.name).split(/\s+/).filter(Boolean);
-  for (let i = 0; i < words.length; i += 1) {
-    if (words.slice(i).join('').startsWith(want)) return true;
-  }
-  return false;
+  if (keys.idKey.startsWith(want)) return true;
+  return keys.tails.some((t) => t.startsWith(want));
+}
+
+function nameMatches(item, match, ids) {
+  return keysMatch(nameKeys(item), match, ids);
 }
 
 function customRules(settings) {
@@ -113,7 +133,7 @@ function inQuietHours(settings, date = new Date()) {
   return from < to ? t >= from && t < to : t >= from || t < to;
 }
 
-function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
+function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
   const doFetch = fetchImpl || ((url, opts) => fetch(url, opts));
 
   const state = {
@@ -125,11 +145,23 @@ function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
     seen: new Set(),
     lastFired: {},
     wasOpen: {},
+    openedAt: {},
+    recentFired: [],
     lastCheck: null,
     nextCheck: null,
     lastError: null,
     last: null,
   };
+
+  // What identifies "this restock" of a shop: its next restock time, or
+  // any restock/start id the feed gives, or, for a shop that just opens
+  // for an event, the time it was first seen open this time.
+  function restockKey(shopId, shop, now) {
+    if (shop.nextRestockAt) return String(shop.nextRestockAt);
+    for (const k of ['restockId', 'restockAt', 'startedAt', 'startsAt', 'openedAt']) if (shop[k]) return `${k}=${shop[k]}`;
+    if (!state.openedAt[shopId]) state.openedAt[shopId] = now;
+    return `open@${state.openedAt[shopId]}`;
+  }
 
   function remember(key) {
     if (state.seen.has(key)) return false;
@@ -160,12 +192,17 @@ function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
         const rule = itemRules.find((r) =>
           r.kind === 'decor'
             ? item.itemType === 'Decor' && item.coinPrice != null && item.coinPrice >= r.minPrice
-            : nameMatches(item, r.match)
+            : nameMatches(item, r.match, r.ids)
         );
         if (!rule) continue;
-        // One announcement per item per restock.
-        const key = `${rule.id}:${shopId}:${item.itemId}:${shop.nextRestockAt}`;
+        // One announcement per item per restock. Weather shops don't
+        // restock (no nextRestockAt), so for them each opening is the
+        // "restock": otherwise the second Thunderspire of a session would
+        // look like the first one again and stay silent.
+        const key = `${rule.id}:${shopId}:${item.itemId}:${restockKey(shopId, shop, now)}`;
         if (!remember(key)) continue;
+        state.recentFired.push({ at: now, key, item: item.name || item.itemId, stock: item.stock });
+        if (state.recentFired.length > 30) state.recentFired.shift();
         fired.push({
           ruleId: rule.id,
           tier: rule.tier,
@@ -191,6 +228,7 @@ function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
       const open = Boolean(shop && shop.open);
       state.wasOpen[shopId] = open;
       if (open && was === false) signals.push(shopId);
+      if (!open) delete state.openedAt[shopId];
     }
 
     const weatherRules = rules.filter((r) => r.kind === 'weather');
@@ -299,6 +337,14 @@ function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
       state.lastCheck = Date.now();
       state.lastError = null;
       state.errors = 0;
+      // Every poll is a sample of what the shops stock (budget.js counts them).
+      if (onData) {
+        try {
+          onData(data);
+        } catch (err) {
+          /* statistics must never stop an alert */
+        }
+      }
       const fired = evaluate(data);
       state.firstPoll = false;
       if (fired.length) onAlerts(fired);
@@ -324,7 +370,56 @@ function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
     state.timer = setTimeout(loop, delay);
   }
 
+  // For the sample: what the watcher last saw and did, compactly, so a
+  // missed alert can be traced (which items were in stock, which rule they
+  // matched, what key they were remembered under).
+  function diagnostics() {
+    const rules = activeRules();
+    const itemRules = rules.filter((r) => r.kind === 'item' || r.kind === 'decor');
+    const feed = state.last || {};
+    const shops = {};
+    for (const [shopId, shop] of Object.entries(feed.shops || {})) {
+      if (!shop) continue;
+      shops[shopId] = {
+        open: Boolean(shop.open),
+        keys: Object.keys(shop).slice(0, 12),
+        nextRestockAt: shop.nextRestockAt || null,
+        listed: Array.isArray(shop.items) ? shop.items.length : 0,
+        inStock: (Array.isArray(shop.items) ? shop.items : []).filter((it) => it && it.stock > 0).slice(0, 30).map((it) => {
+          const rule = itemRules.find((r) => (r.kind === 'decor' ? it.itemType === 'Decor' && it.coinPrice != null && it.coinPrice >= r.minPrice : nameMatches(it, r.match, r.ids)));
+          return { itemId: it.itemId, name: it.name, stock: it.stock, type: it.itemType, rule: rule ? rule.id : null };
+        }),
+      };
+    }
+    return {
+      lastCheck: state.lastCheck,
+      lastError: state.lastError,
+      errors: state.errors,
+      firstPoll: state.firstPoll,
+      activeItemRules: itemRules.map((r) => r.id),
+      remembered: state.seen.size,
+      recentFired: state.recentFired.slice(-30),
+      openedAt: state.openedAt,
+      weather: feed.weather && feed.weather.current ? { name: feed.weather.current.name || feed.weather.current.weatherId, endsAt: feed.weather.current.endsAt } : null,
+      shops,
+    };
+  }
+
+  // What's in stock right now in every open shop, with prices.
+  function current() {
+    const out = [];
+    for (const [shopId, shop] of Object.entries((state.last && state.last.shops) || {})) {
+      if (!shop || !shop.open) continue;
+      for (const it of Array.isArray(shop.items) ? shop.items : []) {
+        if (!it || !(it.stock > 0) || !(Number(it.coinPrice) > 0)) continue;
+        out.push({ itemId: String(it.itemId || ''), name: String(it.name || it.itemId || ''), type: String(it.itemType || ''), price: Number(it.coinPrice), shop: shopId });
+      }
+    }
+    return out;
+  }
+
   return {
+    current,
     start() {
       if (state.running) return;
       state.running = true;
@@ -341,10 +436,11 @@ function createWatcher({ getSettings, onAlerts, onStatus, fetchImpl }) {
       await loop();
     },
     status,
+    diagnostics,
     // exposed for testing
     _evaluate: evaluate,
     _state: state,
   };
 }
 
-module.exports = { RULES, createWatcher, publicRules, inQuietHours, nameMatches };
+module.exports = { RULES, createWatcher, publicRules, allRules, inQuietHours, nameMatches, nameKeys, keysMatch };

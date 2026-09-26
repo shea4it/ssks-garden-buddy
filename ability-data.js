@@ -338,7 +338,7 @@ function describe(ability, strength) {
     out.perHour = perHour;
     if (ability.grants) {
       out.score = perHour;
-      out.text = `turns a crop ${ability.grants}, ${oftenText(perHour)}`;
+      out.text = `turns a crop ${String(ability.grants).replace(/`/g, '')}, ${oftenText(perHour)}`;
     } else if (ability.coinMax) {
       out.coinsPerHour = (perHour * ability.coinMax * s) / 2;
       out.score = out.coinsPerHour;

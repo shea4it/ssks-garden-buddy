@@ -33,6 +33,8 @@ const updater = require('./updater');
 const { spawn } = require('child_process');
 const fun = require('./fun');
 const luck = require('./luck');
+const budget = require('./budget');
+const share = require('./share');
 
 const GAME_URL = 'https://magicgarden.gg';
 const GAME_HOST = 'magicgarden.gg';
@@ -497,6 +499,21 @@ function checkPendingTeam(st) {
   }
 }
 
+// The team to go back to after the weather: remembered when a weather team
+// is swapped in, used when the weather ends and nothing is set for clear
+// skies. Kept in settings (main-owned) so a restart mid-weather still
+// returns. { from: teamId|null, fromName, to: the weather team's id }
+function weatherReturn() {
+  const s = store.get();
+  return s.weatherReturn && typeof s.weatherReturn === 'object' ? s.weatherReturn : null;
+}
+function setWeatherReturn(v) {
+  const s = store.get();
+  if (v) s.weatherReturn = v;
+  else delete s.weatherReturn;
+  store.save();
+}
+
 function checkWeatherTeam(st) {
   const cfg = store.get().weatherTeams;
   if (!cfg || !cfg.enabled || parked || !st.foundSelf || !st.canSend) return;
@@ -506,6 +523,37 @@ function checkWeatherTeam(st) {
   if (key === lastTeamKey) return;
   lastTeamKey = key;
   const teamId = cfg[kind];
+  const back = weatherReturn();
+  if (kind === 'clear') {
+    if (teamId) {
+      setWeatherReturn(null);
+    } else if (back && back.from) {
+      // Nothing set for clear skies: put back the team from before the
+      // weather, but only if the weather team is still out (a swap by hand
+      // or by a trigger since then is left alone).
+      setWeatherReturn(null);
+      const weatherTeam = (st.teams || []).find((t) => t.id === back.to);
+      if (weatherTeam && teamIsOut(weatherTeam, st.pets)) {
+        const why = '(back from the weather)';
+        applyTeam(back.from, why).then((r) => {
+          if (!r.ok) recordNote(`⚠️ Couldn't switch back ${why}: ${r.reason}`);
+        });
+      }
+      return;
+    } else {
+      setWeatherReturn(null);
+      return;
+    }
+  } else if (teamId) {
+    // Weather with a team set: remember what was out before (once per spell
+    // of weather; rain turning to thunder keeps the first).
+    if (!back) {
+      const out = (st.teams || []).find((t) => teamIsOut(t, st.pets));
+      setWeatherReturn({ from: out ? out.id : null, fromName: out ? out.name : null, to: teamId, at: Date.now() });
+    } else {
+      setWeatherReturn(Object.assign({}, back, { to: teamId }));
+    }
+  }
   if (!teamId) return;
   const why = kind === 'clear' ? '(the weather cleared)' : `for ${weather.label(kind)}`;
   applyTeam(teamId, why).then((r) => {
@@ -905,25 +953,354 @@ function secretRainbow(species) {
 }
 
 /* Garden worth over time: one point every half hour while connected (the
- * latest reading in each half hour wins), about a month kept. */
+ * latest reading in each half hour wins), about a month kept. The same for
+ * what you've earned selling (the game's lifetime totals), which the budget
+ * card turns into coins per day. */
 const WORTH_EVERY = 30 * 60 * 1000;
 const WORTH_KEEP = 1500;
-function recordWorth(st) {
-  const b = (st.crops || []).find((x) => /garden/i.test(x.name));
-  if (!b || !(b.value > 0)) return;
+function recordSeries(key, v, t, extra) {
   const s = store.get();
-  const h = Array.isArray(s.worthHistory) ? s.worthHistory : (s.worthHistory = []);
-  const t = Date.now();
-  const v = Math.round(b.value);
+  const h = Array.isArray(s[key]) ? s[key] : (s[key] = []);
   const last = h[h.length - 1];
   if (!last || t - last.t >= WORTH_EVERY) {
-    h.push({ t, v });
+    h.push(Object.assign({ t, v }, extra || {}));
     if (h.length > WORTH_KEEP) h.splice(0, h.length - WORTH_KEEP);
-    store.save();
-  } else {
-    last.v = v;
+    return true;
+  }
+  Object.assign(last, { v }, extra || {});
+  return false;
+}
+// Gold/Rainbow by the hour, from the game's own lifetime counters for the
+// Gold and Rainbow Granter abilities (exact, whatever the activity log looks
+// like). Each reading adds what they went up by since the last one to this
+// hour; a gap over an hour (the app was closed) just resets the baseline, so
+// a day's procs never land in one bar. Every watched hour is marked (w), so
+// the rate counts only hours that were actually watched. Two weeks kept.
+function recordGranters(st, t) {
+  const pa = st.lifetime && st.lifetime.petAbility;
+  if (!pa) return false;
+  const gNow = Number(pa.GoldGranter) || 0;
+  const rNow = Number(pa.RainbowGranter) || 0;
+  const g = store.get().garden;
+  g.hourly = g.hourly && typeof g.hourly === 'object' ? g.hourly : {};
+  const last = g.granterLast;
+  g.granterLast = { t, g: gNow, r: rNow };
+  if (!last || t - last.t > 3600000 || gNow < last.g || rNow < last.r) return false;
+  if (!g.hourlySince) g.hourlySince = last.t;
+  const hr = Math.floor(t / 3600000);
+  const b = g.hourly[hr] || (g.hourly[hr] = { g: 0, r: 0 });
+  const dg = gNow - last.g;
+  const dr = rNow - last.r;
+  const fresh = !b.w;
+  b.w = 1;
+  b.g += dg;
+  b.r += dr;
+  const cutoff = Math.floor(t / 3600000) - 14 * 24;
+  for (const k of Object.keys(g.hourly)) if (Number(k) < cutoff) delete g.hourly[k];
+  return dg > 0 || dr > 0 || fresh;
+}
+
+function recordWorth(st) {
+  const t = Date.now();
+  let changed = false;
+  if (recordGranters(st, t)) {
+    changed = true;
+    sendToControl('garden:stats', store.get().garden);
+  }
+  const b = (st.crops || []).find((x) => /garden/i.test(x.name));
+  // With the garden's worth, how many crops were ready to sell (under the
+  // rule), what they were worth, and how many crops there were: the
+  // maturing rate for the estimated value is learned from these.
+  const extra = b && b.missing ? { r: b.ready || 0, rv: Math.round(b.readyValue || 0), n: b.total || 0 } : null;
+  if (b && b.value > 0) changed = recordSeries('worthHistory', Math.round(b.value), t, extra) || changed;
+  // Money: the wallet, lifetime coins from selling, lifetime coins pets found.
+  const pl = st.lifetime && st.lifetime.player;
+  const pa = (st.lifetime && st.lifetime.petAbility) || {};
+  const coins = st.wallet && Number(st.wallet.coins);
+  if (pl && Number.isFinite(coins)) {
+    const sold = (Number(pl.totalEarningsSellCrops) || 0) + (Number(pl.totalEarningsSellPet) || 0);
+    const found = (Number(pa.totalCoinsFound) || 0) + (Number(pa.totalCoinsFromProduceEater) || 0);
+    changed = budget.recordMoney(store.get(), { coins, sold, found }, t) || changed;
+  }
+  if (changed) store.save();
+}
+
+/* Spending vs. earning (budget.js): what the shops stock, counted from every
+ * feed poll, and what you buy, from the game's own purchase commands. */
+function shopStatsState() {
+  const s = store.get();
+  s.shopStats = budget.migrateStats(s.shopStats);
+  return s.shopStats;
+}
+let statsSaveTimer = null;
+function onShopFeed(data) {
+  if (budget.record(shopStatsState(), data) > 0 && !statsSaveTimer) {
+    statsSaveTimer = setTimeout(() => {
+      statsSaveTimer = null;
+      store.save();
+    }, 60000);
   }
 }
+// When the crops still growing will all be ready to sell, under the rule:
+// the latest of whatever they still need. Ripening from the crops' own end
+// times; full size and Gold/Rainbow from your pets' rates (the Garden tab's
+// estimates); a weather or moon mutation from the next such event in the
+// forecast (now, if it's on). null when any part can't be known.
+function harvestHours(st, upcoming) {
+  const g = (st.crops || []).find((b) => /garden/i.test(b.name));
+  if (!g || !g.total || !g.missing) return null;
+  if (g.ready >= g.total) return 0;
+  const rule = readyRule();
+  const now = Date.now();
+  const cur = weather.kindOf(st.weather);
+  const nextOf = (kinds) => {
+    if (kinds.includes(cur)) return 0;
+    const e = (upcoming || []).find((x) => kinds.includes(x.kind) && Date.parse(x.startsAt) > now);
+    return e ? (Date.parse(e.startsAt) - now) / 3600000 : null;
+  };
+  const parts = [];
+  if (g.missing.grow) parts.push(g.ripeBy ? Math.max(0, (g.ripeBy - now) / 3600000) : null);
+  if (rule.size && g.missing.size) parts.push(st.size ? (st.size.done ? 0 : st.size.hours) : null);
+  if (rule.color && g.missing.color) parts.push(st.eta ? (st.eta.done ? 0 : st.eta.hours) : null);
+  if (rule.hydro && g.missing.hydro) parts.push(nextOf(['rain', 'snow', 'thunder']));
+  if (rule.lunar && g.missing.lunar) parts.push(nextOf(['dawn', 'amber']));
+  if (parts.some((h) => h == null || !Number.isFinite(h))) return null;
+  return parts.length ? Math.max(...parts) : 0;
+}
+
+// When each step will be reached by all crops, for the crop-stage track:
+// hours, 0 when every crop has it, null when unknown.
+function stepHours(st, upcoming) {
+  const g = (st.crops || []).find((b) => /garden/i.test(b.name));
+  if (!g || !g.total || !g.have) return null;
+  const now = Date.now();
+  const cur = weather.kindOf(st.weather);
+  const nextOf = (kinds) => {
+    if (kinds.includes(cur)) return 0;
+    const e = (upcoming || []).find((x) => kinds.includes(x.kind) && Date.parse(x.startsAt) > now);
+    return e ? (Date.parse(e.startsAt) - now) / 3600000 : null;
+  };
+  const all = (k) => g.have[k] >= g.total;
+  return {
+    ripe: all('ripe') ? 0 : g.ripeBy ? Math.max(0, (g.ripeBy - now) / 3600000) : null,
+    size: all('size') ? 0 : st.size ? (st.size.done ? 0 : st.size.hours) : null,
+    hydro: all('hydro') ? 0 : nextOf(['rain', 'snow', 'thunder']),
+    lunar: all('lunar') ? 0 : nextOf(['dawn', 'amber']),
+    color: all('color') ? 0 : st.eta ? (st.eta.done ? 0 : st.eta.hours) : null,
+    // which weather comes next of each kind, for the "next" line
+    nextHydro: (upcoming || []).find((x) => ['rain', 'snow', 'thunder'].includes(x.kind) && Date.parse(x.startsAt) > now) || null,
+    nextLunar: (upcoming || []).find((x) => ['dawn', 'amber'].includes(x.kind) && Date.parse(x.startsAt) > now) || null,
+    weatherNow: cur,
+  };
+}
+
+function readyRule() {
+  const b = store.get().budget || {};
+  const r = b.readyRule && typeof b.readyRule === 'object' ? b.readyRule : {};
+  return { size: r.size !== false, color: r.color !== false, hydro: r.hydro !== false, lunar: r.lunar !== false };
+}
+function pushReadyRule() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setReadyRule(${JSON.stringify(readyRule())})`).catch(() => {});
+}
+
+// What the plan needs from the live game: the wallet, the upcoming weather
+// and the shops' next restocks (from the alert watcher).
+function budgetContext() {
+  const w = watcher ? watcher.status() : {};
+  const garden = gardenStatus && Array.isArray(gardenStatus.crops) ? gardenStatus.crops.find((x) => /garden/i.test(x.name)) : null;
+  return {
+    now: Date.now(),
+    wallet: gardenStatus && gardenStatus.wallet && Number.isFinite(Number(gardenStatus.wallet.coins)) ? Number(gardenStatus.wallet.coins) : undefined,
+    gardenWorth: garden && garden.value > 0 ? garden.value : 0,
+    garden: garden ? {
+      total: garden.total, special: garden.special, gold: garden.gold, rainbow: garden.rainbow,
+      ready: garden.ready || 0, readyValue: garden.readyValue || 0, growingValue: garden.growingValue || 0, growingPotential: garden.growingPotential || 0,
+      missing: garden.missing || null,
+      have: garden.have || null,
+      harvestHours: gardenStatus ? harvestHours(gardenStatus, w.upcoming || []) : null,
+      stepHours: gardenStatus ? stepHours(gardenStatus, w.upcoming || []) : null,
+      // your pets' own Gold/Rainbow rate (crops an hour), from their abilities
+      goldPerHour: gardenStatus && gardenStatus.eta && Number(gardenStatus.eta.perHour) > 0 ? Number(gardenStatus.eta.perHour) : null,
+    } : null,
+    readyRule: readyRule(),
+    // false until the garden's report (with ready/growing) has arrived
+    gardenLoaded: Boolean(garden && garden.missing),
+    upcoming: w.upcoming || [],
+    restocks: w.restocks || [],
+    // Decor in stock right now, dearest first: what the "can I buy this?"
+    // check offers with one tap.
+    inStock: watcher ? watcher.current().filter((i) => /decor/i.test(i.type) && i.price >= 1e6).sort((a, b) => b.price - a.price) : [],
+  };
+}
+// The view isn't free (it walks every counted shop item for every alert),
+// and the panel, the money box and purchases all ask for it, so it is
+// reused for a few seconds unless something just changed.
+let viewCache = { at: 0, view: null };
+function budgetView(fresh) {
+  if (!fresh && viewCache.view && Date.now() - viewCache.at < 3000) return viewCache.view;
+  const view = budget.view({ settings: store.get(), ctx: budgetContext() });
+  // Once the Money tab has earned its unlock it stays unlocked.
+  if (view.unlockEarned && !(store.get().budget && store.get().budget.unlocked)) {
+    const s = store.get();
+    s.budget = Object.assign({}, s.budget, { unlocked: true });
+    store.save();
+    recordNote('💰 The Money tab has unlocked: a full day of coins in and out has been measured. It gets better with every day of play.', 'Money tab unlocked');
+  }
+  // The buy-everything line: keep your best, and the first time you cross
+  // it, celebrate (confetti over the game, a spoken cheer) and remember when.
+  const ev = view.foresight && view.foresight.everything;
+  if (ev && ev.ratio != null) {
+    const s = store.get();
+    s.budget = s.budget || {};
+    let changed = false;
+    if (ev.ratio > (Number(s.budget.everythingBest) || 0) + 0.005) {
+      s.budget.everythingBest = Math.round(ev.ratio * 1000) / 1000;
+      changed = true;
+    }
+    if (ev.ratio >= 1 && !s.budget.everythingCrossedAt) {
+      s.budget.everythingCrossedAt = Date.now();
+      ev.crossedAt = s.budget.everythingCrossedAt;
+      changed = true;
+      recordNote('🏆 You crossed the buy-everything line: you make more a day than buying every alert item and every decoration costs.', 'Buy-everything line crossed!');
+      sendToControl('budget:crossed', { ratio: ev.ratio });
+      const js = fun.script('confetti');
+      const contents = gameView && gameView.webContents;
+      if (js && contents && !contents.isDestroyed() && isGameUrl(contents.getURL())) contents.executeJavaScript(js, true).catch(() => {});
+    }
+    if (changed) store.save();
+  }
+  viewCache = { at: Date.now(), view };
+  return view;
+}
+// The game keeps, per shop, what you've bought in its current restock
+// (slot.data.shopPurchases: {shop: {restockId, purchases: {itemId: n}}}).
+// Every status update carries it; anything that grew since last time (or
+// that appeared with a new restock) is a purchase, with the exact id and
+// count, wherever it was made.
+function applyShopPurchases(sp) {
+  if (!sp || typeof sp !== 'object') return;
+  const s = store.get();
+  const seen = s.restockSeen && typeof s.restockSeen === 'object' ? s.restockSeen : (s.restockSeen = {});
+  let last = null;
+  for (const [shop, info] of Object.entries(sp)) {
+    if (!info || typeof info !== 'object' || !info.restockId) continue;
+    const purchases = info.purchases && typeof info.purchases === 'object' ? info.purchases : {};
+    const prev = seen[shop];
+    const same = Boolean(prev && prev.restockId === info.restockId);
+    for (const [itemId, n] of Object.entries(purchases)) {
+      const count = Math.floor(Number(n) || 0);
+      const before = same && prev.purchases ? Math.floor(Number(prev.purchases[itemId]) || 0) : 0;
+      const delta = count - before;
+      if (delta > 0) {
+        const entry = budget.recordPurchase(s, { at: Date.now(), command: { type: 'PurchaseShopItem', shop, itemId, quantity: delta } });
+        if (entry) last = entry;
+      }
+    }
+    seen[shop] = { restockId: String(info.restockId).slice(0, 60), purchases: Object.fromEntries(Object.entries(purchases).slice(0, 60).map(([k, v]) => [String(k).slice(0, 60), Math.floor(Number(v) || 0)])) };
+  }
+  if (last) {
+    store.save();
+    viewCache = { at: 0, view: null };
+    sendToControl('budget:purchase', last);
+  }
+}
+
+ipcMain.handle('budget:get', () => budgetView());
+ipcMain.handle('budget:set', (event, change) => {
+  budget.setOptions(store.get(), change && typeof change === 'object' ? change : {});
+  store.save();
+  if (change && change.readyRule) pushReadyRule();
+  return budgetView(true);
+});
+ipcMain.handle('budget:whatIf', (event, price) => {
+  const p = Number(price);
+  if (!Number.isFinite(p) || p < 0) return null;
+  return budget.whatIf(store.get(), budgetContext(), p);
+});
+ipcMain.handle('budget:resetPurchases', () => {
+  budget.resetPurchases(store.get());
+  store.save();
+  viewCache = { at: 0, view: null };
+  return budgetView(true);
+});
+ipcMain.handle('budget:plan', (event, change) => {
+  budget.setPlan(store.get(), change && typeof change === 'object' ? change : {});
+  store.save();
+  pushBudgetHud(true);
+  return budgetView(true);
+});
+
+/* The money box over the game (the observer draws it; this writes its
+ * lines). Pushed with each status update, at most every 5 s, and at once
+ * when the plan or the switch changes. */
+function budgetHudOn() {
+  const s = store.get();
+  return !(s.ui && s.ui.budgetHud === false);
+}
+let hudPushedAt = 0;
+let hudLast = '';
+let hudWallet = null;
+function pushBudgetHud(force) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  // The lines only really move with the wallet, so: when it moved, or
+  // every half minute (the "next opening" countdown), not on every update.
+  const wallet = gardenStatus && gardenStatus.wallet ? Number(gardenStatus.wallet.coins) : null;
+  if (!force && wallet === hudWallet && Date.now() - hudPushedAt < 30000) return;
+  if (!force && Date.now() - hudPushedAt < 5000) return;
+  hudPushedAt = Date.now();
+  hudWallet = wallet;
+  let payload = { shown: false, lines: [] };
+  if (budgetHudOn()) {
+    try {
+      payload = { shown: true, lines: budget.hudLines(budgetView(force), shortCoins) };
+    } catch (err) {
+      payload = { shown: false, lines: [] };
+    }
+  }
+  const text = JSON.stringify(payload);
+  if (!force && text === hudLast) return;
+  hudLast = text;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setBudgetHud(${text})`).catch(() => {});
+}
+function shortCoins(n) {
+  const v = Number(n) || 0;
+  for (const [size, suffix] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']]) {
+    if (v >= size) return (v / size).toFixed(v / size >= 100 ? 0 : 1).replace(/\.0$/, '') + suffix;
+  }
+  return String(Math.round(v));
+}
+function setBudgetHud(on) {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { budgetHud: Boolean(on) });
+  store.save();
+  pushBudgetHud(true);
+  sendToControl('budget:hud', budgetHudOn());
+  buildMenu();
+  return budgetHudOn();
+}
+ipcMain.handle('ui:budgetHud', (event, on) => setBudgetHud(on));
+
+/* The open-spot map drawn over the game while you hold a pot (the observer
+ * draws it; this only tells it whether to). */
+function spotMapOn() {
+  const s = store.get();
+  return !(s.ui && s.ui.spotMap === false);
+}
+function pushSpotMap() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setSpotMap(${spotMapOn()})`).catch(() => {});
+}
+ipcMain.handle('ui:spotMap', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { spotMap: Boolean(on) });
+  store.save();
+  pushSpotMap();
+  return spotMapOn();
+});
 
 ipcMain.handle('worth:get', () => {
   const h = store.get().worthHistory;
@@ -1069,6 +1446,16 @@ function migrateSettings() {
   }
   if (!s.ui.panelWidth) s.ui.panelWidth = 430;
   delete s.ui.dock;
+  // Left over from an unreleased draft of the spending card.
+  delete s.earnHistory;
+  // The owner's wants, in his order, become the plan once (editable after).
+  budget.seedWants(s);
+  // Purchases recorded before 0.29.1 were junk (the purchase command's
+  // item is nested, so none were identified): cleared once.
+  if (s.purchases && typeof s.purchases === 'object' && s.purchases.v !== budget.PURCHASES_VERSION) {
+    budget.resetPurchases(s);
+    setTimeout(() => recordNote('🛒 Buying patterns were reset: what was recorded before this version was incomplete. They fill in again from here.'), 6000);
+  }
   pityState();
   store.save();
 }
@@ -1077,6 +1464,9 @@ function handleGardenMessage(type, payload) {
   if (!payload || typeof payload !== 'object') return;
 
   if (type === 'status') {
+    // The observer's connection id (pageId:welcomes). Kept apart, because
+    // gardenStatus.session below becomes the coins-this-session box.
+    const connectionId = payload.session;
     gardenStatus = Object.assign({}, payload, { at: Date.now() });
     gardenStatus.pets = petData.describePets(payload.pets, payload.trough);
     enrichPets(gardenStatus);
@@ -1086,6 +1476,9 @@ function handleGardenMessage(type, payload) {
     if (gardenStatus.foundSelf) {
       checkGrown(gardenStatus);
       recordWorth(gardenStatus);
+      applyShopPurchases(payload.shopPurchases);
+      if (sharer && shareOn()) sharer.nudge().catch(() => {});
+      pushBudgetHud(false);
     }
     // Coins this session: net change in the wallet since the app first saw
     // it (spending counts against it, like in real life).
@@ -1123,7 +1516,7 @@ function handleGardenMessage(type, payload) {
     // Follow the game's own hatch total, once this connection has caught up.
     {
       const p = pityState();
-      if (p.autoCount && gardenStatus.session && gardenStatus.session === p.syncConnection) pity.syncTotal(p, gardenStatus.eggsHatched);
+      if (p.autoCount && connectionId && connectionId === p.syncConnection) pity.syncTotal(p, gardenStatus.eggsHatched);
     }
     if (gardenStatus.capsulePulls && pityState().autoCount) {
       const ev = luck.onCapsuleStats(luckState(), gardenStatus.capsulePulls);
@@ -1204,6 +1597,17 @@ function handleGardenMessage(type, payload) {
     return;
   }
 
+  // A purchase command went out (see budget.js). Only used as a fallback
+  // while the game's own per-restock tally hasn't been seen yet.
+  if (type === 'purchase') {
+    if (store.get().restockSeen && Object.keys(store.get().restockSeen).length) return;
+    const entry = budget.recordPurchase(store.get(), payload);
+    store.save();
+    viewCache = { at: 0, view: null };
+    if (entry) sendToControl('budget:purchase', entry);
+    return;
+  }
+
   if (type === 'superseded') {
     onSuperseded(payload);
     return;
@@ -1216,6 +1620,34 @@ function handleGardenMessage(type, payload) {
 
   if (type === 'harvestBlocked') {
     sendToControl('harvest:blocked', payload);
+    return;
+  }
+
+  // The guard locked pet food and re-sent the sale (or couldn't).
+  if (type === 'sellGuard') {
+    const pretty = (x) => String(x).replace(/([a-z])([A-Z])/g, '$1 $2');
+    if (payload.ok) {
+      recordNote(`🐾 Kept your pet food: locked ${(payload.locked || []).map(pretty).join(', ') || 'it'}, then sold the rest.`);
+    } else {
+      recordNote(`🐾 Couldn't lock ${(payload.failed || []).map(pretty).join(', ') || 'your pet food'}${payload.error ? ` (${payload.error})` : ''}, so nothing was sold. Right-click to lock it and sell again; a sample (Extras, 🛠 Troubleshooting) would help.`, 'Sale stopped: pet food');
+    }
+    sendToControl('harvest:sellGuard', payload);
+    return;
+  }
+  // The field name that locks a crop, learned by trying: kept for next time.
+  if (type === 'lockField') {
+    const lock = harvestLock();
+    if (typeof payload.field === 'string' && /^[a-zA-Z]{1,20}$/.test(payload.field)) {
+      lock.lockField = payload.field;
+      store.save();
+    }
+    return;
+  }
+
+  if (type === 'sellBlocked') {
+    const list = (Array.isArray(payload.crops) ? payload.crops : []).map((c) => `${String(c.species || '').replace(/([a-z])([A-Z])/g, '$1 $2')} ×${c.count}`).join(', ');
+    recordNote(`🐾 Stopped a sale: ${list || 'crops of your potted plants'} aren't locked. Right-click them in your bag to lock them and sell again, or turn off "Never sell pet food".`, 'Sale stopped: pet food');
+    sendToControl('harvest:sellBlocked', payload);
     return;
   }
 
@@ -1512,8 +1944,16 @@ function createGameView() {
     injectScripts(contents);
     relayoutSoon();
     pushHarvestLock();
+    pushSpotMap();
+    pushReadyRule();
+    pushBudgetHud(true);
     // Again once the game has had a moment (the observer is ready by then).
-    setTimeout(pushHarvestLock, 3000);
+    setTimeout(() => {
+      pushHarvestLock();
+      pushSpotMap();
+      pushReadyRule();
+      pushBudgetHud(true);
+    }, 3000);
   });
 
   // The "back soon" page links straight to the game. If you follow it (or
@@ -1546,7 +1986,9 @@ function createGameView() {
         },
       };
     }
-    shell.openExternal(url);
+    // Only web links go to your browser: anything else a page might try to
+    // open (a file:, a custom protocol) is ignored.
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
 
@@ -1657,6 +2099,7 @@ function buildMenu() {
       submenu: [
         { label: 'Show or hide the panel', accelerator: 'CmdOrCtrl+Shift+D', click: togglePanel },
         { label: 'Harvest lock', type: 'checkbox', checked: Boolean(store.get().harvestLock && store.get().harvestLock.on), accelerator: 'CmdOrCtrl+Shift+L', click: () => setHarvestLock({ on: !harvestLock().on }) },
+        { label: 'Money box over the game', type: 'checkbox', checked: budgetHudOn(), accelerator: 'CmdOrCtrl+Shift+B', click: () => setBudgetHud(!budgetHudOn()) },
         { type: 'separator' },
         { label: 'Attached to the game', type: 'radio', checked: store.get().ui.panel !== 'window', click: () => setPanel({ mode: 'attached', open: true }) },
         { label: 'In its own window', type: 'radio', checked: store.get().ui.panel === 'window', click: () => setPanel({ mode: 'window', show: true }) },
@@ -1729,26 +2172,32 @@ function buildMenu() {
 
 ipcMain.handle('settings:get', () => store.get());
 
+// The panel sends its whole copy of the settings back. Only the parts it
+// owns are taken from it; everything else (pet counts, egg counters, luck,
+// worth history, the harvest lock, update state...) is written here in the
+// main process, and a stale copy from the window must never overwrite it.
+// A list of what the panel may change is safer than a list of what it may
+// not: a setting added later is protected without anyone remembering to.
+const PANEL_KEYS = ['alerts', 'weatherTeams', 'teamTriggers', 'logoff'];
+
 ipcMain.handle('settings:set', (event, next) => {
   if (!next || typeof next !== 'object') return store.get();
-  if (store.get().firstRunDone) next.firstRunDone = true;
-  next.gardenCountsVersion = store.get().gardenCountsVersion;
-  next.alertHistory = store.get().alertHistory;
-  // Pet counts are written here in the main process; never let a stale copy
-  // from the window overwrite them.
-  next.garden = store.get().garden;
-  next.pity = store.get().pity;
-  next.luck = store.get().luck;
-  next.harvestLock = store.get().harvestLock;
-  next.reclaim = store.get().reclaim;
-  next.worthHistory = store.get().worthHistory;
-  next.updates = store.get().updates;
-  next.lastRunVersion = store.get().lastRunVersion;
-  next.rooms = store.get().rooms;
-  next.ui = Object.assign({}, next.ui, {
-    panel: store.get().ui.panel, panelOpen: store.get().ui.panelOpen, panelWidth: store.get().ui.panelWidth,
+  const current = store.get();
+  const merged = Object.assign({}, current);
+  for (const key of PANEL_KEYS) if (key in next) merged[key] = next[key];
+  // Where the panel sits is decided here (ui:panel); the panel only picks the tab.
+  merged.ui = Object.assign({}, current.ui, {
+    tab: next.ui && next.ui.tab ? next.ui.tab : current.ui.tab,
+    // Which panel sections you've folded or opened (the panel owns this too).
+    folds: next.ui && next.ui.folds && typeof next.ui.folds === 'object'
+      ? Object.fromEntries(Object.entries(next.ui.folds).slice(0, 120).map(([k, v]) => [String(k).slice(0, 60), Boolean(v)]))
+      : current.ui.folds,
   });
-  const saved = store.set(next);
+  // The clipboard switch is the one rooms setting the panel changes directly.
+  if (next.rooms && typeof next.rooms === 'object' && typeof next.rooms.clipboard === 'boolean') {
+    merged.rooms = Object.assign({}, current.rooms, { clipboard: next.rooms.clipboard });
+  }
+  const saved = store.set(merged);
   if (watcher) planLogoff(watcher.status());
   return saved;
 });
@@ -1942,9 +2391,10 @@ ipcMain.handle('reclaim:act', (event, act) => onReclaimAction(String(act)));
 
 function harvestLock() {
   const s = store.get();
-  s.harvestLock = Object.assign({ on: false, species: [] }, s.harvestLock);
+  s.harvestLock = Object.assign({ on: false, species: [], petFood: false, lockField: null }, s.harvestLock);
   return s.harvestLock;
 }
+
 
 function pushHarvestLock() {
   const contents = gameView && gameView.webContents;
@@ -1956,6 +2406,7 @@ function pushHarvestLock() {
 function setHarvestLock(change) {
   const lock = harvestLock();
   if (change && typeof change.on === 'boolean') lock.on = change.on;
+  if (change && typeof change.petFood === 'boolean') lock.petFood = change.petFood;
   if (change && Array.isArray(change.species)) lock.species = change.species.map(String).slice(0, 100);
   store.save();
   pushHarvestLock();
@@ -2133,6 +2584,9 @@ async function installUpdate() {
   }
   upd.downloading = false;
   upd.ready = { path: dest, platform: process.platform };
+  // Remembered so it can be removed once the update has gone through.
+  updateSettings().pending = { path: dest, from: app.getVersion(), at: Date.now() };
+  store.save();
   sendUpdate();
   if (process.env.MG_TEST_UPDATE_NOINSTALL) return { ok: true, ready: dest };
   if (process.platform === 'win32' || process.env.MG_TEST_UPDATE_SPAWN) {
@@ -2170,6 +2624,82 @@ async function installUpdate() {
   shell.showItemInFolder(dest);
   return { ok: true };
 }
+
+// After an update: remove the installer the app downloaded, once it's clear
+// the update went through (this copy is newer than the one that downloaded
+// it). An update that didn't finish keeps its file for a retry, for a week.
+async function cleanUpAfterUpdate() {
+  const cfg = updateSettings();
+  const p = cfg.pending;
+  if (!p || !p.path) return;
+  const done = updater.compareVersions(app.getVersion(), p.from) > 0;
+  const stale = Date.now() - (p.at || 0) > 7 * 24 * 3600 * 1000;
+  if (!done && !stale) return;
+  try {
+    if (fs.existsSync(p.path)) {
+      // In Downloads (Mac): to the Trash. In the temp folder: just remove it.
+      if (path.dirname(p.path) === app.getPath('downloads')) await shell.trashItem(p.path).catch(() => fs.rmSync(p.path, { force: true }));
+      else fs.rmSync(p.path, { force: true });
+    }
+  } catch (err) {
+    /* try again next start */
+    return;
+  }
+  delete cfg.pending;
+  store.save();
+}
+
+// Installers downloaded from the website that are still sitting in
+// Downloads (browsers number repeats: "... (1).exe"). Only ever offered;
+// moved to the Recycle Bin / Trash when the player says so.
+const OLD_INSTALLER = /^SSKs-Garden-Buddy-(Windows|Mac|Setup-[\d.]+|[\d.]+-(arm64|x64))( \(\d+\))?\.(exe|dmg)$/i;
+function oldInstallers() {
+  let dir;
+  try {
+    dir = app.getPath('downloads');
+  } catch (err) {
+    return [];
+  }
+  let names = [];
+  try {
+    names = fs.readdirSync(dir);
+  } catch (err) {
+    return [];
+  }
+  const keep = upd.ready && upd.ready.path;
+  const out = [];
+  for (const name of names) {
+    if (!OLD_INSTALLER.test(name)) continue;
+    const full = path.join(dir, name);
+    if (full === keep) continue;
+    try {
+      const st = fs.statSync(full);
+      if (st.isFile()) out.push({ name, path: full, size: st.size });
+    } catch (err) {
+      /* skip */
+    }
+  }
+  return out;
+}
+
+ipcMain.handle('update:oldInstallers', () => {
+  const list = oldInstallers();
+  return { count: list.length, bytes: list.reduce((a, f) => a + f.size, 0), names: list.map((f) => f.name) };
+});
+ipcMain.handle('update:tidy', async () => {
+  let moved = 0;
+  let bytes = 0;
+  for (const f of oldInstallers()) {
+    try {
+      await shell.trashItem(f.path);
+      moved += 1;
+      bytes += f.size;
+    } catch (err) {
+      /* leave it */
+    }
+  }
+  return { moved, bytes };
+});
 
 ipcMain.handle('update:get', () => updateView());
 ipcMain.handle('update:check', () => checkForUpdate(true));
@@ -2335,11 +2865,36 @@ ipcMain.handle('rooms:refresh', async () => {
   if (here && byId[here]) {
     const mine = byId[here];
     const inState = gardenStatus.room.players;
-    if (mine.players == null) check = { ok: false, text: `Player-count lookups aren't working (${mine.error || 'no answer'}).`, sample: mine.sample };
-    else if (Math.abs(mine.players - inState) <= 1) check = { ok: true, text: 'Player-count lookups are working.' };
-    else check = { ok: false, text: `The lookup says ${mine.players} players here, the game says ${inState}.` };
+    const how = mine.status ? ` (HTTP ${mine.status}${mine.closed ? ', which the app reads as "closed"' : ''}${mine.path ? ', ' + mine.path : ''})` : '';
+    if (mine.players == null) check = { ok: false, text: `Player-count lookups aren't working (${mine.error || 'no answer'}${mine.status ? `, HTTP ${mine.status}` : ''}).`, sample: mine.sample, path: mine.path };
+    else if (Math.abs(mine.players - inState) <= 1) check = { ok: true, text: 'Player-count lookups are working.', path: mine.path };
+    else check = { ok: false, text: `The lookup says ${mine.players} players here${how}, the game says ${inState}.`, sample: mine.sample, path: mine.path };
+    // Whatever the lookup says, the game knows how many people are in the
+    // room you're in: show that.
+    byId[here] = { players: Math.max(0, Math.min(6, Number(inState) || 0)), closed: false, fromGame: true, status: mine.status };
   }
   lastRoomCheck = check;
+  // When the lookup can't answer (the endpoint is gone) or is known to be
+  // wrong (it said 0 for the room you're standing in), a 0 for another room
+  // means nothing: show it as unknown rather than empty, and where the
+  // community list has a count for that room (rooms shared through Arie's
+  // mod report their own numbers), use that.
+  // Broken if it disagreed with the game about the room you're in (then
+  // it stays so for the session), or if every path has proven dead: either
+  // way, counts come from the community list, in a room or not.
+  if (check && !check.ok) lookupKnownBroken = true;
+  const lookupBroken = lookupKnownBroken || rooms().lookupDead();
+  const community = Object.fromEntries(shared.list.map((r) => [r.id, r]));
+  for (const id of Object.keys(byId)) {
+    if (id === here) continue;
+    const r = byId[id];
+    const c = community[id];
+    if ((r.players == null || (lookupBroken && r.players === 0)) && c && c.reported > 0) {
+      byId[id] = Object.assign({}, r, { players: c.reported, closed: false, viaCommunity: true, error: null, full: c.reported >= 6, bonusIfJoined: roomsMod.bonusIfJoined(c.reported) });
+    } else if (lookupBroken && r.players === 0) {
+      byId[id] = Object.assign({}, r, { players: null, closed: false, error: 'the game\'s count lookup is not answering', full: false, bonusIfJoined: null });
+    }
+  }
   return {
     current: (gardenStatus && gardenStatus.room) || null,
     saved: saved.map((r) => Object.assign({}, r, roomsMod.describeId(r.id), byId[r.id] || {})),
@@ -2348,6 +2903,7 @@ ipcMain.handle('rooms:refresh', async () => {
       // Only rooms the game confirms still have people in them.
       .filter((r) => r.players != null && r.players > 0),
     sharedError: shared.error,
+    lookupBroken,
     sharedOff: Boolean(shared.off),
     sharedTotal: shared.list.length,
     sharedStats: shared.stats || null,
@@ -2358,6 +2914,7 @@ ipcMain.handle('rooms:refresh', async () => {
 });
 
 let lastRoomCheck = null;
+let lookupKnownBroken = false;
 
 ipcMain.handle('rooms:save', (event, id, name) => {
   const roomId = String(id || '').trim().slice(0, 120);
@@ -2410,6 +2967,58 @@ ipcMain.handle('rooms:checkClipboard', () => {
   checkClipboardRoom();
   return true;
 });
+
+/* Sharing your room on the community list (share.js), opt-in. What it
+ * reads from the game: your id and name, your coins, the room you're in
+ * and how many are in it. */
+let sharer = null;
+function shareSnapshot() {
+  const st = gardenStatus || {};
+  const me = st.self || {};
+  const room = st.room || {};
+  return {
+    playerId: me.id || null,
+    playerName: me.name || null,
+    coins: st.wallet && Number.isFinite(Number(st.wallet.coins)) ? Number(st.wallet.coins) : undefined,
+    roomId: st.connected && room.roomId ? room.roomId : null,
+    playersCount: Number.isFinite(Number(room.players)) ? Number(room.players) : undefined,
+    isPrivate: false,
+  };
+}
+function shareOn() {
+  const s = store.get();
+  return Boolean(s.rooms && s.rooms.share);
+}
+function ensureSharer() {
+  if (sharer) return sharer;
+  sharer = share.createSharer({
+    getSnapshot: shareSnapshot,
+    version: app.getVersion(),
+    onEvent: (e) => {
+      if (e.kind === 'stopped') {
+        const s = store.get();
+        s.rooms = Object.assign({ saved: [] }, s.rooms, { share: false });
+        store.save();
+        recordNote(`🎮 Room sharing stopped: the community list refused this account (${e.error}). If you also use Arie's mod, it reports your room itself.`, 'Room sharing stopped');
+      }
+      sendToControl('rooms:share', sharer.status());
+    },
+  });
+  return sharer;
+}
+function applyShareSetting() {
+  const sh = ensureSharer();
+  if (shareOn()) sh.start().catch(() => {});
+  else sh.stop('off').catch(() => {});
+}
+ipcMain.handle('rooms:shareSetting', (event, on) => {
+  const s = store.get();
+  s.rooms = Object.assign({ saved: [] }, s.rooms, { share: Boolean(on) });
+  store.save();
+  applyShareSetting();
+  return { share: Boolean(on), status: ensureSharer().status() };
+});
+ipcMain.handle('rooms:shareStatus', () => ensureSharer().status());
 
 ipcMain.handle('rooms:clipboardSetting', (event, on) => {
   const s = store.get();
@@ -2473,7 +3082,7 @@ ipcMain.handle('garden:sample', async () => {
     const file = path.join(app.getPath('userData'), 'garden-sample.json');
     fs.writeFileSync(
       file,
-      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, lastStatus: gardenStatus, sample }, null, 2),
+      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, lastStatus: gardenStatus, sample }, null, 2),
       'utf8'
     );
     shell.showItemInFolder(file);
@@ -2570,7 +3179,11 @@ if (!gotLock) {
     quitting = true;
     tts.stop();
     voices.stop();
+    if (sharer) sharer.stop('quit').catch(() => {});
+    // Saves are written in the background; whatever is pending lands now.
+    store.flush();
   });
+  app.on('will-quit', () => store.flush());
 
   app.whenReady().then(() => {
     store.init(app.getPath('userData'));
@@ -2617,6 +3230,19 @@ if (!gotLock) {
       st.lastRunVersion = app.getVersion();
       store.save();
     }
+    // The settings file was damaged and replaced at startup: say so.
+    {
+      const r = store.recovered();
+      if (r) {
+        setTimeout(() => recordNote(r.recoveredFrom
+          ? `💾 The settings file was damaged, so the newest backup (${r.recoveredFrom}) was put back. The damaged file is kept as ${r.broken}.`
+          : `💾 The settings file was damaged and no backup was found, so the app started fresh. The damaged file is kept as ${r.broken}.`,
+        'Settings restored from a backup'), 5000);
+      }
+    }
+    // Remove the installer from an update that has gone through.
+    setTimeout(() => cleanUpAfterUpdate(), 8000);
+    if (shareOn()) setTimeout(applyShareSetting, 10000);
     // Look for updates a little after starting, then every 6 hours.
     setTimeout(() => { if (updateSettings().auto) checkForUpdate(false); }, 20000);
     setInterval(() => { if (updateSettings().auto) checkForUpdate(false); }, UPDATE_EVERY);
@@ -2633,6 +3259,7 @@ if (!gotLock) {
     watcher = alerts.createWatcher({
       getSettings: store.get,
       onAlerts: handleAlerts,
+      onData: onShopFeed,
       onStatus: (status) => {
         sendToControl('alerts:status', status);
         planLogoff(status);

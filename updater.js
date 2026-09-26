@@ -83,6 +83,23 @@ async function check({ currentVersion, platform, fetchImpl }) {
   };
 }
 
+// Waits for a write stream to catch up. If it fails instead (disk full, say),
+// this rejects rather than waiting forever for a 'drain' that never comes.
+function drained(stream) {
+  return new Promise((resolve, reject) => {
+    const done = (err) => {
+      stream.off('drain', onDrain);
+      stream.off('error', onError);
+      if (err) reject(err);
+      else resolve();
+    };
+    const onDrain = () => done();
+    const onError = (err) => done(err || new Error('write failed'));
+    stream.once('drain', onDrain);
+    stream.once('error', onError);
+  });
+}
+
 // Downloads to dest, reporting progress, then checks size and fingerprint.
 async function download({ asset, dest, onProgress, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
@@ -99,7 +116,7 @@ async function download({ asset, dest, onProgress, fetchImpl }) {
       const buf = Buffer.from(chunk);
       hash.update(buf);
       got += buf.length;
-      if (!out.write(buf)) await new Promise((r) => out.once('drain', r));
+      if (!out.write(buf)) await drained(out);
       if (onProgress && Date.now() - lastReport > 250) {
         lastReport = Date.now();
         onProgress(got, total);

@@ -25,8 +25,9 @@
     background: var(--base);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
     display: flex;
     flex-direction: column;
   }
@@ -62,7 +63,9 @@
   }
   nav button:hover { color: var(--text); }
   nav button i { display: block; font-style: normal; font-size: 17px; line-height: 1.2; }
-  nav button { font-size: 11.5px; padding: 4px 1px 8px; }
+  nav button { flex: 1 1 0; min-width: 0; font-size: 11px; padding: 4px 0 8px; }
+  nav button[hidden] { display: none; }
+  nav button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--moss); }
   .dedication { text-align: center; color: var(--faint); opacity: 0.55; font-size: 11px; font-style: italic; margin: 34px 0 4px; letter-spacing: 0.02em; }
   #sprout { cursor: default; display: inline-block; transition: transform 300ms ease; }
   #sprout.bloom { transform: scale(1.25) rotate(-8deg); }
@@ -86,9 +89,9 @@
   .str-line { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin: 6px 0 4px; }
   .str-line .bar { flex: 1; height: 6px; }
   .str-line .bar > span { background: var(--moss); }
-  .ab { display: flex; gap: 8px; font-size: 13px; padding: 3px 0; align-items: baseline; }
-  .ab .n { white-space: nowrap; color: var(--text); min-width: 0; }
-  .ab .t { color: var(--muted); flex: 1; text-align: right; }
+  .ab { font-size: 13px; padding: 3px 0; }
+  .ab .n { display: block; color: var(--text); }
+  .ab .t { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
   .ab.off { opacity: 0.55; }
   .ab.unknown .t { color: var(--warn); }
   .goal-line { display: grid; grid-template-columns: 150px 1fr; gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.5); }
@@ -141,6 +144,255 @@
   .restock.soon .tm { color: var(--moss); }
 
   .worth-svg { width: 100%; height: 150px; display: block; margin-top: 6px; }
+  main > section > h2.fold { cursor: pointer; user-select: none; display: flex; align-items: baseline; gap: 6px; min-width: 0; border-radius: 6px; margin-left: 0; padding: 2px 4px; }
+  main > section > h2.fold:hover { background: rgba(255,255,255,.04); color: var(--text); }
+  main > section > h2.fold:focus-visible { outline: 2px solid var(--moss); outline-offset: 1px; }
+  main > section > h2.fold::before { content: '▾'; color: var(--faint); font-size: 12px; width: 12px; flex: none; transition: transform .15s; }
+  main > section > h2.fold.folded::before { transform: rotate(-90deg); }
+  main > section > h2.fold { white-space: nowrap; }
+  main > section > h2.fold .fold-sum { display: none; flex: 1; min-width: 0; font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  main > section > h2.fold.folded .fold-sum { display: inline; }
+  .qa { margin: 4px 0 0; padding-left: 16px; }
+  .qa li { margin: 3px 0; }
+  .qa-note { margin-top: 6px; }
+  .read-me { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 10px; }
+  /* Money tab */
+  .m-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .m-big { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; }
+  .m-big small { font-size: 13px; font-weight: 500; color: var(--faint); margin-left: 4px; }
+  .m-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.06); color: var(--muted); }
+  .m-chip.up { background: rgba(127,201,138,.16); color: #9fdca8; }
+  .m-chip.down { background: rgba(196,106,90,.18); color: #e59a8c; }
+  .m-chart { margin-top: 8px; }
+  .m-chart svg { width: 100%; display: block; }
+  .m-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .m-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .m-legend b { color: var(--text); font-weight: 600; }
+  .m-range { margin: 0; }
+  .m-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .m-pair .lbl { font-size: 11.5px; color: var(--faint); }
+  .m-pair .val { font-size: 19px; font-weight: 700; }
+  .m-pair .inv { color: #9fdca8; }
+  .m-pair .spt { color: #c9b3f0; }
+  .m-bar { display: flex; height: 18px; border-radius: 9px; overflow: hidden; background: rgba(255,255,255,.06); margin-top: 8px; }
+  .m-bar i { display: block; height: 100%; }
+  .m-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .add-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--edge); background: rgba(255,255,255,.03); color: var(--text); font-size: 12.5px; cursor: pointer; }
+  .add-chip:hover { border-color: var(--moss); }
+  .add-chip .p { color: var(--faint); }
+  .add-chip.cel { border-color: #8a7030; }
+  .m-free { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(75, 52, 89, 0.6); }
+  .m-free .val { font-size: 22px; font-weight: 700; }
+  .m-free .lbl { font-size: 11.5px; color: var(--faint); }
+  .m-free .cost { font-size: 12px; color: var(--muted); text-align: right; }
+  .m-track { display: flex; align-items: flex-start; justify-content: space-between; position: relative; margin: 6px 4px 0; }
+  .m-track::before { content: ''; position: absolute; left: 18px; right: 18px; top: 17px; height: 3px; background: rgba(255,255,255,.08); border-radius: 2px; }
+  .m-track .fill { position: absolute; left: 18px; top: 17px; height: 3px; background: var(--moss); border-radius: 2px; }
+  .m-step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 33%; text-align: center; font-size: 11.5px; color: var(--faint); }
+  .m-step .dot { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; background: var(--surface); border: 2px solid var(--edge); }
+  .m-step.done .dot { border-color: var(--moss-dim); }
+  .m-step.here .dot { border-color: var(--moss); box-shadow: 0 0 0 4px rgba(127,201,138,.15); }
+  .m-step.here { color: var(--text); font-weight: 600; }
+  .m-advice { margin-top: 10px; text-align: center; font-size: 13.5px; }
+  .fs-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .fs-signal { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .fs-signal.open { background: rgba(127,201,138,.18); color: #9fdca8; }
+  .fs-signal.careful { background: rgba(230,196,106,.18); color: #f0d27a; }
+  .fs-signal.save { background: rgba(196,106,90,.2); color: #eea090; }
+  .fs-signal.wait { background: rgba(255,255,255,.06); color: var(--faint); }
+  .fs-pace { font-size: 12px; color: var(--muted); text-align: right; line-height: 1.45; }
+  .fs-right { margin-left: auto; max-width: 60%; }
+  .fs-pace b { color: var(--text); }
+  .spot-map[hidden], .spot-key[hidden], #goalPickRow[hidden] { display: none; }
+  main a { color: var(--moss); }
+  /* Long explanations fold to two lines (alert-row descriptions to one);
+     tap to read the rest. */
+  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+  .clamp.c1 { -webkit-line-clamp: 1; }
+  .clamp.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .card > .row + .row, .card > .row + .rule, .card > .rule + .row { margin-top: 10px; }
+  .card > :not(.row):not(.hint):not(.note) + .row { margin-top: 10px; }
+  #teamSelect { flex: 1; min-width: 0; margin-left: 10px; }
+  .team-card-pick { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--edge); border-radius: 9px; background: rgba(255,255,255,.03); }
+  .fs-chart { margin-top: 8px; }
+  .gr-chart { width: 100%; height: auto; display: block; }
+  .gr-chart .tick { font-size: 9px; fill: var(--faint); }
+  .gr-chart .tick.now { fill: var(--text); font-weight: 700; }
+  .money-chart .amt { font-size: 11.5px; font-weight: 700; fill: #fff; }
+  .money-chart .tick { font-size: 9.5px; fill: var(--faint); }
+  .money-chart .tick.now { fill: var(--text); font-weight: 700; }
+  .money-chart .bite { font-size: 10px; font-weight: 700; fill: #fda4af; }
+  .money-chart .tag { font-size: 8.5px; font-weight: 600; opacity: .9; }
+  .mc-intro { font-size: 12px; color: var(--muted); margin: 10px 0 2px; }
+  .mc-key { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .mc-key span { display: inline-flex; align-items: center; gap: 5px; }
+  .mc-key .sw { width: 22px; height: 10px; flex: none; }
+  .mc-key .rings i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid; margin: 0 1px 0 4px; }
+  .mc-key .rings i:first-child { margin-left: 0; }
+  .mc-how .note p { margin: 4px 0; }
+  .mc-edit { display: block; margin-top: 6px; font-size: 12px; }
+  .plan-item.flash { animation: wantFlash 1.6s ease-out; border-radius: 8px; }
+  @keyframes wantFlash { 0%, 30% { background: rgba(252,211,77,.22); } 100% { background: transparent; } }
+  .ev-box { margin-top: 12px; padding: 8px 10px 6px; border-radius: 14px; background: linear-gradient(180deg, rgba(110,231,183,.08), rgba(110,231,183,.02)); border: 1px solid rgba(110,231,183,.18); }
+  .ev-box.past { background: linear-gradient(180deg, rgba(252,211,77,.12), rgba(252,211,77,.03)); border-color: rgba(252,211,77,.3); }
+  .ev-meter { width: 100%; height: auto; display: block; }
+  .ev-status { font-size: 13px; text-align: center; margin-top: 2px; }
+  .ev-box.past .ev-status b { color: #fcd34d; }
+  .ev-sub { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .ev-sub b { color: var(--text); }
+  .ev-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .ev-row b { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  .fs-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .fs-chart text { font: 9px system-ui, sans-serif; fill: var(--muted); }
+  .fs-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto minmax(0, max-content); gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); font-size: 13px; }
+  .fs-row b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fs-row:last-child { border-bottom: none; }
+  .fs-ico { display: inline-block; width: 20px; }
+  .fs-row .d { color: var(--faint); font-size: 12px; }
+  .fs-row .p { color: var(--muted); font-size: 12px; }
+  .fs-row .st { font-size: 12px; text-align: right; max-width: 110px; line-height: 1.25; }
+  .fs-row.s-short .st { color: #eea090; }
+  .fs-row.s-tradeoff .st { color: #f0d27a; }
+  .fs-row.lost { background: rgba(196,106,90,.08); }
+  .fs-check { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(75, 52, 89, 0.6); }
+  .fs-check label { font-size: 12.5px; color: var(--muted); margin-right: 6px; }
+  .fs-check input { width: 120px; padding: 4px 8px; font-size: 13px; }
+  .fs-check .m-chips { margin-top: 6px; }
+  .fs-result { margin-top: 8px; padding: 8px 10px; border-radius: 9px; font-size: 13.5px; font-weight: 600; }
+  .fs-result.safe { background: rgba(127,201,138,.14); color: #9fdca8; }
+  .fs-result.breaks { background: rgba(196,106,90,.16); color: #eea090; }
+  .fs-result.nope { background: rgba(255,255,255,.05); color: var(--muted); }
+  .fs-result small { display: block; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .est { margin-top: 12px; padding: 10px; border-radius: 9px; background: rgba(255,255,255,.035); border: 1px solid var(--edge); }
+  .est .lbl { font-size: 11.5px; color: var(--faint); }
+  .bonus-line { font-size: 13px; margin-top: 2px; }
+  .bonus-line b { color: var(--gold, #e6c46a); }
+  .c-track { display: flex; justify-content: space-between; position: relative; margin: 4px 0 0; }
+  .c-track::before { content: ''; position: absolute; left: 14px; right: 14px; top: 13px; height: 3px; background: rgba(255,255,255,.08); border-radius: 2px; }
+  .c-track .fill { position: absolute; left: 14px; top: 13px; height: 3px; background: var(--moss); border-radius: 2px; }
+  .c-step { position: relative; z-index: 1; width: calc(100% / 7); display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 10px; line-height: 1.2; color: var(--faint); }
+  .c-step .dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 14px;
+    background: conic-gradient(var(--moss) calc(var(--p) * 1%), rgba(255,255,255,.08) 0); padding: 2px; box-sizing: border-box; position: relative; }
+  .c-step .dot::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--surface); z-index: -1; }
+  .c-step .l { margin-top: 4px; min-height: 2.4em; }
+  .c-step .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .c-step.done { color: var(--muted); }
+  .c-step.here { color: var(--text); font-weight: 600; }
+  .c-step.here .dot { box-shadow: 0 0 0 3px rgba(127,201,138,.25); }
+  .c-step.skip { opacity: .4; }
+  details.more { margin-top: 10px; }
+  details.more summary { cursor: pointer; color: var(--faint); font-size: 12.5px; }
+  .read-me b { color: var(--text); }
+  .read-me summary { cursor: pointer; color: var(--faint); }
+  .read-me ul { margin: 6px 0 0; padding-left: 18px; }
+  .read-me li { margin: 3px 0; }
+  .money-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .money-top .chips { margin: 0; }
+  .money-verdict { font-size: 14px; font-weight: 600; }
+  .money-verdict.ok { color: var(--moss); }
+  .money-verdict.close { color: #e6c46a; }
+  .money-verdict.short { color: var(--warn); }
+  .money-verdict.wait, .money-verdict.quiet { color: var(--faint); font-weight: 500; }
+  .inout { margin-top: 10px; display: grid; grid-template-columns: 34px 1fr 64px; gap: 6px 8px; align-items: center; font-size: 12.5px; }
+  .inout .k { color: var(--faint); }
+  .inout .v { text-align: right; font-weight: 600; }
+  .inout .track { height: 14px; border-radius: 7px; background: rgba(255,255,255,.06); overflow: hidden; }
+  .inout .track i { display: block; height: 100%; border-radius: 7px; }
+  .inout .in i { background: var(--moss); }
+  .inout .out i { background: #c46a5a; }
+  .inout .keep { grid-column: 1 / -1; display: flex; justify-content: space-between; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .inout .keep b.up { color: var(--moss); }
+  .inout .keep b.down { color: var(--warn); }
+  .daily { margin-top: 10px; }
+  .daily svg { width: 100%; height: 70px; display: block; }
+  .daily .cap { display: flex; justify-content: space-between; color: var(--faint); font-size: 11px; margin-top: 2px; }
+  .money-tips { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .money-tips div + div { margin-top: 3px; }
+  .money-tips b { color: var(--text); }
+  .cats-bar { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,.06); margin-top: 8px; }
+  .cats-bar i { display: block; height: 100%; }
+  .cats-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 8px; font-size: 12.5px; }
+  .cats-legend .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .cats-legend .amt { color: var(--muted); }
+  .cats-legend .tag { color: var(--faint); font-size: 11px; margin-left: 4px; }
+  .room { margin: 0; font-size: 13.5px; }
+  .plan-item .plan-bar { position: relative; height: 16px; border-radius: 8px; margin: 6px 0 4px 0; }
+  .plan-item .plan-bar i { border-radius: 8px; }
+  .plan-item .plan-bar em { position: absolute; left: 8px; top: 0; line-height: 16px; font-size: 11px; font-style: normal; color: #fff; font-weight: 600; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+  .plan-line { margin-left: 0; }
+  .plan-free { margin-top: 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .plan-free b { font-size: 20px; }
+  .plan-free .where { text-align: right; }
+  .aff-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); font-size: 13px; }
+  .aff-row:last-child { border-bottom: none; }
+  .aff-row .ic { font-size: 15px; text-align: center; }
+  .aff-row .why { color: var(--faint); font-size: 12px; }
+  .aff-row .why.warn { color: #e6c46a; }
+  .aff-row .why.no { color: var(--warn); }
+  .aff-row .star { justify-self: end; }
+  .budget-verdict { margin-top: 8px; padding: 9px 11px; border-radius: 9px; font-size: 13.5px; line-height: 1.4; border: 1px solid var(--edge); background: rgba(255,255,255,.04); }
+  .budget-verdict.ok { border-color: var(--moss-dim); background: rgba(71,98,76,.28); }
+  .budget-verdict.close { border-color: #8a7030; background: rgba(138,112,48,.22); }
+  .budget-verdict.short { border-color: var(--warn); background: rgba(160,60,60,.18); }
+  .budget-verdict.wait, .budget-verdict.quiet { color: var(--muted); }
+  .budget-verdict .tip { margin-top: 4px; }
+  .flow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+  .flow { padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,.04); border: 1px solid var(--edge); }
+  .flow .k { color: var(--faint); font-size: 11.5px; }
+  .flow .v { font-size: 17px; font-weight: 600; margin-top: 2px; }
+  .flow.kept .v.down { color: var(--warn); }
+  .flow.kept .v.up { color: var(--moss); }
+  .flow-bar { display: flex; height: 8px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,.06); margin-top: 8px; }
+  .flow-bar i { display: block; height: 100%; }
+  .flow-bar .spent { background: #b3564a; }
+  .flow-bar .kept { background: var(--moss); }
+  .flow-sub { color: var(--muted); font-size: 12.5px; margin-top: 5px; }
+  .budget-list { margin-top: 0; }
+  .pat { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); font-size: 13px; }
+  .pat:last-child { border-bottom: none; }
+  .pat .rule-text { flex: 1; min-width: 0; }
+  .pat .share { font-weight: 600; min-width: 44px; text-align: right; }
+  .pat .share.hi { color: #e6c46a; }
+  .pat .share.all { color: var(--warn); }
+  .pat-bar { height: 5px; border-radius: 4px; background: rgba(255,255,255,.08); margin-top: 4px; overflow: hidden; }
+  .pat-bar i { display: block; height: 100%; background: var(--moss); }
+  .cat { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+  .cat .name { width: 128px; flex: none; }
+  .cat .amt { width: 76px; flex: none; text-align: right; font-weight: 600; }
+  .cat .bar { flex: 1; height: 8px; border-radius: 6px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .cat .bar i { display: block; height: 100%; background: #b3564a; }
+  .cat.seeds .bar i { background: var(--moss); }
+  .cat.elsewhere .bar i { background: #6b6275; }
+  .cat .pct { width: 40px; flex: none; text-align: right; color: var(--muted); font-size: 12px; }
+  .cat-sub { color: var(--faint); font-size: 11.5px; margin: -3px 0 4px 136px; }
+  .room { margin: 6px 0 4px; font-size: 13.5px; }
+  .room.over b { color: var(--warn); }
+  .room.ok b { color: var(--moss); }
+  .keep-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .keep-row input { width: 56px; padding: 3px 6px; font-size: 12.5px; }
+  .plan-item { padding: 7px 0; border-bottom: 1px solid rgba(75, 52, 89, 0.6); font-size: 13px; }
+  .plan-item:last-child { border-bottom: none; }
+  .plan-head { display: flex; align-items: center; gap: 8px; }
+  .plan-head .num { color: var(--faint); font-size: 12px; width: 16px; }
+  .plan-head b { flex: 1; }
+  .plan-head .btn.small { padding: 2px 7px; font-size: 11px; }
+  .plan-bar { height: 7px; border-radius: 5px; background: rgba(255,255,255,.08); margin: 5px 0 4px 24px; overflow: hidden; }
+  .plan-bar i { display: block; height: 100%; background: var(--moss); }
+  .plan-bar.full i { background: #e6c46a; }
+  .plan-line { margin-left: 24px; color: var(--muted); font-size: 12.5px; }
+  .plan-line.ready { color: var(--moss); }
+  .plan-line.short { color: #e6c46a; }
+  .plan-free { margin-top: 6px; font-size: 13.5px; }
+  .plan-free b { font-size: 16px; }
+  .star { background: none; border: 1px solid var(--edge); color: var(--muted); border-radius: 7px; padding: 2px 7px; font-size: 12px; cursor: pointer; }
+  .star.on { color: #e6c46a; border-color: #8a7030; }
+  .aff .aff-icon { font-size: 16px; min-width: 22px; text-align: right; }
+  .aff-say { color: var(--text); }
+  .aff.no .aff-say b { color: var(--warn); }
+  .aff.yes .aff-say b { color: var(--moss); }
+  .aff.cut .aff-say b { color: #e6c46a; }
+  .budget-how { margin-top: 8px; }
+  .budget-how summary { cursor: pointer; color: var(--faint); font-size: 12.5px; }
   .worth-sum { font-size: 13.5px; margin-top: 4px; }
   .worth-sum .up { color: var(--moss); font-weight: 700; }
   .worth-sum .down { color: var(--warn); font-weight: 700; }
@@ -218,8 +470,8 @@
   section[hidden] { display: none; }
 
   h2 {
-    margin: 22px 4px 8px;
-    font-size: 13px;
+    margin: 20px 4px 6px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--muted);
   }
@@ -228,7 +480,7 @@
     background: var(--surface);
     border: 1px solid var(--edge);
     border-radius: 10px;
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
 
   .card + .card { margin-top: 10px; }
@@ -241,7 +493,7 @@
     min-height: 36px;
   }
 
-  .hint { margin: 4px 0 10px; color: var(--faint); font-size: 12.5px; }
+  .hint { margin: 4px 0 8px; color: var(--faint); font-size: 12px; line-height: 1.4; }
 
   /* switch */
   .switch {
@@ -323,7 +575,7 @@
   .rule:last-child { border-bottom: none; }
   .rule-text { flex: 1; min-width: 0; }
   .rule-name { font-weight: 500; }
-  .rule-desc { color: var(--faint); font-size: 12.5px; }
+  .rule-desc { color: var(--faint); font-size: 12px; line-height: 1.4; }
   .tier-legendary .rule-name { color: var(--gold); }
 
   .add-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -482,11 +734,11 @@
   .tag.off { background: #5a3a3a; color: #f3c9b5; }
   .tag.team { background: var(--moss-dim); color: #dff5e2; }
 
-  .subhead { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .subhead { font-size: 12.5px; font-weight: 600; color: var(--faint); margin: 12px 0 4px; }
   .subhead:first-child { margin-top: 0; }
   .big-line { font-size: 15px; }
-  .big-line strong { font-size: 18px; }
-  .note { color: var(--faint); font-size: 12.5px; margin-top: 6px; }
+  .big-line strong { font-size: 19px; font-weight: 600; }
+  .note { color: var(--faint); font-size: 12px; line-height: 1.4; margin-top: 6px; }
   .note b { color: var(--muted); font-weight: 600; }
 
   .team-pick { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 5px 0; }
@@ -530,6 +782,7 @@
     <button role="tab" data-tab="alerts" aria-selected="true"><i>🔔</i>Alerts</button>
     <button role="tab" data-tab="weather" aria-selected="false"><i>🌦️</i>Weather</button>
     <button role="tab" data-tab="garden" aria-selected="false"><i>🌻</i>Garden</button>
+    <button role="tab" data-tab="money" aria-selected="false"><i>💰</i>Money</button>
     <button role="tab" data-tab="pets" aria-selected="false"><i>🐾</i>Pets</button>
     <button role="tab" data-tab="pity" aria-selected="false"><i>🍀</i>Luck</button>
     <button role="tab" data-tab="rooms" aria-selected="false"><i>🎮</i>Rooms</button>
@@ -602,18 +855,6 @@
       </div>
       <p class="hint" id="deviceNote" hidden></p>
       <div class="row">
-        <label for="panelMode">This panel</label>
-        <select id="panelMode">
-          <option value="attached">Attached to the game</option>
-          <option value="window">In its own window</option>
-        </select>
-      </div>
-      <div class="row" id="panelWidthRow">
-        <span>Panel width</span>
-        <input type="range" id="panelWidth" min="320" max="700" step="10" style="width: 55%" aria-label="Panel width">
-      </div>
-      <p class="hint">Ctrl+Shift+D shows or hides the panel from anywhere in the app.</p>
-      <div class="row">
         <span>Keep speaker awake</span>
         <button class="switch" role="switch" id="keepAwake" aria-label="Keep speaker awake"></button>
       </div>
@@ -650,16 +891,6 @@
       <p class="hint" style="margin-bottom:0">Matches the start of the item's name, so "lychee" catches "Lychee Pit".</p>
     </div>
 
-    <h2>Backups</h2>
-    <div class="card">
-      <p class="hint" style="margin-top:0">Everything in one file: settings, weather teams and triggers, egg counts and history, pet counts, saved rooms, and scripts. The app also saves one by itself each day and keeps the last 7.</p>
-      <div class="button-row">
-        <button class="btn small" id="backupSave">Save a backup…</button>
-        <button class="btn small" id="backupRestore">Restore…</button>
-        <button class="link" id="backupFolder">Open the backups folder</button>
-      </div>
-    </div>
-
     <p class="dedication">🌷 dedicated to my sweet hannah buns</p>
   </section>
 
@@ -678,11 +909,9 @@
         <span>Swap pet teams with the weather</span>
         <button class="switch" role="switch" id="teamsOn" aria-label="Swap pet teams with the weather"></button>
       </div>
-      <p class="hint">When the weather changes, the app switches to the team you pick below, exactly as if you'd tapped that team in the game. It switches once per change, so if you swap by hand afterwards it leaves you alone.</p>
+      <p class="hint">When the weather changes, the app switches to the team you pick below, exactly as if you'd tapped that team in the game. It switches once per change, so if you swap by hand afterwards it leaves you alone. When the weather ends and nothing is picked for clear skies, the team you had out before comes back (unless you've swapped by hand since).</p>
       <div id="teamPicks"></div>
-      <div class="subhead" style="margin-top:14px">Your saved teams</div>
-      <div id="teamList"></div>
-      <p class="hint" style="margin-bottom:0">Teams come from the game's own Pet Teams. Make or edit them in the game and they show up here. <b>Apply</b> swaps one in now, which is a handy way to check it works.</p>
+      <p class="hint" style="margin-bottom:0">Teams come from the game's Pet Teams. To see them or swap one in now: <a href="#" data-goto="pets">Pets tab</a>.</p>
     </div>
 
     <h2>Swap teams when your garden is ready</h2>
@@ -761,27 +990,14 @@
       <div class="status-sub" id="gardenSub"></div>
     </div>
 
-    <h2>Harvest lock</h2>
-    <div class="card">
-      <div class="row">
-        <span>Lock harvesting<div class="rule-desc">While it's on, nothing gets harvested. Handy while moving pots around. Ctrl+Shift+L or the 🔒 up top.</div></span>
-        <button class="switch" role="switch" id="lockOn" aria-label="Harvest lock"></button>
-      </div>
-      <div class="subhead" style="margin-top:10px">Always protect</div>
-      <div class="chips" id="lockSpecies"></div>
-      <p class="hint" style="margin-bottom:0" id="lockHint">Tap a crop to protect it: it's never harvested by accident, lock or no lock. Tap again to allow it.</p>
-    </div>
-
-    <h2>Open spots</h2>
-    <div class="card">
-      <div class="big-line" id="spotCount">Waiting for the game…</div>
-      <div class="spot-map" id="spotMap" aria-label="Your garden, with open spots glowing"></div>
-      <div class="note" id="spotWhere"></div>
-      <div class="spot-key"><span><i class="k-open"></i>open</span><span><i class="k-p"></i>plant</span><span><i class="k-e"></i>egg</span><span><i class="k-d"></i>decoration</span></div>
-    </div>
-
     <h2>Your garden</h2>
     <div class="card" id="cropStats"></div>
+
+    <h2>Your stage</h2>
+    <div class="card" id="moneyStage"><div class="empty">Working it out…</div></div>
+
+    <h2>Gold &amp; Rainbow by your pets</h2>
+    <div class="card" id="goldRate"></div>
 
     <h2>Garden worth over time</h2>
     <div class="card">
@@ -791,6 +1007,7 @@
         <button class="chip" data-range="30">30 days</button>
       </div>
       <div id="worthChart"></div>
+      <div id="moneyProgress" class="note no-clamp" hidden></div>
     </div>
 
     <h2>Weather mutations</h2>
@@ -799,12 +1016,89 @@
     <h2>Crop size</h2>
     <div class="card" id="sizeStats"></div>
 
+    <h2>Open spots</h2>
+    <div class="card">
+      <div class="big-line" id="spotCount">Waiting for the game…</div>
+      <div class="spot-map" id="spotMap" aria-label="Your garden, with open spots glowing"></div>
+      <div class="note" id="spotWhere"></div>
+      <div class="spot-key"><span><i class="k-open"></i>open</span><span><i class="k-p"></i>plant</span><span><i class="k-e"></i>egg</span><span><i class="k-d"></i>decoration</span></div>
+      <div class="rule" style="margin-top:6px">
+        <div class="rule-text"><div class="rule-name">Show this map over the game while you hold a pot</div><div class="rule-desc">Bottom-right of the game, only while a pot is in your hand.</div></div>
+        <button class="switch" role="switch" id="spotMapOn" aria-label="Show the open-spot map over the game while holding a pot"></button>
+      </div>
+    </div>
+
+    <h2>Harvest lock</h2>
+    <div class="card">
+      <div class="row">
+        <span>Lock harvesting<div class="rule-desc">While it's on, nothing gets harvested. Handy while moving pots around. Ctrl+Shift+L or the 🔒 up top.</div></span>
+        <button class="switch" role="switch" id="lockOn" aria-label="Harvest lock"></button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span>Never sell pet food<div class="rule-desc">Pet food is whatever you carry in pots. When you sell, the app locks those crops first, so the sale can't take them.</div></span>
+        <button class="switch" role="switch" id="petFoodOn" aria-label="Never sell pet food"></button>
+      </div>
+      <div class="subhead" style="margin-top:10px">Always protect</div>
+      <div class="chips" id="lockSpecies"></div>
+      <p class="hint" style="margin-bottom:0" id="lockHint">Tap a crop to protect it: it's never harvested by accident, lock or no lock. Tap again to allow it.</p>
+    </div>
+
     <h2>Your stats</h2>
     <div class="card" id="lifeStats"></div>
 
   </section>
 
   <!-- ============================ PETS ============================ -->
+  <section id="tab-money" hidden>
+    <h2 style="margin-top:4px">Spend or save?</h2>
+    <div class="card">
+      <div id="moneyForesight"></div>
+      <div class="fs-check">
+        <label for="whatIfPrice">Can I buy this?</label>
+        <input id="whatIfPrice" type="text" inputmode="decimal" placeholder="price, e.g. 2B" autocomplete="off">
+        <div class="m-chips" id="whatIfChips"></div>
+        <div id="whatIfResult" class="fs-result" hidden></div>
+      </div>
+    </div>
+
+    <h2>Growth</h2>
+    <div class="card" id="moneyGrowth"></div>
+
+    <h2>Money engine</h2>
+    <div class="card" id="moneyEngine"></div>
+
+    <h2>Your wants</h2>
+    <div class="card">
+      <div id="budgetPlan"></div>
+      <div id="budgetAfford"></div>
+    </div>
+
+    <h2>This week</h2>
+    <div class="card">
+      <div id="moneySplit"></div>
+      <details class="more"><summary>What you bought</summary>
+        <div id="budgetPatterns"></div>
+        <div class="row" style="margin-top:6px"><span class="note" style="margin:0">Since <span id="purchasesSince">—</span></span><button class="btn small" id="purchasesReset">Reset</button></div>
+      </details>
+    </div>
+
+    <h2>Money box over the game</h2>
+    <div class="card">
+      <div class="rule">
+        <div class="rule-text"><div class="rule-name">Show it</div><div class="rule-desc">Bank, what you're saving for, free to spend: bottom-right of the game. Ctrl+Shift+B.</div></div>
+        <button class="switch" role="switch" id="budgetHudOn" aria-label="Show the money box over the game"></button>
+      </div>
+    </div>
+
+    <details class="read-me"><summary>How this is counted</summary>
+      <ul>
+        <li><b>Net worth</b> is your wallet plus your growing crops. A harvest moves coins from one to the other, so it stays level.</li>
+        <li><b>Invested</b> is celestials, seeds, eggs and pets. <b>Spent</b> is decor, tools and the rest. "Not seen" was spent where the app couldn't see it.</li>
+        <li>How often things show up is an average, and luck swings around it. Nothing here is sent to the game.</li>
+      </ul>
+    </details>
+  </section>
+
   <section id="tab-pets" hidden>
     <h2 style="margin-top:4px">Your team right now</h2>
     <div class="card" id="teamNow"></div>
@@ -821,7 +1115,7 @@
 
     <h2>Best pets for…</h2>
     <div class="card">
-      <div class="row">
+      <div class="row" id="goalPickRow">
         <select id="goalPick" style="max-width:none;flex:1" aria-label="Pick a goal"></select>
       </div>
       <div id="goalRank" style="margin-top:6px"></div>
@@ -874,20 +1168,26 @@
         <button class="link" id="roomsRefresh">Refresh</button>
       </div>
       <div id="roomList"></div>
-    </div>
-    <div class="card" style="margin-top:10px">
-      <div class="row" style="min-height:30px">
-        <span>Offer rooms I copy<div class="rule-desc">Copy a room code (in Discord, say), come back to the app, and it offers Join or Save</div></span>
-        <button class="switch" role="switch" id="clipOn" aria-label="Offer rooms I copy"></button>
-      </div>
-      <div class="add-row">
+      <div class="add-row" style="margin-top:10px">
         <button class="btn small" id="roomPaste" title="Use the room code on your clipboard">📋 Paste</button>
         <input type="text" id="roomCode" placeholder="A room code, like Q9BD" aria-label="Room code">
         <button class="btn small" id="roomSaveCode">Save</button>
         <button class="btn small primary" id="roomJoinCode">Join</button>
       </div>
     </div>
-    <p class="hint" style="padding: 0 4px">Save rooms you like and see how full they are before you jump in. Counts come from the game and refresh every 45 seconds while this tab is open.</p>
+
+    <h2>Room settings</h2>
+    <div class="card">
+      <div class="row" style="min-height:30px">
+        <span>Share my room on the community list<div class="rule-desc">Adds the room you're in to the list above (Arie's mod), so others can join. It sends your room code, how many are in it, your name and your coin balance (at most once a minute); the name and coins also show on that mod's site. Nothing is sent while this is off.</div><div class="rule-desc" id="shareStatus"></div></span>
+        <button class="switch" role="switch" id="shareOn" aria-label="Share my room on the community list"></button>
+      </div>
+      <div class="row" style="min-height:30px">
+        <span>Offer rooms I copy<div class="rule-desc">Copy a room code (in Discord, say), come back to the app, and it offers Join or Save</div></span>
+        <button class="switch" role="switch" id="clipOn" aria-label="Offer rooms I copy"></button>
+      </div>
+    </div>
+
   </section>
 
   <!-- ============================ SCRIPTS ============================ -->
@@ -900,6 +1200,7 @@
         <button class="btn small" id="updCheck">Check for updates</button>
         <button class="btn small primary" id="updInstall" hidden>Update now</button>
       </div>
+      <div id="updTidy"></div>
       <div class="row" style="min-height:30px">
         <span>Check automatically<div class="rule-desc">When the app starts and every few hours. It only tells you; nothing installs until you press Update now.</div></span>
         <button class="switch" role="switch" id="updAuto" aria-label="Check for updates automatically"></button>
@@ -960,6 +1261,7 @@
       <p class="hint" style="margin-bottom:0">Only on your screen: nothing is sent to the game and nobody else sees it. The game keeps working underneath.</p>
     </div>
 
+    <h2>Scripts</h2>
     <div class="card" id="scriptList"></div>
     <p class="hint" style="padding: 0 4px">Switching a script on or off takes effect the next time the game loads.</p>
     <div class="button-row">
@@ -975,6 +1277,42 @@
       <div id="devDetails"></div>
       <div class="button-row"><button class="btn small" id="gardenSample">Save a sample</button></div>
     </details>
+    <h2>Panel</h2>
+    <div class="card">
+      <div class="row">
+        <label for="panelMode">This panel</label>
+        <select id="panelMode">
+          <option value="attached">Attached to the game</option>
+          <option value="window">In its own window</option>
+        </select>
+      </div>
+      <div class="row" id="panelWidthRow">
+        <span>Panel width</span>
+        <input type="range" id="panelWidth" min="320" max="700" step="10" style="width: 55%" aria-label="Panel width">
+      </div>
+      <p class="hint" style="margin-bottom:0">Ctrl+Shift+D shows or hides the panel from anywhere in the app.</p>
+    </div>
+
+    <h2>Money tab</h2>
+    <div class="card">
+      <div class="chips" id="moneyUnlock" style="margin-top:0">
+        <button class="chip" data-unlock="auto">Unlocks by itself</button>
+        <button class="chip" data-unlock="on">Show it now</button>
+        <button class="chip" data-unlock="off">Keep it hidden</button>
+      </div>
+      <div class="note" id="moneyUnlockNote">By itself, the Money tab appears after a day of play, or two weeks when your garden and wallet together are worth over 1B.</div>
+    </div>
+
+    <h2>Backups</h2>
+    <div class="card">
+      <p class="hint" style="margin-top:0">Everything in one file: settings, weather teams and triggers, egg counts and history, pet counts, saved rooms, and scripts. The app also saves one by itself each day and keeps the last 7.</p>
+      <div class="button-row">
+        <button class="btn small" id="backupSave">Save a backup…</button>
+        <button class="btn small" id="backupRestore">Restore…</button>
+        <button class="link" id="backupFolder">Open the backups folder</button>
+      </div>
+    </div>
+
   </section>
 
 </main>
@@ -2196,6 +2534,8 @@ const LINES = {
     'Egg-cellent news! A Mythical Egg is in stock!',
     "Stop everything, it's a Mythical Egg! Go go go!",
   ],
+  amberegg: ['An Amber Egg is in the shop!', 'Amber Egg in stock. Ooh, shiny!', 'Amber Egg alert! Go on, grab it.'],
+  sunflower: ['Sunflower! Stay calm, everyone.', 'A Sunflower is in stock. Try not to scream.', 'Sunflower alert! Deep breaths. It is just a flower.'],
   starweaver: ['Starweaver alert! Starweaver alert!', 'Starweaver alert! All hands on deck!', 'Starweaver alert! Chop chop!'],
   windturner: ['Windturner alert!'],
   firepit: ['Firepit alert!'],
@@ -2247,6 +2587,15 @@ async function perform(a) {
     await play(SFX.egg());
     await play(SFX.fanfare(true));
     return speak(pick(LINES.mythicalegg), 1.12, 1.03);
+  }
+  if (id === 'sunflower') {
+    await play(SFX.sunrise());
+    return speak(pick(LINES.sunflower), 1.1, 1.06);
+  }
+  if (id === 'amberegg') {
+    await play(SFX.egg());
+    await play(SFX.fanfare(false));
+    return speak(pick(LINES.amberegg), 1.08, 1);
   }
   if (id === 'snow') {
     await play(SFX.frost());
@@ -2360,6 +2709,8 @@ const PET_DESCRIBE = {
 
 const SPECIAL_DESCRIBE = {
   mythicalegg: 'Egg wobble, fanfare, and a very excited announcement',
+  amberegg: 'Egg wobble, fanfare, and an announcement',
+  sunflower: 'Sunrise chime and a very excited (trying to stay calm) announcement',
   decor: 'Quick ping and "Decor alert!"',
 };
 
@@ -2394,9 +2745,18 @@ function renderRules() {
   $('itemRules').innerHTML = RULES.filter((r) => r.kind === 'item' || r.kind === 'decor').map(ruleRow).join('');
   $('weatherRules').innerHTML = RULES.filter((r) => r.kind === 'weather').map(ruleRow).join('');
   $('petRules').innerHTML = RULES.filter((r) => r.kind === 'pet').map(ruleRow).join('');
+  autoFoldSummaries();
+}
+
+function soundSummary() {
+  if (!S || !S.alerts) return;
+  setFoldSummary('alerts/sound-and-voice', S.alerts.muted ? '🔇 muted' : `🔊 ${S.alerts.volume}%${S.alerts.voiceVolume != null ? ` · voice ${S.alerts.voiceVolume}%` : ''}`);
 }
 
 function renderAlertSettings() {
+  setTimeout(soundSummary, 0);
+  setSwitch($('spotMapOn'), !(S.ui && S.ui.spotMap === false));
+  setSwitch($('budgetHudOn'), !(S.ui && S.ui.budgetHud === false));
   $('volume').value = S.alerts.volume;
   $('volumeValue').textContent = S.alerts.volume + '%';
   const vv = S.alerts.voiceVolume == null ? 35 : S.alerts.voiceVolume;
@@ -2515,6 +2875,7 @@ function renderStatus() {
 function wireAlerts() {
   $('volume').addEventListener('input', (e) => {
     S.alerts.volume = Number(e.target.value);
+    soundSummary();
     $('volumeValue').textContent = S.alerts.volume + '%';
     if (master) master.gain.value = level();
     save();
@@ -2523,6 +2884,7 @@ function wireAlerts() {
 
   $('voiceVolume').addEventListener('input', (e) => {
     S.alerts.voiceVolume = Number(e.target.value);
+    soundSummary();
     $('voiceVolumeValue').textContent = S.alerts.voiceVolume + '%';
     if (voiceBus) voiceBus.gain.value = speechLevel();
     save();
@@ -2533,6 +2895,7 @@ function wireAlerts() {
 
   $('muted').addEventListener('click', () => {
     S.alerts.muted = !S.alerts.muted;
+    soundSummary();
     renderAlertSettings();
     if (master) master.gain.value = level();
     if (voiceBus) voiceBus.gain.value = speechLevel();
@@ -2956,7 +3319,7 @@ function abilityLines(p, weatherKind) {
   return (p.abilityInfo || []).map((a) => {
     const waiting = a.weather && kindOfLabel(a.weather) !== weatherKind;
     const when = a.weather ? ` <span class="where">${waiting ? 'only during' : 'now, during'} ${esc(a.weather)}</span>` : '';
-    return `<div class="ab ${waiting ? 'off' : ''} ${a.unknown ? 'unknown' : ''}"><span class="n">${esc(a.name)}${when}</span><span class="t">${esc(a.text || '')}</span></div>`;
+    return `<div class="ab ${waiting ? 'off' : ''} ${a.unknown ? 'unknown' : ''}"><span class="n">${esc(a.name)}${when}</span><span class="t">${esc(String(a.text || '').replace(/`/g, ''))}</span></div>`;
   }).join('');
 }
 
@@ -2972,7 +3335,7 @@ function kindOfLabel(label) {
 }
 
 function summaryLines(sum) {
-  if (!sum || (!sum.totals.length && !sum.waiting.length)) return '<div class="empty">Nothing to add up.</div>';
+  if (!sum || (!sum.totals.length && !sum.waiting.length)) return '<div class="empty">No boosts to total up for these pets.</div>';
   const now = sum.totals.map((t) => `<div class="goal-line"><span>${esc(t.label)}</span><span>${esc(t.text)}</span></div>`).join('');
   const later = sum.waiting.map((w) => `<div class="goal-line" style="opacity:.6"><span>${esc(w.label)}</span><span>during ${esc(w.weather)}: ${esc(w.text)}</span></div>`).join('');
   return now + later;
@@ -2985,7 +3348,7 @@ function renderTeamIdeas(st) {
   const recs = (st && st.recommendations) || [];
   if (!recs.length) {
     $('presetChips').innerHTML = '';
-    $('presetBody').innerHTML = '<div class="empty">Shows up once the app can see your pets.</div>';
+    $('presetBody').innerHTML = `<div class="empty">${st && (st.allPets || []).length ? 'None of your pets have boosts to build a team around yet.' : 'Shows up once the app can see your pets.'}</div>`;
     return;
   }
   if (!PRESET || !recs.some((r) => r.id === PRESET)) {
@@ -3084,6 +3447,7 @@ function renderPets() {
     pick.innerHTML = optHtml;
     pick.dataset.html = optHtml;
   }
+  $('goalPickRow').hidden = !goals.length;
   const whereText = { out: 'out now', inventory: 'inventory', hutch: 'hutch', storage: 'storage' };
   const teamOf = (id) => (st.teams || []).filter((t) => t.members.some((m) => m.petId === id)).map((t) => t.name);
   const ranked = [];
@@ -3106,25 +3470,38 @@ function renderPets() {
 
   const out = new Set(st.pets.map((p) => String(p.id)));
   const teams = st.teamSummaries || [];
-  const openIds = new Set([...document.querySelectorAll('#teamCompare details[open]')].map((d) => d.dataset.team));
-  $('teamCompare').innerHTML = teams.length
-    ? teams.map((t) => {
-        const team = (st.teams || []).find((x) => x.id === t.id) || { members: [] };
-        const isOut = team.members.length && team.members.every((m) => out.has(m.petId));
-        const who = team.members.map((m) => {
-          const pet = all.find((x) => x.id === m.petId);
-          return pet ? `${petTitle(pet)} (${pet.strength})` : (m.name || m.species || 'pet');
-        }).join(', ');
-        const top = t.summary.totals.slice(0, 2).map((x) => `${x.label.split(' ')[0]} ${x.text}`).join(' · ');
-        return `<details class="team" data-team="${esc(t.id)}"${openIds.has(t.id) ? ' open' : ''}>
-          <summary><span class="rule-text"><span class="rule-name">${esc(t.name)}${isOut ? ' <span class="live">· out now</span>' : ''}</span><div class="rule-desc">${esc(top || who)}</div></span>
-          <button class="btn small" data-apply-team="${esc(t.id)}"${isOut || PARKED ? ' disabled' : ''}>Apply</button></summary>
-          <div class="rule-desc" style="margin:6px 0 4px">${esc(who)}${t.missing ? ` · ${t.missing} pet${t.missing === 1 ? '' : 's'} not found` : ''}</div>
-          ${summaryLines(t.summary)}
-        </details>`;
-      }).join('')
-    : '<div class="empty">Save teams in the game (Pet Teams, the T key) and they show up here to compare.</div>';
+  // Like the voice picker: a dropdown of every saved team (its pets in the
+  // name, the one that's out marked), and the chosen team's details below.
+  const isOutT = (t) => {
+    const team = (st.teams || []).find((x) => x.id === t.id) || { members: [] };
+    return Boolean(team.members.length && team.members.every((m) => out.has(m.petId)));
+  };
+  const petsOf = (t, withStr) => {
+    const team = (st.teams || []).find((x) => x.id === t.id) || { members: [] };
+    return team.members.map((m) => {
+      const pet = all.find((x) => x.id === m.petId);
+      return pet ? (withStr ? `${petTitle(pet)} (${pet.strength})` : petTitle(pet)) : (m.name || m.species || 'pet');
+    });
+  };
+  const sorted = teams.slice().sort((a, b) => Number(isOutT(b)) - Number(isOutT(a)));
+  if (!teams.length) {
+    $('teamCompare').innerHTML = '<div class="empty">Save teams in the game (Pet Teams, the T key) and they show up here to compare.</div>';
+    return;
+  }
+  if (!TEAM_PICK || !teams.some((t) => t.id === TEAM_PICK)) TEAM_PICK = sorted[0].id;
+  const t = teams.find((x) => x.id === TEAM_PICK);
+  const outNow = isOutT(t);
+  const opts = sorted.map((x) => `<option value="${esc(x.id)}"${x.id === TEAM_PICK ? ' selected' : ''}>${esc(x.name)}${isOutT(x) ? ' ✓ out now' : ''} — ${esc(petsOf(x, false).join(', ') || 'no pets')}</option>`).join('');
+  $('teamCompare').innerHTML = `<div class="row" style="margin-top:0"><label for="teamSelect">Team</label><select id="teamSelect" aria-label="Choose a saved team">${opts}</select></div>
+    <div class="team-card-pick">
+      <div class="rule-name">${esc(t.name)}${outNow ? ' <span class="live">· out now</span>' : ''}</div>
+      <div class="rule-desc">${esc(petsOf(t, true).join(', ') || 'no pets')}${t.missing ? ` · ${t.missing} pet${t.missing === 1 ? '' : 's'} not found` : ''}</div>
+      ${summaryLines(t.summary)}
+      <div class="button-row" style="margin-top:6px"><button class="btn small" data-apply-team="${esc(t.id)}"${outNow || PARKED ? ' disabled' : ''}>${outNow ? 'Out now' : 'Apply'}</button><span class="where">${teams.length} saved team${teams.length === 1 ? '' : 's'}</span></div>
+    </div>`;
 }
+
+let TEAM_PICK = null;
 
 function renderPetFood(st, stale) {
   const box = $('petFood');
@@ -3178,7 +3555,7 @@ function etaLine(st) {
   if (!eta) return '';
   if (eta.done) return '<div class="note">✨ Every crop is Gold or Rainbow.</div>';
   if (!eta.hours) {
-    return `<div class="note">${eta.remaining.toLocaleString()} crops are still plain. No Gold or Rainbow pet is out, so nothing is converting them.</div>`;
+    return `<div class="note">${eta.remaining.toLocaleString()} ${eta.remaining === 1 ? 'crop is' : 'crops are'} still plain. No Gold or Rainbow pet is out, so nothing is converting them.</div>`;
   }
   return `<div class="note">${eta.remaining.toLocaleString()} still plain. At about ${eta.perHour.toFixed(1)} an hour from your pets, every crop could be Gold or Rainbow in <b>${durationText(eta.hours)}</b>.</div>`;
 }
@@ -3196,7 +3573,10 @@ function renderCropCard(st, b) {
     }</div>`;
     return;
   }
-  const ready = b.matureKnown ? ` · <strong>${b.mature.toLocaleString()}</strong> ready to harvest` : '';
+  // "Ready" means the Money tab's rule everywhere; the game's own "grown"
+  // is called ripe here so the two numbers can't be mixed up.
+  const ready = (b.matureKnown ? ` · <strong>${b.mature.toLocaleString()}</strong> ripe` : '')
+    + (b.missing ? ` · <strong>${(b.ready || 0).toLocaleString()}</strong> ready to sell` : '');
   const unpriced = Object.entries(b.unpricedSpecies || {}).sort((x, y) => y[1] - x[1]);
   const lines = [];
   lines.push(`<div class="big-line"><strong>${b.total.toLocaleString()}</strong> crops growing${ready}</div>`);
@@ -3204,23 +3584,12 @@ function renderCropCard(st, b) {
     lines.push(`<div class="worth">💰 Worth about <strong>${shortNumber(Math.round(b.value))}</strong> if you harvested and sold everything now.</div>`);
     // What you'd actually get: the room's friend bonus and your pets' sell
     // boosts (on average) both multiply the sale.
-    const room = st && st.room;
-    const roomPct = room && room.players ? Math.min(50, Math.max(0, room.players - 1) * 10) : 0;
-    const rows = ((st && st.abilities && st.abilities.rows) || []).filter((r) => !r.weather);
-    const sellPct = rows.filter((r) => r.goal === 'sell' && r.sellChance).reduce((a, r) => a + (r.score || 0), 0);
-    // Double Harvest: that chance of an extra crop at each harvest.
-    // Crop Refund: that chance the sold crops come back, to be sold again,
-    // which on average is 1 / (1 - chance). Both are averages.
-    const chanceOf = (id) => rows.filter((r) => r.id === id).reduce((a, r) => a + (r.chance || 0), 0);
-    const dh = Math.min(100, chanceOf('DoubleHarvest'));
-    const refund = Math.min(90, chanceOf('CropRefund'));
-    const extra = (1 + dh / 100) / (1 - refund / 100);
+    const { roomPct, sellPct, dh, refund, petPart } = saleBonuses(st);
     const bits = [];
     if (roomPct) bits.push(`your room's +${roomPct}%`);
     if (sellPct) bits.push(`your pets' sell boost (≈ +${sellPct.toFixed(1)}%)`);
     if (dh) bits.push(`Double Harvest (≈ +${dh.toFixed(1)}%)`);
     if (refund) bits.push(`Crop Refund (≈ +${((1 / (1 - refund / 100) - 1) * 100).toFixed(1)}%)`);
-    const petPart = (1 + sellPct / 100) * extra;
     if (bits.length) {
       const total = b.value * (1 + roomPct / 100) * petPart;
       const list = bits.length > 1 ? bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1] : bits[0];
@@ -3458,8 +3827,13 @@ function renderSpots(st) {
   $('spotCount').innerHTML = open.length
     ? `<strong>${open.length}</strong> open spot${open.length === 1 ? '' : 's'}`
     : 'No open spots: every spot has something in it';
-  $('spotWhere').innerHTML = open.length
-    ? open.slice(0, 4).map((i) => `✨ ${esc(spotWhere(i))}`).join('<br>') + (open.length > 4 ? `<br>…and ${open.length - 4} more (they glow on the map)` : '')
+  // With nothing to find, the map is just a picture of a full garden.
+  map.hidden = !open.length;
+  const key = document.querySelector('#tab-garden .spot-key');
+  if (key) key.hidden = !open.length;
+  // Spelled out only when there are a few to find; otherwise the map says it.
+  $('spotWhere').innerHTML = open.length && open.length <= 6
+    ? open.map((i) => `✨ ${esc(spotWhere(i))}`).join('<br>')
     : '';
 }
 
@@ -3499,6 +3873,9 @@ function renderGarden() {
   renderLifeStats(shown);
   renderSpots(shown);
   refreshWorth(false);
+  renderGoldRate();
+  refreshBudget(Boolean(BUDGET && BUDGET.foresight && BUDGET.foresight.waitingFor === 'garden'));
+  autoFoldSummaries();
   renderPetFood(st, stale);
   renderPets();
 
@@ -3585,6 +3962,7 @@ function renderTeams() {
   }
 
   const out = new Set(((st && st.pets) || []).map((p) => String(p.id)));
+  if (!$('teamList')) return;
   $('teamList').innerHTML = teams.length
     ? teams.map((t) => {
         const isOut = t.members.length && t.members.every((m) => out.has(m.petId));
@@ -3757,6 +4135,7 @@ function renderLock() {
   $('lockBtn').title = on ? 'Harvest lock is ON: click to allow harvesting (Ctrl+Shift+L)' : 'Harvest lock (Ctrl+Shift+L)';
   if (!$('lockOn')) return;
   setSwitch($('lockOn'), on);
+  setSwitch($('petFoodOn'), Boolean(LOCK.petFood));
   const inGarden = (GARDEN_STATUS && GARDEN_STATUS.gardenSpecies) || [];
   const all = [...new Set([...(LOCK.species || []), ...inGarden])].sort((a, b) => seedLabel(a).localeCompare(seedLabel(b)));
   const prot = new Set(LOCK.species || []);
@@ -3765,6 +4144,7 @@ function renderLock() {
     : '<span class="note" style="margin:0">Your crops show up here once the game is connected.</span>';
   $('lockHint').textContent = 'Tap a crop to protect it: it\'s never harvested by accident, lock or no lock. Tap again to allow it.' +
     (blockedCount ? ` Stopped ${blockedCount} harvest${blockedCount === 1 ? '' : 's'} this session.` : '');
+  setFoldSummary('garden/harvest-lock', `${on ? '🔒 on' : 'off'}${(LOCK.species || []).length ? ` · ${LOCK.species.length} protected` : ''}${LOCK.petFood ? ' · pet food guarded' : ''}`);
 }
 
 // A crop id as its name ("ThunderCelestialShroomPlant" -> "Stormcap").
@@ -3785,6 +4165,18 @@ function wireLock() {
   });
   $('lockOn').addEventListener('click', () => {
     setLock({ on: !LOCK.on });
+  });
+  $('petFoodOn').addEventListener('click', () => {
+    setLock({ petFood: !LOCK.petFood });
+    toast(!LOCK.petFood ? '🐾 On: sales that would take pet food are stopped.' : '🐾 Off: sales go through as normal.');
+  });
+  window.app.onSellGuard((g) => {
+    const pretty = (x) => cropName(x);
+    toast(g && g.ok ? `🐾 Locked ${(g.locked || []).map(pretty).join(', ') || 'your pet food'}, sold the rest.` : `🐾 Couldn't lock ${(g && g.failed || []).map(pretty).join(', ') || 'your pet food'}; nothing sold.`);
+  });
+  window.app.onSellBlocked((b) => {
+    const list = (b && b.crops ? b.crops : []).slice(0, 3).map((c) => `${cropName(c.species)} ×${c.count}`).join(', ');
+    toast(`🐾 Sale stopped: ${list || 'pet food'} not locked.`);
   });
   $('lockSpecies').addEventListener('click', (e) => {
     const b = e.target.closest('[data-protect]');
@@ -3883,6 +4275,23 @@ function renderUpdate() {
   }
 }
 
+// Old installers in Downloads: offered, never removed without asking.
+async function renderTidy() {
+  const box = $('updTidy');
+  if (!box) return;
+  let r;
+  try {
+    r = await window.app.updateOldInstallers();
+  } catch (err) {
+    return;
+  }
+  const bin = UPD && UPD.platform === 'darwin' ? 'Trash' : 'Recycle Bin';
+  box.innerHTML = r && r.count
+    ? `<div class="note">🧹 ${r.count} old installer${r.count === 1 ? '' : 's'} from this app ${r.count === 1 ? 'is' : 'are'} in your Downloads (${mb(r.bytes)}). You don't need ${r.count === 1 ? 'it' : 'them'} any more.
+       <button class="link" id="updTidyGo">Move ${r.count === 1 ? 'it' : 'them'} to the ${bin}</button></div>`
+    : '';
+}
+
 async function startUpdate() {
   const r = await window.app.updateInstall();
   if (r && r.openedPage) toast('Opened the download page.');
@@ -3895,6 +4304,12 @@ function wireUpdates() {
     renderUpdate();
   });
   $('updInstall').addEventListener('click', startUpdate);
+  $('updTidy').addEventListener('click', async (e) => {
+    if (!e.target.closest('#updTidyGo')) return;
+    const r = await window.app.updateTidy();
+    toast(r && r.moved ? `🧹 Moved ${r.moved} old installer${r.moved === 1 ? '' : 's'} (${mb(r.bytes)}) to the ${UPD && UPD.platform === 'darwin' ? 'Trash' : 'Recycle Bin'}.` : "Couldn't move them. You can delete them from Downloads yourself.");
+    renderTidy();
+  });
   $('updAuto').addEventListener('click', async () => {
     UPD = await window.app.updateAuto(!(UPD && UPD.auto));
     renderUpdate();
@@ -3936,6 +4351,15 @@ function wireReclaim() {
   });
 }
 
+function wireGoldRate() {
+  $('goldRate').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-grange]');
+    if (!c) return;
+    GOLD_RANGE = Number(c.dataset.grange);
+    renderGoldRate();
+  });
+}
+
 function wireWorth() {
   $('worthRange').addEventListener('click', (e) => {
     const b = e.target.closest('[data-range]');
@@ -3943,6 +4367,822 @@ function wireWorth() {
     WORTH_DAYS = Number(b.dataset.range);
     for (const c of document.querySelectorAll('#worthRange .chip')) c.classList.toggle('on', c === b);
     refreshWorth(true);
+  });
+}
+
+/* Spending vs. earning (budget.js in the main process does the sums; this
+ * only draws them). */
+let BUDGET = null;
+let budgetFetchedAt = 0;
+
+async function refreshBudget(force) {
+  if (!force && Date.now() - budgetFetchedAt < 60000) return;
+  budgetFetchedAt = Date.now();
+  try {
+    BUDGET = await window.app.budgetGet();
+  } catch (err) {
+    BUDGET = null;
+  }
+  renderBudget();
+}
+
+function agoLong(t) {
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  if (m < 48 * 60) return `${Math.round(m / 60)} h ago`;
+  return `${Math.round(m / 1440)} days ago`;
+}
+
+function fmtHoursShort(h) {
+  if (h < 1) {
+    const m = Math.max(1, Math.round(h * 60));
+    return `${m} minute${m === 1 ? '' : 's'}`;
+  }
+  if (h < 48) {
+    const r = Math.round(h);
+    return `${r} hour${r === 1 ? '' : 's'}`;
+  }
+  return `${Math.round(h / 24)} days`;
+}
+
+function fmtEvery(days) {
+  if (!Number.isFinite(days)) return '';
+  if (days < 1 / 12) return 'many times a day';
+  if (days < 0.75) return `about ${Math.round(1 / days)} times a day`;
+  if (days < 1.5) return 'about once a day';
+  if (days < 14) return `about every ${Math.round(days)} days`;
+  if (days < 60) return `about every ${Math.round(days / 7)} weeks`;
+  return `about every ${Math.round(days / 30)} months`;
+}
+
+// The Money tab is hidden until a full day of coins has been measured, then
+// appears (and stays). Until then the Garden tab says how far along it is.
+let MONEY_WAS = null;
+function applyMoneyUnlock(b) {
+  const btn = document.querySelector('nav [data-tab="money"]');
+  if (!btn) return;
+  const on = Boolean(b && b.unlocked);
+  btn.hidden = !on;
+  const prog = $('moneyProgress');
+  if (prog) {
+    const h = b ? Math.max(0, Number(b.measuredHours) || 0) : 0;
+    const days = (b && b.unlockDays) || 1;
+    const measured = h < 1 ? 'under an hour' : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} days`;
+    prog.hidden = on;
+    prog.innerHTML = on ? ''
+      : b && b.unlockMode === 'off' ? '💰 The Money tab is kept hidden (Extras → Money tab).'
+      : `💰 A Money tab unlocks after ${days === 1 ? 'a day' : `${days} days`} of play${days > 1 ? ' (garden and wallet over 1B)' : ''}: ${measured} measured so far. Can't wait? <a href="#" data-goto="scripts">Extras → Money tab → Show it now</a>.`;
+  }
+  for (const c of document.querySelectorAll('#moneyUnlock .chip')) c.classList.toggle('on', c.dataset.unlock === ((b && b.unlockMode) || 'auto'));
+  if (MONEY_WAS === false && on) toast('💰 The Money tab has unlocked.');
+  MONEY_WAS = on;
+  if (!on && document.querySelector('nav [data-tab="money"][aria-selected="true"]')) showTab('garden');
+}
+
+/* The rate your pets turn crops Gold and Rainbow: bars over time (stacked
+ * gold / rainbow), the average, the best stretch, and what's left. From the
+ * hourly tally main keeps of each pet proc (the game's own timestamps). */
+let GOLD_RANGE = 12;
+function renderGoldRate() {
+  const box = $('goldRate');
+  if (!box) return;
+  const hourly = (GARDEN_STATS && GARDEN_STATS.hourly) || {};
+  const since = (GARDEN_STATS && GARDEN_STATS.hourlySince) || null;
+  const nowH = Math.floor(Date.now() / 3600000);
+  const step = { 12: 1, 24: 1, 72: 3, 168: 6 }[GOLD_RANGE] || 1;
+  const n = GOLD_RANGE / step;
+  // An hour counts as watched if the app had a reading in it (w), or saw a
+  // proc in it (older records).
+  const watchedHour = (b) => Boolean(b && (b.w || b.g || b.r));
+  const bars = [];
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const end = nowH - i * step; // last hour in this bar
+    let g = 0;
+    let r = 0;
+    let watched = 0;
+    for (let h = end - step + 1; h <= end; h += 1) {
+      const b = hourly[h];
+      if (watchedHour(b)) watched += 1;
+      if (b) {
+        g += b.g || 0;
+        r += b.r || 0;
+      }
+    }
+    bars.push({ t: (end - step + 1) * 3600000, g, r, watched, tracked: watched > 0 });
+  }
+  const tracked = bars.filter((b) => b.tracked);
+  const hours = tracked.reduce((a, b) => a + b.watched, 0);
+  const total = tracked.reduce((a, b) => a + b.g + b.r, 0);
+  // A rate once there's something to go on: a proc, or two watched hours.
+  const perHour = hours >= 1 && (total > 0 || hours >= 2) ? total / hours : null;
+  const best = tracked.reduce((m, b) => (!m || b.g + b.r > m.g + m.r ? b : m), null);
+  const ranges = `<div class="chips m-range" id="goldRange">${[[12, '12 h'], [24, '24 h'], [72, '3 days'], [168, '7 days']].map(([v, l]) => `<button class="chip ${GOLD_RANGE === v ? 'on' : ''}" data-grange="${v}">${l}</button>`).join('')}</div>`;
+  if (!since) {
+    box.innerHTML = `<div class="m-head"><div class="empty" style="margin:0">Fills in as you play: the game's own Gold and Rainbow Granter counts, hour by hour.</div>${ranges}</div>`;
+    return;
+  }
+  // A line graph: a warm gold line and a rainbow-striped line, each over a
+  // soft glowing fill, drawn as smooth curves through the bars' counts. Hours
+  // the game wasn't open break the lines (no invented data). A ✨ marks the
+  // best stretch; faint guides on the left give the scale.
+  const W = 330; const H = 96; const PL = 18; const PR = 6; const PT = 12; const PB = 14;
+  const max = Math.max(1, ...bars.map((b) => Math.max(b.g, b.r)));
+  const fmtT = (t) => (step === 1 ? new Date(t).toLocaleTimeString([], { hour: 'numeric' }) : new Date(t).toLocaleString([], { weekday: 'short', hour: 'numeric' }));
+  const gx = (i) => PL + (n === 1 ? (W - PL - PR) / 2 : (i / (n - 1)) * (W - PL - PR));
+  const gy = (v) => PT + (1 - v / max) * (H - PT - PB);
+  // Watched stretches as runs of points; a smooth curve through each run.
+  const runs = (key) => {
+    const out = [];
+    let cur = null;
+    bars.forEach((b, i) => {
+      if (!b.tracked) {
+        cur = null;
+        return;
+      }
+      if (!cur) out.push((cur = []));
+      cur.push([gx(i), gy(b[key])]);
+    });
+    return out;
+  };
+  const curve = (pts) => {
+    if (pts.length === 1) return `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} h0.1`;
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i += 1) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, Math.min(gy(0), p1[1] + (p2[1] - p0[1]) / 6)];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, Math.min(gy(0), p2[1] - (p3[1] - p1[1]) / 6)];
+      d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
+  };
+  const series = (key, stroke, fill) => runs(key).map((pts) => {
+    const d = curve(pts);
+    const area = pts.length > 1 ? `<path d="${d} L${pts[pts.length - 1][0].toFixed(1)},${gy(0).toFixed(1)} L${pts[0][0].toFixed(1)},${gy(0).toFixed(1)} Z" fill="${fill}"/>` : '';
+    return `${area}<path d="${d}" fill="none" stroke="${stroke}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+  const hoverDots = bars.map((b, i) => (b.tracked ? `<circle cx="${gx(i).toFixed(1)}" cy="${gy(Math.max(b.g, b.r)).toFixed(1)}" r="7" fill="transparent"><title>${esc(fmtT(b.t))}: ${b.g} Gold, ${b.r} Rainbow</title></circle>` : `<rect x="${(gx(i) - 2).toFixed(1)}" y="${(gy(0) - 1).toFixed(1)}" width="4" height="1" fill="rgba(255,255,255,.12)"><title>${esc(fmtT(b.t))}: not watched (the game wasn't open here)</title></rect>`)).join('');
+  const bestI = best && best.g + best.r > 0 ? bars.indexOf(best) : -1;
+  const sparkle = bestI >= 0 ? `<text x="${gx(bestI).toFixed(1)}" y="${Math.max(10, gy(Math.max(best.g, best.r)) - 5).toFixed(1)}" text-anchor="middle" style="font-size:11px">✨</text>` : '';
+  const guides = [max, Math.round(max / 2)].filter((v, i, arr) => v > 0 && arr.indexOf(v) === i).map((v) => `<line x1="${PL}" y1="${gy(v).toFixed(1)}" x2="${W - PR}" y2="${gy(v).toFixed(1)}" stroke="rgba(255,255,255,.06)"/><text x="${PL - 4}" y="${(gy(v) + 3).toFixed(1)}" text-anchor="end" class="tick">${v}</text>`).join('')
+    + `<line x1="${PL}" y1="${gy(0).toFixed(1)}" x2="${W - PR}" y2="${gy(0).toFixed(1)}" stroke="rgba(255,255,255,.14)"/><text x="${PL - 4}" y="${(gy(0) + 3).toFixed(1)}" text-anchor="end" class="tick">0</text>`;
+  const xTicks = `<text x="${PL}" y="${H - 2}" class="tick">${esc(GOLD_RANGE <= 24 ? `${GOLD_RANGE}h ago` : `${GOLD_RANGE / 24}d ago`)}</text><text x="${W - PR}" y="${H - 2}" text-anchor="end" class="tick now">now</text>`;
+  const svg = `<svg class="gr-chart" viewBox="0 0 ${W} ${H}" aria-label="Crops your pets turned Gold (gold line) and Rainbow (rainbow line), over time">
+      <defs>
+        <linearGradient id="grGoldFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcd34d" stop-opacity=".45"/><stop offset="1" stop-color="#fcd34d" stop-opacity=".02"/></linearGradient>
+        <linearGradient id="grRainbow" gradientUnits="userSpaceOnUse" x1="${PL}" y1="0" x2="${W - PR}" y2="0"><stop offset="0" stop-color="#f87171"/><stop offset=".2" stop-color="#fbbf24"/><stop offset=".4" stop-color="#a3e635"/><stop offset=".6" stop-color="#38bdf8"/><stop offset=".8" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/></linearGradient>
+        <linearGradient id="grRainbowFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4b5fd" stop-opacity=".30"/><stop offset="1" stop-color="#c4b5fd" stop-opacity=".02"/></linearGradient>
+      </defs>
+      ${guides}${series('g', '#fcd34d', 'url(#grGoldFill)')}${series('r', 'url(#grRainbow)', 'url(#grRainbowFill)')}${sparkle}${hoverDots}${xTicks}</svg>`;
+  const eta = GARDEN_STATUS && GARDEN_STATUS.eta;
+  const gardenB = GARDEN_STATUS && (GARDEN_STATUS.crops || []).find((c) => /garden/i.test(c.name));
+  const left = eta && eta.remaining != null ? eta.remaining : gardenB ? Math.max(0, gardenB.total - (gardenB.special || 0)) : null;
+  const byRate = left != null && perHour > 0 ? left / perHour : null;
+  const tg = tracked.reduce((a, b) => a + b.g, 0);
+  const tr = tracked.reduce((a, b) => a + b.r, 0);
+  box.innerHTML = `<div class="m-head"><div><div class="m-big">${perHour != null ? (perHour >= 10 ? Math.round(perHour) : perHour.toFixed(1)) : '—'}<small>crops an hour</small></div></div>${ranges}</div>
+    <div class="m-chart">${svg}</div>
+    <div class="m-legend"><span><i style="background:#fcd34d"></i>Gold <b>${tg}</b></span><span><i style="background:linear-gradient(90deg,#f87171,#fbbf24,#a3e635,#38bdf8,#a78bfa,#f472b6)"></i>Rainbow <b>${tr}</b></span>${best && best.g + best.r > 0 ? `<span>✨ Best ${step === 1 ? 'hour' : `${step} h`} <b>${best.g + best.r}</b> · ${esc(fmtT(best.t))}</span>` : ''}</div>
+    ${left != null ? `<div class="m-legend"><span>${left === 0 ? '✅ every crop is Gold or Rainbow' : `<b>${left}</b> ${left === 1 ? 'crop' : 'crops'} to go${byRate != null ? ` · ~${esc(fmtHoursShort(byRate))} at this rate` : ''}`}</span></div>` : ''}`;
+  setFoldSummary('garden/gold-rainbow-by-your-pets', perHour != null ? `${perHour >= 10 ? Math.round(perHour) : perHour.toFixed(1)}/hour` : '');
+}
+
+// What selling actually pays on top of the price: the room's friend bonus
+// (+10% per other player, up to +50%) and your pets' boosts, on average
+// (sell boosts; Double Harvest's extra crop; Crop Refund's crops coming back,
+// 1 / (1 - chance)). The Garden tab and the Money tab both use this.
+function saleBonuses(st) {
+  const room = st && st.room;
+  const roomPct = room && room.players ? Math.min(50, Math.max(0, room.players - 1) * 10) : 0;
+  const rows = ((st && st.abilities && st.abilities.rows) || []).filter((r) => !r.weather);
+  const sellPct = rows.filter((r) => r.goal === 'sell' && r.sellChance).reduce((a, r) => a + (r.score || 0), 0);
+  const chanceOf = (id) => rows.filter((r) => r.id === id).reduce((a, r) => a + (r.chance || 0), 0);
+  const dh = Math.min(100, chanceOf('DoubleHarvest'));
+  const refund = Math.min(90, chanceOf('CropRefund'));
+  const petPart = (1 + sellPct / 100) * ((1 + dh / 100) / (1 - refund / 100));
+  return { roomPct, sellPct, dh, refund, petPart, now: (1 + roomPct / 100) * petPart, full: 1.5 * petPart };
+}
+
+// Under "Estimated value when full": the same with your bonuses (the room
+// you're in now, your pets' average), and in a full room.
+function bonusLine(E) {
+  if (!E || E.fullValue == null) return '';
+  const b = saleBonuses(GARDEN_STATUS);
+  if (!(b.now > 1.0001) && !(b.full > 1.0001)) return '';
+  const parts = [];
+  if (b.roomPct) parts.push(`room +${b.roomPct}%`);
+  if (b.petPart > 1.0001) parts.push(`pets ≈ +${((b.petPart - 1) * 100).toFixed(1)}%`);
+  const now = b.now > 1.0001 ? `<div class="bonus-line">+ bonuses <b>~${shortNumber(E.fullValue * b.now)}</b> <span class="where">${esc(parts.join(' · '))}</span></div>` : '';
+  const full = b.roomPct < 50 ? `<div class="bonus-line">in a full room <b>~${shortNumber(E.fullValue * b.full)}</b> <span class="where">+50%${b.petPart > 1.0001 ? ' with your pets' : ''}</span></div>` : '';
+  return now + full;
+}
+
+let GROWTH_DAYS = 7;
+let READY_OPEN = false;
+let MC_HOW_OPEN = false;
+
+// Wallet | ready to sell | still growing, as one bar, with what the growing
+// crops will be worth (at least) when they're ready, and the rule chips.
+function lifecycleBar() {
+  const fs = BUDGET && BUDGET.foresight;
+  if (!fs || !fs.garden) return '';
+  const g = fs.garden;
+  const total = fs.wallet + g.ready + g.growing;
+  if (!(total > 0)) return '';
+  const w = (v) => ((v / total) * 100).toFixed(1);
+  const rule = (BUDGET.options && BUDGET.options.readyRule) || {};
+  const chip = (k, label) => `<button class="chip ${rule[k] !== false ? 'on' : ''}" data-ready="${k}">${label}</button>`;
+  const pr = fs.prediction || {};
+  const est = pr.valueSource === 'cycles' ? `~${shortNumber(pr.predictedGrowing)}` : `≥ ${shortNumber(g.potential)}`;
+  // With the estimate in use it says the future; this bar is just "now".
+  const when = fs.mode === 'estimate' ? '' : fs.harvest ? `→ ${est} at harvest · ${fs.harvest.t < 1 / 24 ? 'now' : `~${fmtHoursShort(fs.harvest.t * 24)}`}` : g.growing > 0 ? `→ ${est} at harvest · timing unknown` : '';
+  const learned = pr.cycles >= pr.cyclesWanted
+    ? `🌾 ${pr.cycles} harvest cycles learned · typical ${fmtHoursShort(pr.typicalHours)}${pr.lastSold ? ` · last sold ${shortNumber(pr.lastSold)}` : ''}`
+    : `🌾 Learning your harvest cycle: ${pr.cycles || 0} of ${pr.cyclesWanted || 3}${pr.typicalHours ? ` · so far ~${fmtHoursShort(pr.typicalHours)} each` : ''}`;
+  const E = fs.estimate || {};
+  let estBlock = '';
+  if (E.total > 0) {
+    const src = { observed: 'your recent pace', procs: 'your pets\' Gold/Rainbow procs', pets: 'your pets\' abilities', requirements: 'the requirement ETAs', cycles: 'your harvest cycles', full: 'everything is ready' }[E.rateSource] || 'not known yet';
+    const perSrc = { ready: 'your ready crops', history: 'your records', floor: 'full size + gold', cycles: 'your cycles' }[E.perCropSource] || '';
+    const rw = (n) => ((n / E.total) * 100).toFixed(1);
+    estBlock = `<div class="est">
+      <div class="m-head"><div><div class="lbl">Estimated value when full</div><div class="m-big" style="font-size:22px">${E.fullValue != null ? '~' + shortNumber(E.fullValue) : '—'}<small>${E.fullAt && E.hoursToFull > 0 ? `~${esc(dayLabel(E.fullAt))}` : E.hoursToFull === 0 ? 'now' : ''}</small></div></div></div>
+      ${bonusLine(E)}
+      <div class="m-bar" aria-hidden="true"><i style="width:${rw(E.ready)}%;background:#9fdca8"></i><i style="width:${rw(E.canMature)}%;background:${M_COL.garden};opacity:.4"></i></div>
+      <div class="m-legend"><span><i style="background:#9fdca8"></i>Ready <b>${E.ready}</b> · ${shortNumber(E.readyValue)}</span><span><i style="background:${M_COL.garden};opacity:.4"></i>Can mature <b>${E.canMature}</b>${E.perCrop ? ` × ~${shortNumber(E.perCrop)}` : ''}</span></div>
+      <div class="m-legend"><span>${E.rate != null && E.rateSource !== 'full' ? `⏱ <b>${E.rate >= 10 ? Math.round(E.rate) : E.rate.toFixed(1)}</b> crops/hour, from ${esc(src)}` : E.rateSource === 'full' ? '✅ everything is ready' : '⏱ maturing rate: not known yet'}${perSrc ? ` · worth from ${esc(perSrc)}` : ''}</span></div>
+      ${E.stuck ? `<div class="m-legend"><span>⚠️ <b>${E.stuck}</b> crop${E.stuck === 1 ? '' : 's'} can't mature: ${E.stuckWhy === 'size' ? 'short of full size with no size-boost pet out' : 'plain with nothing turning crops Gold or Rainbow'}</span></div>` : ''}
+    </div>`;
+  }
+  return estBlock + `<div class="m-bar" style="margin-top:12px" aria-hidden="true"><i style="width:${w(fs.wallet)}%;background:${M_COL.wallet}"></i><i style="width:${w(g.ready)}%;background:#9fdca8"></i><i style="width:${w(g.growing)}%;background:${M_COL.garden};opacity:.45"></i></div>
+    <div class="m-legend"><span><i style="background:${M_COL.wallet}"></i>Wallet <b>${shortNumber(fs.wallet)}</b></span><span><i style="background:#9fdca8"></i>Ready to sell <b>${shortNumber(g.ready)}</b> <span class="where">${g.readyCount}/${g.total}</span></span><span><i style="background:${M_COL.garden};opacity:.45"></i>Growing <b>${shortNumber(g.growing)}</b>${when ? ` <span class="where">${esc(when)}</span>` : ''}</span></div>
+    ${fs.mode === 'estimate' && fs.estimate && !['cycles'].includes(fs.estimate.rateSource) && fs.estimate.perCropSource !== 'cycles' ? '' : `<div class="m-legend"><span>${esc(learned)}</span></div>`}
+    <details class="more" ${READY_OPEN ? 'open' : ''}><summary data-ready-toggle>⚙ What counts as ready</summary><div class="chips" id="readyRule" style="margin-top:6px">${chip('size', 'Full size')}${chip('color', 'Gold/Rainbow')}${chip('hydro', 'Weather')}${chip('lunar', 'Moon')}</div></details>`;
+}
+const M_COL = {
+  garden: '#7fc98a', wallet: '#d9b25a',
+  celestials: '#f0d27a', seeds: '#7fc98a', eggs: '#5aa8c4',
+  decor: '#a58ad6', tools: '#8a7aa8', other: '#6f6480', elsewhere: '#4a4152',
+};
+const dayLabel = (t) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
+function deltaChip(change, pct, suffix) {
+  if (change == null) return '<span class="m-chip">filling in</span>';
+  const up = change >= 0;
+  return `<span class="m-chip ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${shortNumber(Math.abs(change))}${pct != null ? ` · ${Math.abs(Math.round(pct * 100))}%` : ''}${suffix ? ' ' + suffix : ''}</span>`;
+}
+
+// "2B", "500m", "1.5b", "250k", "12,000" → coins.
+function parsePrice(text) {
+  const m = /^\s*([\d.,]+)\s*([kmbt]?)\s*$/i.exec(String(text || ''));
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ''));
+  if (!Number.isFinite(n)) return null;
+  return n * ({ '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2].toLowerCase()]);
+}
+
+let WHATIF = null;
+const wantIcon = (id) => (BUDGET && BUDGET.icons && BUDGET.icons[id]) || '•';
+
+// Your money, kept simple: one line in one colour — solid for the past
+// week, dashed for what's expected — a dot at now with the amount, the
+// amount at the end, and your wants as small icons along the bottom on
+// the days they're due (ringed green if you'll have the money, amber if
+// it's worth skipping for a bigger one, coral if you'll be short).
+function combinedChart(fs, wi, events) {
+  const RING = { ready: '#6ee7b7', tradeoff: '#fcd34d', short: '#fb7185' };
+  const GOLD = '#fcd34d';
+  const W = 330; const PLOT_H = 112; const PADX = 12; const PADL = 36; const PADT = 18; const LANE = 26;
+  const H = PLOT_H + LANE + 14;
+  const end = Math.max(0.2, fs.end || 1);
+  const F = wi && wi.after ? wi.after : fs;
+  const future = (F.line || []).filter((p) => p[0] <= end);
+  const HIST = fs.history && fs.history.line && fs.history.line.length > 1 ? fs.history : null;
+  const P = HIST ? Math.min(7, HIST.days) : 0;
+  const past = HIST ? HIST.line.filter((p) => p[0] >= -P) : [];
+  // The final boss: your money if you bought everything (every alert item
+  // and every decoration, each time it shows up). Above zero the whole way:
+  // you could afford it all.
+  const EV = fs.everything && fs.everything.line && fs.everything.line.length ? fs.everything : null;
+  const boss = EV ? EV.line.filter((p) => p[0] >= 0 && p[0] <= end) : [];
+  const vals = [...future, ...past, ...boss].map((p) => p[1]);
+  const top = Math.max(1, ...vals) * 1.08;
+  const lowest = Math.min(0, ...boss.map((p) => p[1]));
+  const bottom = lowest < 0 ? Math.max(-top * 0.22, lowest) : 0;
+  // The past always gets the left quarter and the future the rest, however
+  // many days each covers; with no past yet, the quarter says it's coming.
+  const PAST_W = 0.25 * (W - PADL - PADX);
+  const FUT_W = W - PADL - PADX - PAST_W;
+  const x = (t) => {
+    const c = Math.min(end, Math.max(-(P || 7), t));
+    return (c < 0 ? PADL + PAST_W * (1 + c / (P || 7)) : PADL + PAST_W + (c / end) * FUT_W).toFixed(1);
+  };
+  const y = (v) => (PADT + (1 - (Math.min(top, Math.max(bottom, v)) - bottom) / (top - bottom)) * (PLOT_H - PADT)).toFixed(1);
+  const path = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p[0])},${y(p[1])}`).join(' ');
+  const base = y(0);
+  // A y axis: round steps (1, 2 or 5 × a power of ten) from zero to the top,
+  // faint gridlines, amounts in the left gutter; zero a little stronger.
+  const niceStep = (v) => {
+    const p10 = 10 ** Math.floor(Math.log10(Math.max(v, 1)));
+    const f = v / p10;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p10;
+  };
+  const yStep = niceStep(top / 4);
+  const yTicks = [];
+  for (let v = yStep; v < top; v += yStep) yTicks.push(v);
+  if (bottom < 0) for (let v = -yStep; v > bottom; v -= yStep) yTicks.push(v);
+  const yAxis = `<line x1="${PADL}" y1="${PADT - 8}" x2="${PADL}" y2="${Math.max(Number(base), Number(y(bottom))).toFixed(1)}" stroke="#fff" stroke-opacity=".14"/>`
+    + yTicks.map((v) => `<line x1="${PADL}" y1="${y(v)}" x2="${W - PADX}" y2="${y(v)}" stroke="#fff" stroke-opacity=".06"/><text x="${PADL - 4}" y="${(Number(y(v)) + 3).toFixed(1)}" text-anchor="end" class="tick">${v < 0 ? '−' + shortNumber(-v) : shortNumber(v)}</text>`).join('')
+    + `<line x1="${PADL}" y1="${base}" x2="${W - PADX}" y2="${base}" stroke="#fff" stroke-opacity=".22"/><text x="${PADL - 4}" y="${(Number(base) + 3).toFixed(1)}" text-anchor="end" class="tick">0</text>`;
+  const all = past.length ? [...past, ...future] : future;
+  const fill = all.length > 1 ? `<path d="${path(all)} L${x(all[all.length - 1][0])},${base} L${x(all[0][0])},${base} Z" fill="${GOLD}" fill-opacity=".10"/>` : '';
+  const pastLine = past.length > 1
+    ? `<path d="${path([...past, future[0] || past[past.length - 1]])}" fill="none" stroke="${GOLD}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`
+    : `<text x="${(PADL + PAST_W / 2).toFixed(1)}" y="${(PLOT_H - 30).toFixed(1)}" text-anchor="middle" class="tag" style="fill:var(--faint)"><tspan x="${(PADL + PAST_W / 2).toFixed(1)}">your past</tspan><tspan x="${(PADL + PAST_W / 2).toFixed(1)}" dy="11">fills in as</tspan><tspan x="${(PADL + PAST_W / 2).toFixed(1)}" dy="11">you play</tspan></text>`;
+  const futureLine = future.length > 1 ? `<path d="${path(future)}" fill="none" stroke="${GOLD}" stroke-width="3" stroke-dasharray="7 5" stroke-linecap="round" stroke-linejoin="round"/>` : '';
+  const without = wi ? `<path d="${path((fs.line || []).filter((p) => p[0] <= end))}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5" stroke-dasharray="2 4"><title>Without it</title></path>` : '';
+  const v0 = future.length ? future[0][1] : 0;
+  const v1 = future.length ? future[future.length - 1][1] : v0;
+  const label = (v, px, py, anchor) => `<text x="${px}" y="${py}" text-anchor="${anchor}" class="amt">${shortNumber(v)}</text>`;
+  const nowX = Number(x(0));
+  const nowY = Number(y(v0));
+  const nowMark = `<line x1="${nowX}" y1="${PADT - 6}" x2="${nowX}" y2="${base}" stroke="#fff" stroke-opacity=".18"/><circle cx="${nowX}" cy="${nowY}" r="5.5" fill="${GOLD}" stroke="#1b1426" stroke-width="2.5"/>`
+    + label(v0, nowX, Math.max(12, nowY - 10), 'middle');
+  // Both lines say what they are at their ends: gold "with your wants",
+  // purple "if you buy everything" (or where it would run out).
+  // Where each line ends up: just the number, in the line's colour (the
+  // key under the chart says which is which).
+  const tag = (v, py, color) => `<text x="${W - PADX}" y="${py.toFixed(1)}" text-anchor="end" class="amt" style="fill:${v < 0 ? '#fca5a5' : color}">${v < 0 ? `short ${shortNumber(-v)}` : shortNumber(v)}</text>`;
+  let goldY = Math.max(12, Number(y(v1)) - 16);
+  let bossSvg = '';
+  if (boss.length > 1) {
+    const bEnd = boss[boss.length - 1][1];
+    const under = boss.some((p) => p[1] < 0)
+      ? `<path d="${path(boss.map((p) => [p[0], Math.min(0, p[1])]))} L${x(boss[boss.length - 1][0])},${y(0)} L${x(0)},${y(0)} Z" fill="#ef4444" fill-opacity=".55"/>`
+      : '';
+    const gap = `<path d="${path(future)} ${boss.slice().reverse().map((p) => `L${x(p[0])},${y(p[1])}`).join(' ')} Z" fill="#c084fc" fill-opacity=".08"/>`;
+    let runDot = '';
+    if (EV.runsOut && EV.runsOut.t <= end) {
+      runDot = `<circle cx="${x(EV.runsOut.t)}" cy="${y(0)}" r="4" fill="#ef4444" stroke="#1b1426" stroke-width="2"/><text x="${(Number(x(EV.runsOut.t)) + 7).toFixed(1)}" y="${(Number(y(0)) + 11).toFixed(1)}" text-anchor="start" class="tag" style="fill:#fecaca">runs out ~${esc(dayLabel(EV.runsOut.at))}</text>`;
+    }
+    let bossY = Math.min(PLOT_H - 12, Number(y(bEnd)) + 14);
+    if (Math.abs(bossY - goldY) < 24) {
+      if (bEnd <= v1) bossY = Math.min(PLOT_H - 12, goldY + 24);
+      else goldY = Math.min(PLOT_H - 12, bossY + 24);
+    }
+    bossSvg = `${gap}${under}<path d="${path(boss)}" fill="none" stroke="#c084fc" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><title>Your money if you bought everything: every alert item and every decoration, each time it shows up</title></path>${runDot}`
+      + tag(bEnd, bossY, '#d8b4fe');
+  }
+  const endMark = tag(v1, goldY, GOLD);
+  // Each purchase as a coral block hanging from your money on its day, as
+  // tall as its price (to scale), so big ones read as big next to what you
+  // have; the price beside the ones big enough to see. A faint stem ties
+  // each block to its icon along the bottom.
+  const valueBefore = (t) => {
+    let v = future.length ? future[0][1] : 0;
+    for (const [ft, fv] of future) if (ft < t - 1e-9) v = fv;
+    return v;
+  };
+  const shown = (wi ? wi.after.events : events).filter((e) => e.t <= end).slice().sort((a, b) => a.t - b.t);
+  // The two biggest get a label: the price, and how much of your money at
+  // that point it takes.
+  const labelled = new Set(shown.filter((e) => e.price >= 1e9).sort((a, b) => b.price - a.price).slice(0, 2).map((e) => e.ruleId));
+  const placed = [];
+  const blocks = shown.map((e) => {
+    const px = Number(x(e.t));
+    const before = valueBefore(e.t);
+    const y1 = Number(y(before));
+    const y2 = Number(y(before - e.price));
+    const h = Math.max(1.5, y2 - y1);
+    const short = e.status === 'short';
+    const share = before > 0 ? Math.round((e.price / before) * 100) : null;
+    const flip = px > W - 70;
+    let lbl = '';
+    if (labelled.has(e.ruleId)) {
+      // Just under the block, inside the shaded area; if it would sit on
+      // another label, one line lower.
+      const text = `${wantIcon(e.ruleId)} −${shortNumber(e.price)}${share != null ? ` · ${share}%` : ''}`;
+      const wText = (text.length + 1) * 6.4;
+      const lx = flip ? px - 7 - wText : px + 7;
+      let ly = Math.min(PLOT_H - 4, y1 + Math.max(h, 2) + 12);
+      for (let k = 0; k < 3 && placed.some((b) => lx < b.x2 && lx + wText > b.x1 && Math.abs(ly - b.y) < 11); k += 1) ly = Math.min(PLOT_H - 4, ly + 12);
+      placed.push({ x1: lx, x2: lx + wText, y: ly });
+      lbl = `<text x="${(flip ? px - 7 : px + 7).toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${flip ? 'end' : 'start'}" class="bite">${text}</text>`;
+    }
+    return `<g><title>${esc(e.label)} −${shortNumber(e.price)} · ~${esc(dayLabel(e.at))}</title><line x1="${px}" y1="${(y1 + h).toFixed(1)}" x2="${px}" y2="${PLOT_H + 4}" stroke="${short ? '#fb7185' : '#fff'}" stroke-opacity=".18" stroke-dasharray="1 3"/><rect x="${(px - 4).toFixed(1)}" y="${y1.toFixed(1)}" width="8" height="${h.toFixed(1)}" rx="2" fill="${short ? '#ef4444' : '#fb7185'}" fill-opacity=".9"/>${lbl}</g>`;
+  }).join('');
+  // Wants along the bottom; ones due within a few pixels step up a little.
+  let lastX = -99;
+  let lift = 0;
+  const lane = shown.map((e) => {
+    const px = Number(x(e.t));
+    lift = px - lastX < 18 ? (lift + 1) % 2 : 0;
+    lastX = px;
+    const cy = PLOT_H + 13 - lift * 4;
+    const cx = px + lift * 9;
+    const c = RING[e.status] || '#c4b5fd';
+    return `<g data-edit-want="${esc(e.ruleId)}" style="cursor:pointer"><title>${esc(e.label)} ${shortNumber(e.price)} · ~${esc(dayLabel(e.at))}${e.status === 'ready' ? ' · you\'ll have it' : e.status === 'tradeoff' ? ` · skip it for the ${esc(e.costs)}` : ` · short ${shortNumber(e.short)}`} · tap to edit your wants</title><circle cx="${cx.toFixed(1)}" cy="${cy}" r="9" fill="#1b1426" stroke="${c}" stroke-width="2"/><text x="${cx.toFixed(1)}" y="${cy + 3.6}" text-anchor="middle" style="font-size:10px">${wantIcon(e.ruleId)}</text></g>`;
+  }).join('');
+  const pastTick = P > 0 ? `<text x="${PADL}" y="${H - 2}" text-anchor="start" class="tick">${P >= 1 ? `${Math.round(P)}d ago` : `${Math.max(1, Math.round(P * 24))}h ago`}</text>` : '';
+  const ticks = pastTick + [0, 7, 14, 21].filter((d) => d <= end && (d === 0 || Math.abs(Number(x(d)) - nowX) > 30)).map((d) => `<text x="${x(d)}" y="${H - 2}" text-anchor="middle" class="tick${d === 0 ? ' now' : ''}">${d === 0 ? 'now' : `in ${d}d`}</text>`).join('');
+  const svg = `<svg class="money-chart" viewBox="0 0 ${W} ${H}" aria-label="Your money: ${past.length > 1 ? `${shortNumber(past[0][1])} ${Math.round(P)} days ago, ` : ''}${shortNumber(v0)} now, about ${shortNumber(v1)} expected by the end. Solid is what happened, dashed is what's expected. Your wants are along the bottom on the days they're due.">
+      ${yAxis}
+      ${fill}${bossSvg}${pastLine}${futureLine}${without}${blocks}${nowMark}${endMark}${lane}${ticks}</svg>`;
+  const days = Math.max(1, Math.round(end));
+  const intro = `<div class="mc-intro">Your money ${past.length > 1 ? `over the last ${Math.round(P) === 1 ? 'day' : `${Math.round(P)} days`} and ` : 'over '}the next ${days === 1 ? 'day' : `${days} days`}</div>`;
+  const sw = (inner) => `<svg class="sw" viewBox="0 0 22 10" aria-hidden="true">${inner}</svg>`;
+  const key = `<div class="mc-key">
+      <span>${sw(`<line x1="1" y1="5" x2="21" y2="5" stroke="${GOLD}" stroke-width="2.6" stroke-dasharray="5 3" stroke-linecap="round"/>`)}Your money</span>
+      ${boss.length > 1 ? `<span>${sw('<line x1="1" y1="5" x2="21" y2="5" stroke="#c084fc" stroke-width="2.6" stroke-linecap="round"/>')}If you bought everything</span>` : ''}
+      ${shown.length ? `<span>${sw('<rect x="8" y="0.5" width="6" height="9" rx="1.5" fill="#fb7185"/>')}A purchase, to scale</span>` : ''}
+      ${shown.length ? `<span class="rings"><i style="border-color:#6ee7b7"></i>can afford <i style="border-color:#fcd34d"></i>skip for a bigger one <i style="border-color:#fb7185"></i>short</span>` : ''}
+    </div>
+    <button class="link mc-edit" data-edit-want="">✏️ Edit what you want</button>`;
+  const how = `<details class="more mc-how"${MC_HOW_OPEN ? ' open' : ''}><summary data-mc-how>How to read this</summary><div class="note no-clamp">
+      <p>${past.length > 1 ? 'The solid gold line on the left is what your money actually did. From the dot (now) it turns dashed: ' : 'The dashed gold line is '}what your money should do from here, as your crops mature and you buy the things on your wants list.</p>
+      ${shown.length ? '<p>Each icon along the bottom is something on your wants list, on the day it usually turns up in the shop. The coral block above it is its price, to scale, coming out of your money that day, so you can see how big it is next to what you have.</p>' : ''}
+      ${boss.length > 1 ? '<p>The purple line is the final boss: your money if you also bought every other alert item and every decoration worth 100M or more, each time it shows up. If it stays above the bottom, you can afford everything.</p>' : ''}
+      <p>The numbers on the right are where each line ends up.</p>
+    </div></details>`;
+  return `${intro}<div class="fs-chart">${svg}</div>${key}${how}${everythingMeter(fs.everything)}`;
+}
+
+// The buy-everything line as a race: a track, a 🏁 at what buying every
+// alert item and every decoration costs a day, and you (🌱) at what you
+// make a day. Past the flag, the track turns gold. Your best is marked.
+function everythingMeter(EV) {
+  if (!EV || !(EV.perDay > 0) || EV.ratio == null) return '';
+  const r = EV.ratio;
+  const best = EV.best || r;
+  const span = Math.min(3, Math.max(1.6, r * 1.15, best * 1.1));
+  const W = 330; const L = 14; const R = W - 14; const TY = 30;
+  const X = (v) => L + (Math.min(span, Math.max(0, v)) / span) * (R - L);
+  const flagX = X(1);
+  const youX = X(r);
+  const past = r >= 1;
+  const bestMark = best > r + 0.03 ? `<g><title>Your best: ${Math.round(best * 100)}%</title><path d="M${X(best).toFixed(1)},${TY + 11} l-4,6 h8 z" fill="#c4b5fd" fill-opacity=".8"/></g>` : '';
+  const svg = `<svg class="ev-meter" viewBox="0 0 ${W} 50" aria-label="${past ? 'Past' : 'Short of'} the buy-everything line: you make ${shortNumber(EV.income)} a day, everything costs ${shortNumber(EV.perDay)} a day">
+      <defs><linearGradient id="evFill" x1="0" x2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="${Math.min(1, 1 / Math.max(r, 1)).toFixed(3)}" stop-color="#6ee7b7"/><stop offset="1" stop-color="${past ? '#fcd34d' : '#6ee7b7'}"/></linearGradient></defs>
+      <rect x="${L}" y="${TY - 6}" width="${R - L}" height="12" rx="6" fill="#fff" fill-opacity=".08"/>
+      <rect x="${L}" y="${TY - 6}" width="${Math.max(12, youX - L).toFixed(1)}" height="12" rx="6" fill="url(#evFill)"/>
+      <line x1="${flagX.toFixed(1)}" y1="${TY - 13}" x2="${flagX.toFixed(1)}" y2="${TY + 8}" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      <text x="${(flagX + 1).toFixed(1)}" y="${TY - 14}" text-anchor="start" style="font-size:13px">🏁</text>
+      ${bestMark}
+      <circle cx="${youX.toFixed(1)}" cy="${TY}" r="10" fill="#241a31" stroke="${past ? '#fcd34d' : '#6ee7b7'}" stroke-width="2.4"/>
+      <text x="${youX.toFixed(1)}" y="${TY + 4.5}" text-anchor="middle" style="font-size:12px">${past ? '🏆' : '🌱'}</text>
+    </svg>`;
+  const pct = Math.round(r * 100);
+  const status = past
+    ? `🏆 <b>Past the buy-everything line</b> by ${pct - 100}%${EV.crossedAt ? ` · since ${esc(dayLabel(EV.crossedAt))}` : ''}`
+    : `<b>${pct}%</b> of the way to the buy-everything line · ${shortNumber(EV.perDay - EV.income)} a day to go`;
+  const rows = (EV.rows || []).filter((row) => row.cost > 0).slice(0, 10).map((row) => `<div class="ev-row"><span>${esc(row.label)} <span class="where">${shortNumber(row.price)}${row.typical > 1.05 ? ` ×${row.typical.toFixed(1)}` : ''} · every ~${esc(everyText(row.perDay))}</span></span><b>${shortNumber(row.cost)}/day</b></div>`).join('');
+  const unknown = (EV.unknown || []).length ? `<div class="note" style="margin-top:6px">Not counted yet (no pings, and the app hasn't watched their shop long enough): ${EV.unknown.map((u) => `${esc(u.label)} ${shortNumber(u.price)}`).join(', ')}.</div>` : '';
+  return `<div class="ev-box${past ? ' past' : ''}">${svg}
+      <div class="ev-status">${status}</div>
+      <div class="ev-sub"><span title="${EV.incomeFrom === 'maturing' ? 'What your garden is maturing a day (until the app has a week of your earnings)' : 'Your earnings a day this week (the Money engine)'}">🌱 you make <b>${shortNumber(EV.income)}</b>/day</span><span>🏁 everything <b>${shortNumber(EV.perDay)}</b>/day</span></div>
+      <details class="more"><summary>What "everything" is</summary><div class="note" style="margin:4px 0 6px">Every item you have an alert for and every decoration from 100M up, each time it shows up, at how often it does (community pings, and the app's own count of the shops).</div>${rows}${unknown}</details>
+    </div>`;
+}
+
+function everyText(perDay) {
+  if (!(perDay > 0)) return '?';
+  const d = 1 / perDay;
+  return d < 1 ? `${Math.max(1, Math.round(d * 24))} h` : `${d < 10 ? d.toFixed(1) : Math.round(d)} days`;
+}
+function renderForesight() {
+  const b = BUDGET;
+  const fs = b && b.foresight;
+  if (!fs || !$('moneyForesight')) return;
+  const wi = WHATIF && WHATIF.after ? WHATIF : null;
+  const sig = { open: '🟢 Open to spend', careful: '🟡 Careful', save: '🔴 Save', wait: fs.waitingFor === 'garden' ? '⏳ Waiting for your garden' : '⏳ Measuring your pace' }[fs.signal];
+  const est = fs.estimate || {};
+  const estLine = fs.mode === 'estimate'
+    ? (est.hoursToFull === 0 ? '🌾 garden all ready' : `📈 growing ~<b>${shortNumber(est.perDay)}</b> a day<br>garden full ~${esc(dayLabel(est.fullAt))}`)
+    : '';
+  const pace = [
+    estLine,
+    fs.harvest ? `🌾 harvest <b>${fs.harvest.valueSource === 'cycles' ? '~' : '≥ '}${shortNumber(fs.harvest.value)}</b> ${fs.harvest.t < 1 / 24 ? 'now' : `in ~${fmtHoursShort(fs.harvest.t * 24)}`}` : '',
+    fs.mode === 'estimate'
+      ? (fs.paceMeasured && fs.pace > 0 ? `then ~<b>${shortNumber(fs.pace)}</b> a day` : '')
+      : fs.paceMeasured ? `~<b>${shortNumber(fs.pace)}</b> a day${fs.paceRaw != null && fs.paceRaw < 0 ? ' (shrinking lately)' : ''}` : (fs.harvest ? '' : 'measuring how fast you grow'),
+  ].filter(Boolean).join('<br>').replace(/^then /, '');
+  const need = fs.needMore ? `<br>grow ~${shortNumber(fs.needMore.perDay)}/day more to catch the ${esc(fs.needMore.label)}` : '';
+  const waitingGarden = fs.waitingFor === 'garden';
+  const right = waitingGarden ? '' : [pace, fs.signal === 'wait' ? '' : need].filter(Boolean).join('');
+  let html = `<div class="fs-top"><div><span class="fs-signal ${esc(fs.signal)}">${sig}</span><div class="m-big">${waitingGarden ? '—' : shortNumber(fs.safeToSpend)}<small>safe to spend now</small></div></div>${right ? `<div class="fs-right"><div class="fs-pace">${right}</div></div>` : ''}</div>`;
+  // One chart, one time axis (now → the last want due): the garden's
+  // estimated value (green area), the coins you could have (gold line:
+  // wallet + ready crops + what matures, less the wants bought on the way),
+  // safe to spend over time (teal steps), and below it a row with each
+  // want's icon on the day it's due, ringed by whether you'll have it.
+  // Plain (linear) scale, so a rise reads as a rise.
+  const events = fs.events || [];
+  if (!waitingGarden && (events.length || fs.estimate)) html += combinedChart(fs, wi, events);
+
+  // The wants, in the order they're due.
+  const lostIds = new Set(wi ? wi.lost.map((l) => l.label) : []);
+  html += (wi ? wi.after.events : events).map((e) => {
+    const st = e.status === 'ready' ? '✅' : e.status === 'tradeoff' ? `skip for ${esc(e.costs)}` : `🔴 short ${shortNumber(e.short)}`;
+    return `<div class="fs-row s-${esc(e.status)} ${lostIds.has(e.label) ? 'lost' : ''}"><span class="d">~${esc(dayLabel(e.at))}</span><b><span class="fs-ico">${wantIcon(e.ruleId)}</span>${esc(e.label)}</b><span class="p">${shortNumber(e.price)}</span><span class="st">${st}</span></div>`;
+  }).join('');
+  if ((fs.unknown || []).length) html += `<div class="note">${fs.unknown.map((u) => esc(u.label)).join(', ')}: not enough sightings yet to know when.</div>`;
+  if (!events.length && !(fs.unknown || []).length) html += '<div class="empty">Add wants below (Your wants) to see where you\'ll be when they show up.</div>';
+  $('moneyForesight').innerHTML = html;
+  setFoldSummary('money/spend-or-save', fs.signal === 'wait' ? '' : `${sig} · ${shortNumber(fs.safeToSpend)} safe`);
+
+  // One-tap checks: decor in stock right now.
+  const chips = (b.inStock || []).slice(0, 6);
+  $('whatIfChips').innerHTML = chips.map((i) => `<button class="add-chip" data-whatif="${i.price}" title="In the ${esc(i.shop)} shop now">🪴 ${esc(i.name)} <span class="p">${shortNumber(i.price)}</span></button>`).join('');
+}
+
+function renderWhatIf() {
+  const box = $('whatIfResult');
+  const wi = WHATIF;
+  if (!wi) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const fs = BUDGET && BUDGET.foresight;
+  const have = fs ? (fs.available != null ? fs.available : fs.wallet) : 0;
+  const back = wi.refillDays != null ? `Back in about ${fmtHoursShort(wi.refillDays * 24)} of growth.` : '';
+  if (wi.price > have) {
+    box.className = 'fs-result nope';
+    box.innerHTML = `Not in reach yet: that's ${shortNumber(wi.price - have)} more than your wallet and ready crops.`;
+  } else if (wi.verdict === 'breaks') {
+    const l = wi.lost[0];
+    const what = l.status === 'tradeoff' ? `you'd have to skip the ${esc(l.label)} to keep the ${esc(l.costs)}` : `you'd be ${shortNumber(l.short)} short for the ${esc(l.label)} around ${esc(dayLabel(l.at))}`;
+    box.className = 'fs-result breaks';
+    box.innerHTML = `⚠️ It would cost you: ${what}.${wi.lost.length > 1 ? `<small>Also: ${wi.lost.slice(1).map((x) => esc(x.label)).join(', ')}.</small>` : ''}<small>${esc(back)}</small>`;
+  } else if (wi.verdict === 'deepens') {
+    const d = wi.deepens;
+    box.className = 'fs-result breaks';
+    box.innerHTML = `⚠️ You're already short for the ${esc(d.label)}: this makes it ${shortNumber(d.after)} short around ${esc(dayLabel(d.at))} (was ${shortNumber(d.before)}).<small>${esc(back)}</small>`;
+  } else {
+    box.className = 'fs-result safe';
+    box.innerHTML = `✅ Safe: everything you want stays covered.<small>${esc(back)}</small>`;
+  }
+}
+
+async function checkWhatIf(price) {
+  if (!(price > 0)) {
+    WHATIF = null;
+    renderWhatIf();
+    renderForesight();
+    return;
+  }
+  try {
+    WHATIF = await window.app.budgetWhatIf(price);
+  } catch (err) {
+    WHATIF = null;
+  }
+  renderWhatIf();
+  renderForesight();
+}
+
+function renderBudget() {
+  const b = BUDGET;
+  applyMoneyUnlock(b);
+  if (!b || !$('moneyGrowth')) return;
+  renderForesight();
+
+  // ---- Growth: net worth, stacked garden + wallet ----
+  {
+    const g = GROWTH_DAYS === 30 ? b.growth.month : b.growth.week;
+    const since = Date.now() - GROWTH_DAYS * 86400000;
+    const pts = (b.growth.month.series || []).filter((p) => p.t >= since);
+    const now = g.now;
+    let chart = '<div class="empty" style="margin-top:8px">Filling in: a point every half hour of play.</div>';
+    if (pts.length >= 2) {
+      const W = 320; const H = 96;
+      const t0 = pts[0].t; const t1 = pts[pts.length - 1].t || t0 + 1;
+      const max = Math.max(1, ...pts.map((p) => p.total)) * 1.08;
+      const x = (t) => (((t - t0) / Math.max(1, t1 - t0)) * W).toFixed(1);
+      const y = (v) => (H - (v / max) * H).toFixed(1);
+      const gardenTop = pts.map((p) => `${x(p.t)},${y(p.garden || 0)}`);
+      const totalTop = pts.map((p) => `${x(p.t)},${y(p.total)}`);
+      const gardenArea = `M${x(t0)},${H} L${gardenTop.join(' L')} L${x(t1)},${H} Z`;
+      const walletArea = `M${gardenTop[0]} L${totalTop.join(' L')} L${gardenTop.slice().reverse().join(' L')} Z`;
+      chart = `<div class="m-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:96px" aria-label="Net worth over time: garden and wallet">
+          <path d="${gardenArea}" fill="${M_COL.garden}" fill-opacity=".55"/>
+          <path d="${walletArea}" fill="${M_COL.wallet}" fill-opacity=".6"/>
+          <polyline points="${totalTop.join(' ')}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+        </svg></div>`;
+    }
+    $('moneyGrowth').innerHTML = `<div class="m-head">
+        <div><div class="m-big">${now ? shortNumber(now.total) : '—'}<small>net worth</small></div>${deltaChip(g.change, g.pct, GROWTH_DAYS === 30 ? 'this month' : 'this week')}</div>
+        <div class="chips m-range" id="growthRange"><button class="chip ${GROWTH_DAYS === 7 ? 'on' : ''}" data-gdays="7">Week</button><button class="chip ${GROWTH_DAYS === 30 ? 'on' : ''}" data-gdays="30">Month</button></div>
+      </div>${chart}
+      <div class="m-legend"><span><i style="background:${M_COL.garden}"></i>Garden <b>${now ? shortNumber(now.garden || 0) : '—'}</b></span><span><i style="background:${M_COL.wallet}"></i>Wallet <b>${now ? shortNumber(now.wallet) : '—'}</b></span></div>${lifecycleBar()}`;
+    setFoldSummary('money/growth', now ? `${shortNumber(now.total)}${g.pct != null ? ` ${g.pct >= 0 ? '▲' : '▼'}${Math.abs(Math.round(g.pct * 100))}%` : ''}` : '');
+  }
+
+  // ---- Money engine: income per day, 14 daily bars ----
+  {
+    const e = b.engine || {};
+    const days = e.days || [];
+    const known = days.filter((d) => d.earned != null);
+    let bars = '';
+    if (known.length) {
+      const W = 320; const H = 56;
+      const max = Math.max(1, ...known.map((d) => d.earned));
+      const bw = W / days.length;
+      bars = `<div class="m-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:56px" aria-label="Coins earned each day, last two weeks">${days.map((d, i) => {
+        if (d.earned == null) return `<rect x="${(i * bw + 2).toFixed(1)}" y="${H - 2}" width="${(bw - 4).toFixed(1)}" height="2" fill="rgba(255,255,255,.12)"/>`;
+        const h = Math.max(2, (d.earned / max) * (H - 2));
+        const best = e.best && d.t === e.best.t;
+        return `<rect x="${(i * bw + 2).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(bw - 4).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${best ? '#f0d27a' : M_COL.garden}"><title>${esc(dayLabel(d.t))}: ${shortNumber(d.earned)}</title></rect>`;
+      }).join('')}</svg></div>
+      <div class="m-legend"><span>Last 14 days</span>${e.best ? `<span><i style="background:#f0d27a"></i>Best <b>${esc(dayLabel(e.best.t))}</b> ${shortNumber(e.best.earned)}</span>` : ''}</div>`;
+    }
+    const chip = e.change != null ? deltaChip(e.change * (e.lastWeekPerDay || 0), e.change, 'vs last week') : `<span class="m-chip">${e.perDay != null ? 'first week' : 'filling in'}</span>`;
+    $('moneyEngine').innerHTML = `<div class="m-head"><div><div class="m-big">${e.perDay != null ? shortNumber(e.perDay) : '—'}<small>a day</small></div>${chip}</div></div>${bars}`;
+    setFoldSummary('money/money-engine', e.perDay != null ? `${shortNumber(e.perDay)}/day` : '');
+  }
+
+  // ---- Saving for: the plan, free to spend, and chips to add more ----
+  const pl = b.plan || { items: [] };
+  {
+    const rows = pl.items.map((i, k) => {
+      const pctN = Math.round(i.pct * 100);
+      return `<div class="plan-item" data-want="${esc(i.ruleId)}"><div class="plan-head"><span class="num">${k + 1}.</span><b>${wantIcon(i.ruleId)} ${esc(i.label)}</b><span class="where">${shortNumber(i.price)}</span>${k > 0 ? `<button class="btn small" data-plan-up="${esc(i.ruleId)}" title="Move up">↑</button>` : ''}<button class="btn small" data-plan-remove="${esc(i.ruleId)}" title="Remove">✕</button></div><div class="plan-bar ${i.funded ? 'full' : ''}"><i style="width:${Math.min(100, pctN)}%"></i><em>${i.funded ? '✅ ' : ''}${shortNumber(i.have)} / ${shortNumber(i.price)}</em></div></div>`;
+    }).join('');
+    $('budgetPlan').innerHTML = pl.items.length ? rows : '<div class="empty">Tap an item below to add it to your wants.</div>';
+    setFoldSummary('money/your-wants', pl.items.length ? pl.items.map((i) => i.label).slice(0, 3).join(' › ') + (pl.items.length > 3 ? ' …' : '') : '');
+  }
+  {
+    // Chips: celestials first, then by price. The full sums are in each chip's tooltip.
+    const cel = /celestial|moonbinder|dawnbinder|thunderspire|starweaver/i;
+    const aff = (b.afford || []).filter((a) => a.price >= 1e6 && !a.planned)
+      .sort((x, y) => (cel.test(y.label) - cel.test(x.label)) || (y.price - x.price));
+    const icon = { yes: '✅', cut: '🟡', no: '⚠️', wait: '⏳', unknown: '❔' };
+    const tip = (a) => {
+      const bits = [];
+      if (a.rate && a.rate.perDay) bits.push(`${fmtEvery(a.gapDays)} · every one ≈ ${shortNumber(a.costPerDay)}/day`);
+      bits.push({ yes: 'You can buy every one.', cut: `Every one is ${Math.round((a.shareOfEarned || 0) * 100)}% of what you earn.`, no: `Every one is ${(a.shareOfEarned || 0).toFixed(1)}× what you earn.`, wait: 'Measuring what you earn.', unknown: 'How often it shows up isn\'t known yet.' }[a.level] || '');
+      if (a.haveIt) bits.push('You have the price now.');
+      return bits.join(' ');
+    };
+    $('budgetAfford').innerHTML = aff.length
+      ? `<div class="m-chips">${aff.map((a) => `<button class="add-chip ${cel.test(a.label) ? 'cel' : ''}" data-plan-star="${esc(a.ruleId)}" title="${esc(tip(a))}">${wantIcon(a.ruleId) !== '•' ? wantIcon(a.ruleId) : icon[a.level] || ''} ${esc(a.label)} <span class="p">${shortNumber(a.price)}</span> ＋</button>`).join('')}</div>`
+      : '';
+  }
+
+  // ---- This week: invested vs spent ----
+  {
+    const sp = b.split;
+    if (sp && (sp.invested + sp.spent + sp.unseen) > 0) {
+      const total = sp.invested + sp.spent + sp.unseen;
+      const seg = sp.rows.filter((r) => r.coins > 0).map((r) => `<i style="width:${((r.coins / total) * 100).toFixed(1)}%;background:${M_COL[r.cat] || '#999'}" title="${esc(r.label)} ${shortNumber(r.coins)}"></i>`).join('');
+      const legend = sp.rows.filter((r) => r.coins > 0).map((r) => `<span><i style="background:${M_COL[r.cat] || '#999'}"></i>${esc(r.emoji)} ${esc(r.label)} <b>${shortNumber(r.coins)}</b></span>`).join('');
+      $('moneySplit').innerHTML = `<div class="m-pair"><div><div class="lbl">Invested</div><div class="val inv">${shortNumber(sp.invested)}</div></div><div><div class="lbl">Spent</div><div class="val spt">${shortNumber(sp.spent)}</div></div></div>
+        <div class="m-bar" aria-hidden="true">${seg}</div><div class="m-legend">${legend}</div>`;
+    } else {
+      $('moneySplit').innerHTML = '<div class="empty">Nothing bought yet this week.</div>';
+    }
+    setFoldSummary('money/this-week', sp && (sp.invested + sp.spent + sp.unseen) > 0 ? `invested ${shortNumber(sp.invested)} · spent ${shortNumber(sp.spent + sp.unseen)}` : 'nothing bought');
+  }
+
+  // ---- What you bought (inside This week) ----
+  {
+    const pats = b.patterns || [];
+    const recent = (b.purchases && b.purchases.recent) || [];
+    let html = '';
+    if (pats.length) {
+      html += pats.map((r) => {
+        const pctN = r.share != null ? Math.round(r.share * 100) : null;
+        return `<div class="pat"><div class="rule-text"><div><b>${esc(r.label)}</b> <span class="where">${r.bought} of ${r.seen || r.bought}</span></div>${pctN != null ? `<div class="pat-bar"><i style="width:${Math.min(100, pctN)}%"></i></div>` : ''}</div><div class="share">${pctN != null ? pctN + '%' : ''}</div></div>`;
+      }).join('');
+    }
+    if (recent.length) html += `<div class="subhead">Recent</div>${recent.map((e) => `<div class="pat"><div class="rule-text">🛒 ${esc(e.name)}${e.qty > 1 ? ` ×${e.qty}` : ''}</div><div class="where">${e.coins != null ? shortNumber(e.coins) + ' · ' : ''}${esc(agoLong(e.t))}</div></div>`).join('')}`;
+    $('budgetPatterns').innerHTML = html || '<div class="empty">What you buy shows up here.</div>';
+    if ($('purchasesSince')) $('purchasesSince').textContent = b.purchases && b.purchases.since ? dayLabel(b.purchases.since) : 'now';
+  }
+
+  // ---- Your stage: the game (seed ladder → mutation farming) and your crops (bare → harvest) ----
+  {
+    const st = b.stage;
+    const cs = b.cropStage;
+    let html = '';
+    if (st) {
+      const steps = st.stages.map((x, i) => `<div class="m-step ${i < st.index ? 'done' : ''} ${i === st.index ? 'here' : ''}"><div class="dot">${esc(x.emoji)}</div>${esc(x.label)}</div>`).join('');
+      const fill = st.index <= 0 ? 0 : st.index >= st.stages.length - 1 ? 100 : 50;
+      html += `<div class="subhead" style="margin-top:0">Game</div><div class="m-track"><div class="fill" style="width:calc((100% - 36px) * ${fill / 100})"></div>${steps}</div><div class="m-advice">${esc(st.advice)}</div>`;
+    }
+    if (cs) {
+      const n = cs.steps.length;
+      const nodes = cs.steps.map((x, i) => {
+        const cls = [!x.required ? 'skip' : '', x.done && i <= cs.index ? 'done' : '', i === cs.index ? 'here' : ''].join(' ');
+        const count = cs.total ? (i === 0 ? `${cs.total}` : `${x.count}/${cs.total}`) : '';
+        return `<div class="c-step ${cls}" title="${esc(x.label)}: ${x.count} of ${cs.total} crops${x.required ? '' : ' (not in your Ready-means rule)'}"><div class="dot" style="--p:${Math.round(x.share * 100)}">${esc(x.emoji)}</div><div class="l">${esc(x.label)}</div><div class="n">${count}</div></div>`;
+      }).join('');
+      const fill = n > 1 ? (cs.index / (n - 1)) * 100 : 0;
+      const nx = cs.next || {};
+      const what = { ripe: 'to finish growing', size: 'to reach full size', hydro: 'a weather mutation', lunar: 'a moon mutation', color: 'to turn Gold or Rainbow' }[nx.stepId];
+      const when = nx.now ? "it's on now" : nx.weather && nx.hours != null ? `${esc(nx.weather)} in ~${esc(fmtHoursShort(nx.hours))}` : nx.hours === 0 ? '' : nx.hours != null ? (nx.stepId === 'ripe' ? `all grown in ~${esc(fmtHoursShort(nx.hours))}` : `~${esc(fmtHoursShort(nx.hours))} at your pets' pace`) : 'timing not known yet';
+      const line = nx.text ? esc(nx.text) + (nx.hours ? ` ~${esc(fmtHoursShort(nx.hours))}` : '') : `${cs.steps[cs.index].emoji} <b>${nx.left}</b> crop${nx.left === 1 ? '' : 's'} ${nx.stepId === 'hydro' || nx.stepId === 'lunar' ? 'need' : 'still'} ${esc(what)}${when ? ` · ${when}` : ''}`;
+      html += `<div class="subhead">Crops</div><div class="c-track"><div class="fill" style="width:calc((100% - 28px) * ${(fill / 100).toFixed(3)})"></div>${nodes}</div><div class="m-advice">${line}</div>`;
+    }
+    $('moneyStage').innerHTML = html;
+    const here = cs ? cs.steps[cs.index] : null;
+    setFoldSummary('garden/your-stage', [st ? `${st.emoji} ${st.label}` : '', here ? `${here.emoji} ${here.label}` : ''].filter(Boolean).join(' · '));
+  }
+  autoFoldSummaries();
+}
+
+function wireBudget() {
+  let whatIfTimer = null;
+  $('whatIfPrice').addEventListener('input', () => {
+    clearTimeout(whatIfTimer);
+    whatIfTimer = setTimeout(() => checkWhatIf(parsePrice($('whatIfPrice').value)), 250);
+  });
+  $('whatIfChips').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-whatif]');
+    if (!c) return;
+    const price = Number(c.dataset.whatif);
+    $('whatIfPrice').value = shortNumber(price);
+    checkWhatIf(price);
+  });
+  $('moneyGrowth').addEventListener('click', async (e) => {
+    if (e.target.closest('[data-ready-toggle]')) READY_OPEN = !READY_OPEN;
+    const r = e.target.closest('[data-ready]');
+    if (r) {
+      const cur = (BUDGET && BUDGET.options && BUDGET.options.readyRule) || {};
+      try {
+        BUDGET = await window.app.budgetSet({ readyRule: { [r.dataset.ready]: cur[r.dataset.ready] === false } });
+        budgetFetchedAt = Date.now();
+        renderBudget();
+        // The game page re-counts under the new rule; fetch again shortly.
+        setTimeout(() => refreshBudget(true), 2500);
+      } catch (err) {
+        toast("Couldn't save that.");
+      }
+      return;
+    }
+    const c = e.target.closest('[data-gdays]');
+    if (!c) return;
+    GROWTH_DAYS = Number(c.dataset.gdays);
+    renderBudget();
+  });
+  const planChange = async (change) => {
+    try {
+      BUDGET = await window.app.budgetPlan(change);
+      budgetFetchedAt = Date.now();
+      renderBudget();
+    } catch (err) {
+      toast("Couldn't save that.");
+    }
+  };
+  $('budgetAfford').addEventListener('click', (e) => {
+    const st = e.target.closest('[data-plan-star]');
+    if (!st) return;
+    planChange(st.classList.contains('on') ? { remove: st.dataset.planStar } : { add: st.dataset.planStar });
+  });
+  $('budgetPlan').addEventListener('click', (e) => {
+    const up = e.target.closest('[data-plan-up]');
+    if (up) return planChange({ up: up.dataset.planUp });
+    const rm = e.target.closest('[data-plan-remove]');
+    if (rm) return planChange({ remove: rm.dataset.planRemove });
+    return undefined;
+  });
+  $('budgetHudOn').addEventListener('click', async () => {
+    const on = !(S.ui && S.ui.budgetHud === false);
+    const now = await window.app.budgetHudSetting(!on);
+    S.ui = Object.assign({}, S.ui, { budgetHud: now });
+    setSwitch($('budgetHudOn'), now);
+  });
+  window.app.onBudgetHud((on) => {
+    S.ui = Object.assign({}, S.ui, { budgetHud: on });
+    setSwitch($('budgetHudOn'), on);
+  });
+  $('purchasesReset').addEventListener('click', async () => {
+    if (!confirm('Start the buying patterns over? The shop counts stay; only what you bought is cleared.')) return;
+    try {
+      BUDGET = await window.app.budgetResetPurchases();
+      budgetFetchedAt = Date.now();
+      renderBudget();
+      toast('🛒 Buying patterns reset.');
+    } catch (err) {
+      toast("Couldn't reset that.");
+    }
+  });
+  $('moneyUnlock').addEventListener('click', async (e) => {
+    const c = e.target.closest('[data-unlock]');
+    if (!c) return;
+    try {
+      BUDGET = await window.app.budgetSet({ unlockMode: c.dataset.unlock });
+      budgetFetchedAt = Date.now();
+      renderBudget();
+      if (c.dataset.unlock === 'on') showTab('money');
+    } catch (err) {
+      toast("Couldn't save that.");
+    }
+  });
+  window.app.onPurchase((e) => {
+    if (e && e.name) toast(`🛒 Noted: ${e.name}${e.coins != null ? ' for ' + shortNumber(e.coins) : ''}`);
+    refreshBudget(true);
   });
 }
 
@@ -4013,7 +5253,21 @@ function wireWeather() {
     sel.blur();
     toast(sel.value ? `${kindLabel(sel.dataset.teamKind)}: ${sel.options[sel.selectedIndex].textContent}` : `${kindLabel(sel.dataset.teamKind)}: pets left alone`);
   });
-  $('teamList').addEventListener('click', async (e) => {
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-mc-how]')) MC_HOW_OPEN = !MC_HOW_OPEN;
+    const ed = e.target.closest('[data-edit-want]');
+    if (ed) {
+      e.preventDefault();
+      openWants(ed.getAttribute('data-edit-want'));
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-goto]');
+    if (!g) return;
+    e.preventDefault();
+    showTab(g.dataset.goto);
+  });
+  if ($('teamList')) $('teamList').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-apply-team]');
     if (!btn) return;
     btn.disabled = true;
@@ -4089,6 +5343,11 @@ function wireGarden() {
     GOAL = e.target.value;
     renderPets();
   });
+  $('teamCompare').addEventListener('change', (e) => {
+    if (e.target.id !== 'teamSelect') return;
+    TEAM_PICK = e.target.value;
+    renderPets();
+  });
   $('teamCompare').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-apply-team]');
     if (!btn) return;
@@ -4148,11 +5407,15 @@ function renderRooms() {
   }
   const check = ROOMS && ROOMS.check;
   // Only worth mentioning when it isn't working (details in Troubleshooting).
-  $('roomCheck').innerHTML = check && !check.ok ? `⚠️ ${esc(check.text)} A sample (Extras tab, 🛠 Troubleshooting) would help when reporting it.` : '';
+  $('roomCheck').innerHTML = check && !check.ok
+    ? `⚠️ ${esc(check.text)} Counts come from the community list where a room is shared there; other rooms show as unknown rather than empty. A sample (Extras tab, 🛠 Troubleshooting) would help when reporting it.`
+    : '';
 
   if (!ROOMS) return;
   setSwitch($('sharedOn'), !ROOMS.sharedOff);
   setSwitch($('clipOn'), !(S.rooms && S.rooms.clipboard === false));
+  setFoldSummary('rooms/room-settings', `sharing ${S.rooms && S.rooms.share ? 'on' : 'off'} · copy prompts ${S.rooms && S.rooms.clipboard === false ? 'off' : 'on'}`);
+  setSwitch($('shareOn'), Boolean(S.rooms && S.rooms.share));
   const shared = (ROOMS.shared || []).filter((x) => x.id !== hereId)
     .sort((a, b) => (a.full - b.full) || (b.players - a.players));
   $('sharedStatus').textContent = ROOMS.sharedOff ? 'Off.'
@@ -4184,9 +5447,10 @@ function renderRooms() {
   $('roomList').innerHTML = list.length
     ? list.map((x) => {
         const bonus = x.full ? 'Full' : x.closed ? 'Empty' : x.bonusIfJoined != null ? `+${x.bonusIfJoined}%` : x.error ? '?' : '';
+        const via = x.viaCommunity ? ' <span class="where" title="From the community list (rooms shared through Arie\'s mod), which can lag a few minutes">via list</span>' : '';
         return `<div class="room ${x.full ? 'full' : ''} ${x.id === hereId ? 'here' : ''}">
           <span>${esc(x.name)}${x.id === hereId ? ' <span class="live">· you\'re here</span>' : ''}<div class="where">${/^i-/.test(x.id) ? 'Discord room' : esc(shortRoomId(x.id))} · <button class="link" style="font-size:11px" data-forget="${esc(x.id)}">Remove</button></div></span>
-          ${seats(x.players)}
+          ${seats(x.players)}${via}
           <span class="bonus" title="${esc(x.error || '')}">${bonus}</span>
           <button class="btn small" data-join="${esc(x.id)}" data-name="${esc(x.name)}"${x.full || x.id === hereId ? ' disabled' : ''}>Join</button>
         </div>`;
@@ -4254,6 +5518,34 @@ function wireRooms() {
     CLIP = null;
     renderClipBanner();
   });
+  $('spotMapOn').addEventListener('click', async () => {
+    const on = !(S.ui && S.ui.spotMap === false);
+    const now = await window.app.spotMapSetting(!on);
+    S.ui = Object.assign({}, S.ui, { spotMap: now });
+    setSwitch($('spotMapOn'), now);
+  });
+  const shareStatusText = (st) => {
+    if (!st) return '';
+    if (!st.on) return st.stoppedBy === 'refused' ? `Stopped: the list refused this account (${st.lastError || 'no reason given'}).` : '';
+    if (st.lastError) return `Trying: ${st.lastError}`;
+    if (st.room) return `Sharing room ${st.room}${st.lastAt ? ` · last sent ${agoLong(st.lastAt)}` : ''}`;
+    return st.sent ? 'Not in a room right now.' : 'On: waiting for the game.';
+  };
+  $('shareOn').addEventListener('click', async () => {
+    const on = Boolean(S.rooms && S.rooms.share);
+    const r = await window.app.roomsShareSetting(!on);
+    S.rooms = Object.assign({}, S.rooms, { share: r.share });
+    setSwitch($('shareOn'), r.share);
+    if (!r.share) $('shareStatus').textContent = '';
+    $('shareStatus').textContent = shareStatusText(r.status);
+    toast(r.share ? '🎮 Sharing your room on the community list.' : '🎮 Room sharing off.');
+  });
+  window.app.onRoomShare((st) => {
+    if (st && !st.on && S.rooms && S.rooms.share && st.stoppedBy === 'refused') S.rooms = Object.assign({}, S.rooms, { share: false });
+    setSwitch($('shareOn'), Boolean(S.rooms && S.rooms.share));
+    $('shareStatus').textContent = shareStatusText(st);
+  });
+  window.app.roomsShareStatus().then((st) => { $('shareStatus').textContent = shareStatusText(st); }).catch(() => {});
   $('clipOn').addEventListener('click', async () => {
     const on = !(S.rooms && S.rooms.clipboard === false);
     const now = await window.app.roomsClipboardSetting(!on);
@@ -4330,6 +5622,7 @@ function renderPanel() {
   $('panelHide').hidden = PANEL.mode !== 'attached';
   $('panelPop').textContent = PANEL.mode === 'attached' ? '⧉' : '⇤';
   $('panelPop').title = PANEL.mode === 'attached' ? 'Pop the panel out into its own window' : 'Attach the panel to the side of the game';
+  setFoldSummary('scripts/panel', PANEL.mode === 'attached' ? `attached · ${PANEL.width} px` : 'own window');
 }
 
 async function setPanel(change) {
@@ -4411,6 +5704,140 @@ function wireScripts() {
  * Tabs and startup
  * ================================================================== */
 
+/* Folding sections: every heading in the panel folds the cards under it
+ * (until the next heading); which are folded is remembered. The Spending
+ * card starts folded, with a summary in its heading. */
+// Sections that start folded until you open them (settings, and the long
+// reference lists). Your own choices are kept in S.ui.folds, one per section.
+const FOLD_DEFAULT = new Set([
+  'alerts/sound-and-voice', 'alerts/add-another-item', 'alerts/shop-items', 'alerts/weather', 'alerts/your-pets',
+  'rooms/room-settings', 'scripts/panel',
+  'garden/harvest-lock', 'garden/weather-mutations', 'garden/crop-size', 'garden/your-stats',
+  'money/money-box-over-the-game',
+  'pity/by-egg', 'pity/rare-finds',
+  'scripts/backups',
+]);
+function foldKey(h2) {
+  const sec = h2.closest('section');
+  const label = (h2.childNodes[0] && h2.childNodes[0].textContent) || h2.textContent;
+  return `${sec ? sec.id.replace(/^tab-/, '') : ''}/${label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+}
+function isFolded(key) {
+  const f = S.ui && S.ui.folds;
+  if (f && typeof f === 'object' && key in f) return Boolean(f[key]);
+  return FOLD_DEFAULT.has(key);
+}
+function applyFold(h2, folded) {
+  h2.classList.toggle('folded', folded);
+  h2.setAttribute('aria-expanded', String(!folded));
+  for (let el = h2.nextElementSibling; el && el.tagName !== 'H2'; el = el.nextElementSibling) el.hidden = folded;
+}
+function wireFolds() {
+  for (const h2 of document.querySelectorAll('main > section > h2')) {
+    if (!h2.nextElementSibling || h2.nextElementSibling.tagName === 'H2') continue;
+    h2.classList.add('fold');
+    h2.setAttribute('role', 'button');
+    h2.tabIndex = 0;
+    const key = foldKey(h2);
+    h2.dataset.fold = key;
+    if (!h2.querySelector('.fold-sum')) {
+      const sum = document.createElement('span');
+      sum.className = 'fold-sum';
+      h2.appendChild(sum);
+    }
+    applyFold(h2, isFolded(key));
+    const toggle = () => {
+      const now = !h2.classList.contains('folded');
+      applyFold(h2, now);
+      S.ui = Object.assign({}, S.ui, { folds: Object.assign({}, S.ui && S.ui.folds, { [key]: now }) });
+      save();
+    };
+    h2.addEventListener('click', toggle);
+    h2.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  }
+}
+// "Edit what you want" (and a want's icon on the chart): opens Your wants,
+// scrolls to it, and briefly lights up that want if one was tapped.
+function openWants(ruleId) {
+  const h2 = document.querySelector('h2[data-fold="money/your-wants"]');
+  if (!h2) return;
+  if (h2.classList.contains('folded')) h2.click();
+  const row = ruleId ? document.querySelector(`.plan-item[data-want="${CSS.escape(ruleId)}"]`) : null;
+  (row || h2).scrollIntoView({ behavior: 'smooth', block: row ? 'center' : 'start' });
+  if (row) {
+    row.classList.remove('flash');
+    void row.offsetWidth;
+    row.classList.add('flash');
+  }
+}
+
+// A one-line summary shown in a folded heading.
+function setFoldSummary(key, text) {
+  const sum = document.querySelector(`main > section > h2[data-fold="${key}"] .fold-sum`);
+  if (!sum) return;
+  sum.textContent = text ? ' · ' + text : '';
+  sum.dataset.set = text ? '1' : '';
+}
+// Folds long text in cards to two lines (one for the descriptions in the
+// alert lists), opening on a tap. Runs whenever the panel's content changes.
+function clampLongText() {
+  const lists = new Set(['itemRules', 'weatherRules', 'petRules']);
+  for (const el of document.querySelectorAll('main .card .hint, main .card .note, main .card .rule-desc, main > section > .hint')) {
+    if (el.classList.contains('clamp') || el.classList.contains('no-clamp') || el.closest('.est') || el.id === 'spotWhere') continue;
+    const inList = [...lists].some((id) => el.closest('#' + id));
+    const len = (el.textContent || '').trim().length;
+    if (inList ? len > 0 : len > 110) {
+      el.classList.add('clamp');
+      if (inList) el.classList.add('c1');
+      el.title = 'Tap to read all of it';
+    }
+  }
+}
+let clampTimer = null;
+function watchClamp() {
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest('.clamp');
+    if (c && !e.target.closest('button, a, input, select, summary')) c.classList.toggle('open');
+  });
+  new MutationObserver(() => {
+    if (clampTimer) return;
+    clampTimer = setTimeout(() => {
+      clampTimer = null;
+      clampLongText();
+    }, 150);
+  }).observe(document.querySelector('main'), { childList: true, subtree: true });
+  clampLongText();
+}
+
+// Headings nobody has written a summary for borrow the first line of their
+// card (its big line, or its first row's label), so a folded tab still
+// reads as a status board.
+function autoFoldSummaries() {
+  for (const h2 of document.querySelectorAll('main > section > h2.fold')) {
+    const sum = h2.querySelector('.fold-sum');
+    if (!sum || sum.dataset.set) continue;
+    const card = h2.nextElementSibling;
+    if (!card) continue;
+    // A list of switches (the alert lists): how many are on.
+    const sw = card.querySelectorAll('.rule .switch, .rule [role="switch"]');
+    if (sw.length >= 3) {
+      const on = [...sw].filter((x) => x.getAttribute('aria-checked') === 'true').length;
+      sum.textContent = ` · ${on} of ${sw.length} on`;
+      continue;
+    }
+    const src = card.querySelector('.big-line, .status-main, .row > span, .rule-name, .empty');
+    // A row's label only, not the description tucked under it.
+    const label = src && src.matches('.row > span') && src.firstChild ? src.firstChild.textContent : src ? src.textContent : '';
+    const text = label.replace(/\s+/g, ' ').trim().slice(0, 56);
+    sum.textContent = text ? ' · ' + text : '';
+  }
+}
+
 function showTab(name) {
   for (const btn of document.querySelectorAll('nav [data-tab]')) {
     btn.setAttribute('aria-selected', String(btn.dataset.tab === name));
@@ -4421,8 +5848,10 @@ function showTab(name) {
   if (name === 'scripts') {
     renderScripts();
     renderDevDetails();
+    renderTidy();
   }
   if (name === 'pets') renderPets();
+  if (name === 'money') refreshBudget(true);
   if (name === 'pity') renderPity();
   startRoomsPolling(name === 'rooms');
   if (S && S.ui && S.ui.tab !== name) {
@@ -4504,6 +5933,11 @@ async function start() {
   wireUpdates();
   wireSecret();
   wireWorth();
+  wireGoldRate();
+  wireBudget();
+  wireFolds();
+  watchClamp();
+  setTimeout(autoFoldSummaries, 1500);
   wireKeysToGame();
 
   renderAlertSettings();
@@ -4540,6 +5974,11 @@ async function start() {
   window.app.onGardenStatus((st) => {
     GARDEN_STATUS = st;
     renderGarden();
+  });
+  window.app.onBudgetCrossed(() => {
+    toast('🏆 You crossed the buy-everything line!');
+    if (S && S.alerts && !S.alerts.muted) speak(pick(['Woohoo! You can buy everything now!', 'You crossed the buy everything line! Treat yourself!']), 1.08, 1.05);
+    refreshBudget(true);
   });
   window.app.onGardenStats((stats) => {
     GARDEN_STATS = stats;

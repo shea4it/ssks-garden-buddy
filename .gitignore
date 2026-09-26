@@ -8,3 +8,9 @@ dist/
 Thumbs.db
 # and Claude's working notes (personal; delete this line to publish them).
 HANDOFF.md
+# and test leftovers.
+tests/key.pem
+tests/cert.pem
+tests/server.log
+tests/server.out
+tests/result.json

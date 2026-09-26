@@ -27,27 +27,42 @@ history are kept. You can also use **Help → Check for updates…**.
 
 ## What it does
 
-- **🔔 Alerts** with sound and a voice when rare seeds, eggs, tools or decor
-  are in the shop, when the weather changes, and when your pets are hungry.
-  Quiet hours, with a 🌙 for the alerts worth waking up for.
+- **🔔 Alerts** with sound and a voice when rare seeds, eggs (Mythical and
+  Amber too), tools or decor are in the shop, when the weather changes, when
+  a pet turns a crop Gold or Rainbow, and when your pets are hungry. Quiet
+  hours, with a 🌙 for the alerts worth waking up for.
 - **🎭 Voices with personality:** cheerful Poppy, grumpy Spike, gloomy
   Obadiah, a storybook narrator, a stadium announcer, and more.
-- **🌦️ Weather helpers:** today's weather at a glance, a pet team for each kind
-  of weather, and team swaps when your garden reaches a goal (like "95% of my
-  crops are Thunderstruck").
-- **🌻 Garden:** what your garden is worth (with your room and pet bonuses), a
-  chart of it over time, how close you are to all-Gold/Rainbow and full size,
-  your weather mutations, and open spots for when you're moving plants around.
+- **💰 Money:** one chart of your money — the last week as it happened and
+  the next couple of weeks as expected — with each thing you want (celestials,
+  Mythical and Amber Eggs) sitting on the day it's likely to show up, sized
+  against what you'll have. How much is safe to spend right now, "Can I buy
+  this?" for anything you're eyeing, what your garden will be worth when it's
+  all ready (and with your room and pet bonuses), and **the final boss**: the
+  line for buying *everything* — every alert item and every decoration as it
+  shows up. There's a race to cross it, and a party when you do.
+- **🌻 Garden:** what your garden is worth, how many crops are ripe and ready
+  to sell, how fast your pets are turning crops Gold and Rainbow (hour by
+  hour), where you are in the game and in your crops' lives, weather
+  mutations, crop size, and an open-spot map that appears over the game
+  while you hold a pot.
 - **🐾 Pets:** each pet's real strength, what its abilities do in plain words,
-  the best pets you own for any goal, and team ideas.
+  the best pets you own for any goal, team ideas, your saved teams with what
+  each one does, and pet food.
+- **🌦️ Weather helpers:** a pet team for each kind of weather (swapped in
+  and back again for you), team swaps when your garden reaches a goal, and
+  stepping out during weather you want to keep off your crops.
 - **🍀 Luck:** Bad Luck Protection counters for every egg, plant and capsule,
   with a heads-up when a guarantee is one pull away.
-- **🎮 Rooms:** your room's sell bonus, rooms other players share, and your
-  saved rooms with how full they are.
+- **🎮 Rooms:** your room's sell bonus, rooms other players share, your
+  saved rooms with how full they are, and an opt-in switch to share your own
+  room on the community list.
 - **🧰 Extras:** a harvest lock for moving pots without harvesting by
-  accident, a seed deleter, backups, and some just-for-fun effects.
+  accident, a "never sell pet food" guard, a seed deleter, backups, and some
+  just-for-fun effects.
 
-The **[guide](GUIDE.md)** explains every part of it.
+The **[guide](GUIDE.md)** explains every part of it, and
+**[FEATURES.md](FEATURES.md)** is the full list.
 
 ## Fair play and what it sends
 
@@ -57,13 +72,15 @@ and tells you things. Here is everything it does that touches the game:
 
 - **It reads** your game's own data in the app's window, and the game's public
   shop feed.
-- **It can send the game exactly two kinds of command**, both only because of
-  something you set up or pressed:
+- **It can send the game exactly three kinds of command**, all only because
+  of something you set up or pressed:
   - **Swap to one of your saved pet teams** (the same as tapping the team in the
     game): when you press Apply, or from weather teams and team triggers if
     you've switched those on.
   - **Throw a seed into the wishing well**: the seed deleter, one seed at a
     time, only when you press it.
+  - **Lock a crop kind** (the game's own right-click lock): only with "Never
+    sell pet food" on, when you sell, so the crops your pets eat are kept.
 - **The harvest lock** doesn't send anything of its own: while it's on, it
   points the game's own harvest at a spot that doesn't exist, so the game
   refuses it and nothing is harvested.
@@ -74,10 +91,15 @@ and tells you things. Here is everything it does that touches the game:
   weather, and coming back automatically after you play on another device
   (with a countdown and a Stay away button, as Magic Circle asks).
 - **Other places it connects to:** magicgarden.gg (the shop feed and room
-  player counts), Arie's Mod's public room list (read only; can be switched
+  player counts), Arie's Mod's public room list (reading it can be switched
   off), GitHub to check for updates (can be switched off; nothing installs
   until you press Update now), and GitHub / Hugging Face to download the
-  natural voices when you choose one. No accounts, no tracking; nothing about you is sent anywhere.
+  natural voices when you choose one. No accounts, no tracking.
+- **The one thing that sends anything about you, and only if you switch it
+  on:** *Share my room on the community list* (Rooms tab) sends your room
+  code, how many are in it, your name and your coin balance to Arie's Mod's
+  site (at most once a minute), so others can find and join your room. It's off
+  until you turn it on, and nothing is sent while it's off.
 
 All of the code is plain, readable JavaScript, right here.
 
@@ -93,9 +115,12 @@ Troubleshooting → Save a sample** makes a file that helps a lot.
 - **Magic Circle** for Magic Garden, and for welcoming mods.
 - **[magicgarden.wiki](https://magicgarden.wiki)** for prices, odds and
   ability numbers.
+- **Arie**, big time: Arie opened up Arie's Mod's public room list so the
+  Buddy can both read it and post shared rooms to it, and his team wrote up
+  a guide to their API. That's what makes "Open rooms right now" and "Share
+  my room" work, for his users and ours.
 - **Arie's Mod** and **MG AFK** for showing how the game's commands and rooms
-  work, and Arie for the public room list; the pet strength formula comes from
-  the community's Gemini mod.
+  work; the pet strength formula comes from the community's Gemini mod.
 - The natural voices are **[Piper](https://github.com/rhasspy/piper)** voices
   (SEMAINE, Cori, Amy, Alba, VCTK and Lessac recordings).
 

@@ -8,12 +8,20 @@ building from the code.
 
 1. Install Node.js (the LTS version) from https://nodejs.org, once.
 2. Download the code (the green **Code** button, then **Download ZIP**) and
-   extract it somewhere, say `Documents\ssks-garden-buddy`.
+   extract it anywhere.
 3. Double-click **BUILD.bat**. If Windows warns you, click
    **More info → Run anyway**.
 4. Wait for it to finish. The app installs and opens by itself. The installer
-   it made is in the `release` folder (`SSKs-Garden-Buddy-Windows.exe`),
-   ready to copy to another computer.
+   it made is copied into the `release` folder
+   (`SSKs-Garden-Buddy-Windows.exe`), ready to copy to another computer.
+
+The installer is built in a new folder of its own each time, under
+`AppData\Local\SSKs-Garden-Buddy-builds` (the newest three are kept), not in
+the code folder. The code folder is often synced by OneDrive (Documents
+usually is), and OneDrive or a virus scan picking up the new installer while
+it was being written used to stall the build at "output file is locked for
+writing". An installer still running from an earlier build is closed first
+for the same reason.
 
 To update, extract the newer code over the same folder (say yes to replacing
 files) and run BUILD.bat again. Settings, egg counts and scripts live in the

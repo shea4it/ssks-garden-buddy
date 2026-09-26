@@ -48,8 +48,33 @@ function parseCommunity(rows, now) {
     .filter((r) => r.reported > 0 && (!r.updatedAt || t - r.updatedAt < COMMUNITY_MAX_AGE_MS));
 }
 
-function infoPath(id) {
-  return `/api/rooms/${encodeURIComponent(id)}/info`;
+// The paths tried, in order. The first (the one verified in v0.11) stopped
+// existing in Sep 2026 (the router answers 404 "Not found (router)" for
+// every room); the others are where the game's newer "platform" API keeps
+// things (the shop feed lives under /platform/v1/). The first path that
+// answers for a room is kept for the rest of the session.
+const INFO_PATHS = [
+  (id) => `/api/rooms/${encodeURIComponent(id)}/info`,
+  (id) => `/platform/v1/rooms/${encodeURIComponent(id)}/info`,
+  (id) => `/platform/v1/rooms/${encodeURIComponent(id)}`,
+];
+// Only the original path ever meant "404 = this room is closed". The others
+// are guesses: a 404 there means the path doesn't exist (proven: the second
+// one answered 404 for a room the game said had 5 players), so it counts as
+// gone, not as an empty room.
+const GUESSED_FROM = 1;
+let pathIndex = 0;
+// Once every path has proven dead, nothing more is fetched this session.
+let allDead = false;
+
+function infoPath(id, which = pathIndex) {
+  return INFO_PATHS[which](id);
+}
+
+// A 404 from the router itself (the endpoint is gone) is not "this room is
+// closed": nothing is known then.
+function endpointGone(status, body) {
+  return status === 404 && /router/i.test(String(body || ''));
 }
 
 function joinUrl(id) {
@@ -78,6 +103,7 @@ function describeId(id) {
 
 // Turns whatever the endpoint answered into { players } or { error }.
 function readInfo(status, body) {
+  if (endpointGone(status, body)) return { players: null, error: 'the game no longer answers this lookup', gone: true };
   if (status === 404) return { players: 0, closed: true };
   if (status < 200 || status >= 300) return { players: null, error: `HTTP ${status}` };
   let data = body;
@@ -113,10 +139,24 @@ function createRooms({ fetchInfo }) {
   let busy = null;
 
   async function count(id) {
+    if (allDead) return { players: null, error: 'the game no longer answers this lookup', gone: true };
     try {
-      const r = await fetchInfo(infoPath(id));
-      const out = readInfo(r.status, r.body);
-      if (out.error) out.sample = String(r.body || '').slice(0, 200);
+      let out = null;
+      for (let tries = 0; tries < INFO_PATHS.length; tries += 1) {
+        const which = (pathIndex + tries) % INFO_PATHS.length;
+        const r = await fetchInfo(infoPath(id, which));
+        out = readInfo(r.status, r.body);
+        if (which >= GUESSED_FROM && r.status === 404) out = { players: null, error: 'the game no longer answers this lookup', gone: true };
+        out.status = r.status;
+        out.path = infoPath(id, which);
+        // Keep what the endpoint said when it's odd (an error, or "closed"),
+        // so a sample shows it.
+        if (out.error || out.closed) out.sample = String(r.body || '').slice(0, 200);
+        if (out.gone) continue; // this path is dead: try the next
+        pathIndex = which;
+        return out;
+      }
+      if (out && out.gone) allDead = true;
       return out;
     } catch (err) {
       return { players: null, error: String((err && err.message) || err).slice(0, 80) };
@@ -151,13 +191,15 @@ function createRooms({ fetchInfo }) {
         closed: Boolean(c.closed),
         error: c.error || null,
         sample: c.sample || null,
+        status: c.status || null,
+        path: c.path || null,
         at: c.at || null,
         bonusIfJoined: bonusIfJoined(c.players),
       };
     });
   }
 
-  return { refresh, snapshot };
+  return { refresh, snapshot, lookupDead: () => allDead };
 }
 
 // How the shared list broke down, to show why it can look empty.
