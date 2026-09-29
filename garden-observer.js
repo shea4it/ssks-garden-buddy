@@ -273,6 +273,33 @@
     };
   }
 
+  // What's on a garden spot: [kind, name]. kind: p plant, e egg,
+  // d decoration, s shard (hunger / XP / strength…), o anything else. The
+  // name comes from whichever field holds it (species, eggId, decorId, or
+  // any other "…Id" that isn't a random unique id), else the object's type.
+  function tileKind(o) {
+    const t = String((o && o.objectType) || '').toLowerCase();
+    const looksUnique = (v) => /^[0-9a-f-]{16,}$/i.test(v);
+    let name = '';
+    for (const k of ['species', 'eggId', 'decorId', 'shardId', 'itemId', 'consumableId', 'name']) {
+      if (typeof o[k] === 'string' && o[k] && !looksUnique(o[k])) {
+        name = o[k];
+        break;
+      }
+    }
+    if (!name) {
+      for (const [k, v] of Object.entries(o)) {
+        if (/Id$/.test(k) && typeof v === 'string' && v && !looksUnique(v)) {
+          name = v;
+          break;
+        }
+      }
+    }
+    if (!name) name = String(o.objectType || '');
+    const kind = /plant/.test(t) || Array.isArray(o.slots) ? 'p' : /egg/.test(t) ? 'e' : /decor/.test(t) ? 'd' : /shard/i.test(t + ' ' + name) ? 's' : 'o';
+    return [kind, String(name).slice(0, 40)];
+  }
+
   function checkActivity() {
     const slot = mySlot();
     const logs = slot && slot.data && Array.isArray(slot.data.activityLogs) ? slot.data.activityLogs : null;
@@ -630,6 +657,9 @@
     obs.lastReport = Date.now();
     try {
       spotMap();
+      binderMap();
+      mountMap();
+      thunderMap();
     } catch (err) {
       /* the map must never get in the way */
     }
@@ -696,9 +726,27 @@
         const out = {};
         for (const [k, o] of Object.entries(tiles)) {
           if (!o || typeof o !== 'object') continue;
-          const t = String(o.objectType || '').toLowerCase();
-          const kind = /plant/.test(t) || Array.isArray(o.slots) ? 'p' : /egg/.test(t) ? 'e' : /decor/.test(t) ? 'd' : 'o';
-          out[k] = [kind, String(o.species || o.eggId || o.decorId || '').slice(0, 40)];
+          out[k] = tileKind(o);
+        }
+        return out;
+      })(),
+      // Each plant on its tile, for the Garden map's to-do (garden-plan.js):
+      // { i: tile, sp: species, s: [[mutations, size, ripe 0/1, value]] }.
+      gardenPlants: (() => {
+        const sl = mySlot();
+        const tiles = (sl && sl.data && sl.data.garden && sl.data.garden.tileObjects) || {};
+        const now = Date.now();
+        const out = [];
+        for (const [k, o] of Object.entries(tiles)) {
+          if (!o || !Array.isArray(o.slots) || !o.slots.length) continue;
+          const s = [];
+          for (const c of o.slots) {
+            if (!isCrop(c)) continue;
+            const end = Number(c.endTime);
+            const v = window.__MG_CROP_VALUE ? window.__MG_CROP_VALUE(c, { unpriced: 0, unpricedSpecies: {}, unknownMutations: [] }) : 0;
+            s.push([c.mutations.map(mutationKey).join(','), Math.round((Number(c.size) || 0) * 10) / 10, Number.isFinite(end) && end > now ? 0 : 1, Math.round(v)]);
+          }
+          out.push({ i: Number(k), sp: String(o.species || (o.slots[0] && o.slots[0].species) || ''), s });
         }
         return out;
       })(),
@@ -753,6 +801,9 @@
         spotTimer = null;
         try {
           spotMap();
+          binderMap();
+          mountMap();
+          thunderMap();
         } catch (err) {
           /* never in the way */
         }
@@ -1173,12 +1224,19 @@
       if (only && !only.has(String(it.id)) && !only.has(String(it.species))) continue;
       if (!isFood(it.species)) continue;
       foodSeen += 1;
-      if (fav.has(String(it.species)) || fav.has(String(it.id)) || favNz.has(nz(it.species))) continue;
+      // Locked means the crop's own id is in the lock list. A kind's name in
+      // the list (like "Cabbage") doesn't keep a crop from being sold: the
+      // game took a locked-by-name Cabbage in Sept 2026. Only a crop with no
+      // id at all falls back to its name.
+      if (it.id != null ? fav.has(String(it.id)) : fav.has(String(it.species)) || favNz.has(nz(it.species))) continue;
       const q = Math.max(1, Math.floor(Number(it.quantity) || 1));
-      counts[it.species] = (counts[it.species] || 0) + q;
+      const c = counts[it.species] || (counts[it.species] = { count: 0, ids: [] });
+      c.count += q;
+      if (it.id != null) c.ids.push(String(it.id));
+      else c.noId = true;
     }
-    const crops = Object.entries(counts).map(([species, count]) => ({ species: String(species).slice(0, 40), count }));
-    obs.lastSaleCheck = { at: Date.now(), command: String(cmd.type || '').slice(0, 40), items: (inv.items || []).length, produceSeen, potted, foodSeen, favourites: fav.size, blocked: crops };
+    const crops = Object.entries(counts).map(([species, c]) => ({ species: String(species).slice(0, 40), count: c.count, ids: c.ids, noId: Boolean(c.noId) }));
+    obs.lastSaleCheck = { at: Date.now(), command: String(cmd.type || '').slice(0, 40), items: (inv.items || []).length, produceSeen, potted, foodSeen, favourites: fav.size, blocked: crops.map((c) => ({ species: c.species, count: c.count, ids: c.ids.length, noId: c.noId })) };
     return crops;
   }
 
@@ -1202,26 +1260,33 @@
     });
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  function lockedNow(species) {
+  function lockList() {
     const slot = mySlot();
     const ids = (slot && slot.data && slot.data.inventory && slot.data.inventory.favoritedItemIds) || [];
-    return Array.isArray(ids) && ids.some((x) => nz(x) === nz(species));
+    return Array.isArray(ids) ? ids.map(String) : [];
+  }
+  function inBag(id) {
+    const slot = mySlot();
+    const items = (slot && slot.data && slot.data.inventory && slot.data.inventory.items) || [];
+    return Array.isArray(items) && items.some((it) => it && String(it.id) === String(id));
   }
 
-  // Locks one crop kind (the game's right-click lock: ToggleLockItem). The
-  // field that names the crop isn't documented, so the likely ones are
-  // tried until the bag shows the lock; the one that worked is remembered.
-  const LOCK_FIELDS = ['itemId', 'species', 'id'];
-  async function lockSpecies(species) {
-    if (lockedNow(species)) return true;
-    const fields = obs.lockField ? [obs.lockField].concat(LOCK_FIELDS.filter((f) => f !== obs.lockField)) : LOCK_FIELDS;
+  // Locks one crop item (the game's right-click lock: ToggleLockItem) by its
+  // own id, and waits until the bag's lock list shows that id. The field is
+  // itemId (the game accepts it); id is tried if that's ever refused. A
+  // kind's name is never sent: it doesn't keep crops, and a toggle by name
+  // could flip the lock on that kind's seeds.
+  const LOCK_FIELDS = ['itemId', 'id'];
+  async function lockItem(id) {
+    if (lockList().includes(String(id))) return true;
+    const fields = obs.lockField && LOCK_FIELDS.includes(obs.lockField) ? [obs.lockField].concat(LOCK_FIELDS.filter((f) => f !== obs.lockField)) : LOCK_FIELDS;
     for (const field of fields) {
       const cmd = { type: 'ToggleLockItem' };
-      cmd[field] = species;
-      const res = await sendAndWait(cmd, 'Lock:' + species);
+      cmd[field] = String(id);
+      const res = await sendAndWait(cmd, 'Lock:' + String(id).slice(0, 12));
       if (!res.ok) continue; // the server refused this shape: try the next
       for (let i = 0; i < 20; i += 1) {
-        if (lockedNow(species)) {
+        if (lockList().includes(String(id))) {
           if (obs.lockField !== field) {
             obs.lockField = field;
             send('lockField', { field });
@@ -1246,13 +1311,27 @@
     const failed = [];
     try {
       for (const c of crops) {
-        if (await lockSpecies(c.species)) locked.push(c.species);
+        let all = !c.noId && c.ids.length > 0;
+        for (const id of c.ids) if (!(await lockItem(id))) all = false;
+        if (all) locked.push(c.species);
         else failed.push(c.species);
       }
+      // If locks ever failed to hold, the app no longer re-sends sales: it
+      // stops them and asks for a hand lock instead.
+      if (obs.locksUntrusted && !failed.length) failed.push(...locked.splice(0));
       if (!failed.length) {
         const r = sendCommand(sale, 'Sell:after-lock');
-        showBlocked({ reason: 'petfood-locked', crops });
-        send('sellGuard', { ok: true, locked, resent: r.ok, command: String(sale.type || '').slice(0, 40) });
+        // Then make sure: every crop that was locked should still be here.
+        await sleep(1500);
+        const gone = crops.filter((c) => c.ids.some((id) => !inBag(id))).map((c) => c.species);
+        if (gone.length) {
+          obs.locksUntrusted = true;
+          showBlocked({ reason: 'petfood-failed', crops, failed: gone });
+          send('sellGuard', { ok: false, soldAnyway: gone, locked, resent: r.ok, command: String(sale.type || '').slice(0, 40) });
+        } else {
+          showBlocked({ reason: 'petfood-locked', crops });
+          send('sellGuard', { ok: true, locked, resent: r.ok, command: String(sale.type || '').slice(0, 40) });
+        }
       } else {
         showBlocked({ reason: 'petfood-failed', crops, failed });
         send('sellGuard', { ok: false, locked, failed, command: String(sale.type || '').slice(0, 40) });
@@ -1368,8 +1447,8 @@
       const o = tiles[i] || tiles[String(i)];
       let col = '#5ee87a'; // open
       if (o && typeof o === 'object') {
-        const t = String(o.objectType || '').toLowerCase();
-        col = /plant/.test(t) || Array.isArray(o.slots) ? '#3a3040' : /egg/.test(t) ? '#6b5a2a' : /decor/.test(t) ? '#4a3d6b' : '#3a3040';
+        const kind = tileKind(o)[0];
+        col = kind === 'e' ? '#6b5a2a' : kind === 'd' ? '#4a3d6b' : kind === 's' ? '#2f6b73' : '#3a3040';
       } else {
         open += 1;
       }
@@ -1384,6 +1463,601 @@
     spotBox.style.display = '';
   }
 
+  /* The binder map (v0.53.4): during an Amber Moon (with a Moonbinder in
+   * the garden) or a Dawn (with a Dawnbinder), a bigger map in the corner
+   * for moving plants so lit crops bind: the binder and its 8 tiles, lit
+   * crops (steady beside a binder: binding now; pulsing elsewhere: move
+   * them in), bound ones dimmed, the other lunar kind's crops pulsing where
+   * they hold a binder spot (swap them out), open binder spots green. Drawn
+   * from the live garden, so it follows every move. Nothing is sent. */
+  obs.binderOn = true;
+  obs.binderEvent = null;
+  let bBox = null;
+  let bCells = null;
+  let bHead = null;
+  let bSum = null;
+  let bLast = '';
+  let bTick = null;
+  const B_COL = {
+    amber: { lit: '#ffb13b', glow: '#ffb13b', bound: '#4a3418', other: '#9b3f72', otherDim: '#3d2236', ring: 'rgba(233,213,255,.85)', name: 'Amber', other_name: 'Dawn', binder: 'Moonbinder', title: '🌕 Amber Moon' },
+    dawn: { lit: '#d8b4fe', glow: '#c084fc', bound: '#3e2a55', other: '#9a5a24', otherDim: '#3a2c20', ring: 'rgba(216,180,254,.9)', name: 'Dawn', other_name: 'Amber', binder: 'Dawnbinder', title: '🌅 Dawn' },
+  };
+  function isBinderOf(tile, kind) {
+    const sp = String((tile && tile.species) || '');
+    return kind === 'amber' ? /moon(celestial|binder)/i.test(sp) : /dawn(celestial|binder)/i.test(sp);
+  }
+  function ring(i) {
+    const row = Math.floor(i / 20);
+    const col = i % 20;
+    const side = col < 10 ? 0 : 1;
+    const out = [];
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        const r = row + dr;
+        const c = col + dc;
+        if ((dr || dc) && r >= 0 && r <= 9 && c >= 0 && c <= 19 && (c < 10 ? 0 : 1) === side) out.push(r * 20 + c);
+      }
+    }
+    return out;
+  }
+  function binderMapStyle() {
+    const st = document.createElement('style');
+    st.id = 'mg-binder-style';
+    st.textContent = '@keyframes mgBindPulse{0%,100%{box-shadow:0 0 0 1.5px var(--g),0 0 9px 2px var(--g)}50%{box-shadow:0 0 0 1.5px var(--g),0 0 2px 0 var(--g)}}'
+      + '#mg-binder-map i.pulse,#mg-mount-map i.pulse{animation:mgBindPulse 1.1s ease-in-out infinite}'
+      + '@media (prefers-reduced-motion:reduce){#mg-binder-map i.pulse,#mg-mount-map i.pulse{animation:none}}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function binderMap() {
+    const ev = obs.binderOn && obs.binderEvent && (!obs.binderEvent.endsAt || obs.binderEvent.endsAt > Date.now()) ? obs.binderEvent : null;
+    const slot = ev ? mySlot() : null;
+    const tiles = (slot && slot.data && slot.data.garden && slot.data.garden.tileObjects) || {};
+    const binders = [];
+    if (ev) {
+      for (let i = 0; i < 200; i += 1) {
+        const t = tiles[i] || tiles[String(i)];
+        if (t && Array.isArray(t.slots) && isBinderOf(t, ev.kind)) binders.push(i);
+      }
+    }
+    if (!ev || !binders.length) {
+      if (bBox && bBox.style.display !== 'none') {
+        bBox.style.display = 'none';
+        try { thunderMap(); } catch (err) { /* never in the way */ }
+      }
+      clearInterval(bTick);
+      bTick = null;
+      bLast = '';
+      return;
+    }
+    const C = B_COL[ev.kind];
+    if (!bBox) {
+      if (!document.getElementById('mg-binder-style')) binderMapStyle();
+      const m = miniMapBox('mg-binder-map');
+      bBox = m.box;
+      bHead = m.head;
+      bSum = m.sum;
+      bCells = m.cells;
+    }
+    // Each tile's state.
+    const near = new Set();
+    for (const b of binders) for (const n of ring(b)) near.add(n);
+    const now = Date.now();
+    const lit = `${ev.kind}lit`;
+    const bound = `${ev.kind}bound`;
+    const other = ev.kind === 'amber' ? /^dawn(lit|bound)$/ : /^amber(lit|bound)$/;
+    const count = { litIn: 0, litOut: 0, otherIn: 0, openIn: 0, bound: 0 };
+    // Each tile's state first (binder, open, lit, other, bound, plain, thing).
+    const states = [];
+    for (let i = 0; i < 200; i += 1) {
+      const t = tiles[i] || tiles[String(i)];
+      const inRing = near.has(i);
+      let s = 'thing';
+      let binderLit = false;
+      if (binders.includes(i)) s = 'binder';
+      else if (!t || typeof t !== 'object') s = 'open';
+      else if (Array.isArray(t.slots)) {
+        let hasLit = false;
+        let hasBound = false;
+        let hasOther = false;
+        for (const c of t.slots) {
+          if (!isCrop(c)) continue;
+          const end = Number(c.endTime);
+          if (Number.isFinite(end) && end > now) continue;
+          for (const m of c.mutations) {
+            const k = mutationKey(m);
+            if (k === lit) hasLit = true;
+            else if (k === bound) hasBound = true;
+            else if (other.test(k)) hasOther = true;
+          }
+        }
+        s = hasLit ? 'lit' : hasOther ? 'other' : hasBound ? 'bound' : 'plain';
+      }
+      if (s === 'binder' && Array.isArray(t.slots)) {
+        // Its own fruit binds too when it's beside another binder.
+        for (const c of t.slots) {
+          if (!isCrop(c)) continue;
+          const end = Number(c.endTime);
+          if (Number.isFinite(end) && end > now) continue;
+          if (c.mutations.some((m) => mutationKey(m) === lit)) binderLit = true;
+        }
+        if (binderLit && inRing) count.litIn += 1;
+      }
+      if (s === 'lit') count[inRing ? 'litIn' : 'litOut'] += 1;
+      else if (s === 'open' && inRing) count.openIn += 1;
+      else if (s === 'other' && inRing) count.otherIn += 1;
+      else if (s === 'bound') count.bound += 1;
+      states.push({ s, inRing, binderLit });
+    }
+    // The other moon's crops in a binder spot only need moving when there
+    // are more lit crops waiting than open binder spots for them (an
+    // Amberbound crop by a Dawnbinder is already worth more than Dawnbound
+    // would be).
+    const swap = count.litOut > count.openIn;
+    const looks = states.map(({ s, inRing, binderLit }) => {
+      let bg = '#18121f';
+      let glow = '';
+      let pulse = false;
+      let edge = inRing ? `inset 0 0 0 1.5px ${C.ring}` : '';
+      if (s === 'binder') {
+        bg = '#f3e8ff';
+        // Its own lit fruit: the lit glow (binding when it's beside another).
+        glow = binderLit ? C.glow : '#c084fc';
+        edge = binderLit ? `inset 0 0 0 2px ${C.lit}` : '';
+      } else if (s === 'open') {
+        if (inRing) {
+          bg = '#1f5a38';
+          glow = '#4ade80';
+        }
+      } else if (s === 'lit') {
+        bg = C.lit;
+        glow = C.glow;
+        pulse = !inRing;
+      } else if (s === 'other') {
+        // Its fill says what it is (the other moon's crop); anything that
+        // glows is in this event's colour.
+        bg = inRing && swap ? C.other : C.otherDim;
+        if (inRing && swap) {
+          glow = C.glow;
+          pulse = true;
+        }
+      } else if (s === 'bound') {
+        bg = C.bound;
+      } else if (s === 'plain') {
+        bg = inRing ? '#4b4060' : '#2b2436';
+      } else {
+        bg = '#2a2433';
+      }
+      return { bg, glow, pulse, edge };
+    });
+    const keyStr = JSON.stringify([ev.kind, looks]);
+    if (keyStr !== bLast) {
+      bLast = keyStr;
+      looks.forEach((l, i) => {
+        const cell = bCells[i];
+        cell.style.background = l.bg;
+        cell.style.setProperty('--g', l.glow || 'transparent');
+        cell.style.boxShadow = [l.edge, l.glow && !l.pulse ? `0 0 7px 1px ${l.glow}` : ''].filter(Boolean).join(',');
+        cell.className = l.pulse ? 'pulse' : '';
+        cell.style.position = l.glow ? 'relative' : '';
+        cell.style.zIndex = l.glow ? '1' : '';
+      });
+      const bits = [`${count.litIn} binding`];
+      if (count.litOut) bits.push(`${count.litOut} to move in`);
+      if (count.otherIn && swap) bits.push(`${count.otherIn} ${C.other_name} to swap out`);
+      if (count.openIn) bits.push(`${count.openIn} open spot${count.openIn === 1 ? '' : 's'}`);
+      bSum.textContent = bits.join(' · ');
+      const sw = (bg, glow, text, pulse) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${bg};${glow ? `box-shadow:0 0 5px 1px ${glow};` : ''}${pulse ? 'outline:1px dashed #fff;outline-offset:1px;' : ''}"></i>${text}</span>`;
+      bBox.lastChild.innerHTML = [
+        sw('#f3e8ff', '#c084fc', C.binder),
+        sw(C.lit, C.glow, `${C.name}lit (binding)`),
+        sw(C.lit, C.glow, 'move in', true),
+        sw(C.bound, '', `${C.name}bound`),
+        swap ? sw(C.other, C.glow, `${C.other_name} (swap out)`, true) : sw(C.otherDim, '', `${C.other_name} crops`),
+        sw('#1f5a38', '#4ade80', 'open spot'),
+      ].join('');
+    }
+    const left = ev.endsAt ? Math.max(0, Math.round((ev.endsAt - Date.now()) / 1000)) : null;
+    const title = `${C.title} · binder map`;
+    const tail = left != null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left` : '';
+    if (bHead.textContent !== title + tail) {
+      bHead.innerHTML = '';
+      const a = document.createElement('span');
+      a.textContent = title;
+      const b = document.createElement('span');
+      b.textContent = tail;
+      b.style.cssText = 'font-weight:600;color:#ffd35c;';
+      bHead.appendChild(a);
+      bHead.appendChild(b);
+    }
+    bBox.style.display = '';
+    placeMap(bBox);
+    if (!bTick) bTick = setInterval(() => { try { binderMap(); } catch (err) { /* never in the way */ } }, 1000);
+  }
+  /* The Thunderstruck finder (v0.53.8): while a pet with Thundercharger is
+   * out (the Thunder Wolf: it turns Thunderstruck crops near it into
+   * Thundercharged, x5 to x7) and there's a Thunderstruck crop left, a map in
+   * the corner like the binder map, showing where they are so the Wolf can
+   * be walked over (or the crops potted beside it). Thunderstruck plants
+   * glow electric lime, Thundercharged ones are a dim green (done), the rest
+   * quiet. It steps aside while the binder map is up (Amber and Dawn are
+   * short). Where the Wolf stands isn't drawn: pets' positions are in world
+   * coordinates, and how those line up with tiles isn't known yet. */
+  obs.thunderOn = true;
+  let tBox = null;
+  let tCells = null;
+  let tHead = null;
+  let tSum = null;
+  let tLast = '';
+  const T_COL = { struck: '#a3e635', charged: '#2f4a22', other: '#2b2436', open: '#18121f', thing: '#231d2c' };
+  function thunderPetOut(slot) {
+    const pets = (slot && slot.data && Array.isArray(slot.data.petSlots) && slot.data.petSlots) || [];
+    return pets.some((p) => p && Array.isArray(p.abilities) && p.abilities.some((a) => /thundercharger/i.test(String(a))));
+  }
+  function thunderMap() {
+    const binderUp = bBox && bBox.style.display !== 'none';
+    const riding = mBox && mBox.style.display !== 'none';
+    const slot = obs.thunderOn && !binderUp && !riding ? mySlot() : null;
+    const tiles = (slot && slot.data && slot.data.garden && slot.data.garden.tileObjects) || {};
+    const now = Date.now();
+    const looks = [];
+    let struck = 0;
+    let struckPlants = 0;
+    let charged = 0;
+    if (slot && thunderPetOut(slot)) {
+      for (let i = 0; i < 200; i += 1) {
+        const t = tiles[i] || tiles[String(i)];
+        let bg = T_COL.open;
+        let glow = '';
+        if (t && typeof t === 'object' && Array.isArray(t.slots)) {
+          let s = 0;
+          let c = 0;
+          for (const cr of t.slots) {
+            if (!isCrop(cr)) continue;
+            const end = Number(cr.endTime);
+            if (Number.isFinite(end) && end > now) continue;
+            for (const m of cr.mutations) {
+              const k = mutationKey(m);
+              if (k === 'thunderstruck') s += 1;
+              else if (k === 'thundercharged') c += 1;
+            }
+          }
+          struck += s;
+          charged += c;
+          if (s) {
+            struckPlants += 1;
+            bg = T_COL.struck;
+            glow = T_COL.struck;
+          } else bg = c ? T_COL.charged : T_COL.other;
+        } else if (t && typeof t === 'object') bg = T_COL.thing;
+        looks.push({ bg, glow });
+      }
+    }
+    if (!struck) {
+      if (tBox) tBox.style.display = 'none';
+      tLast = '';
+      return;
+    }
+    if (!tBox) {
+      const m = miniMapBox('mg-thunder-map');
+      tBox = m.box;
+      tHead = m.head;
+      tSum = m.sum;
+      tCells = m.cells;
+      const sw = (bg, gl, text) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${bg};${gl ? `box-shadow:0 0 5px 1px ${gl};` : ''}"></i>${text}</span>`;
+      m.key.innerHTML = [sw(T_COL.struck, T_COL.struck, 'Thunderstruck: bring the Wolf'), sw(T_COL.charged, '', 'Thundercharged'), sw(T_COL.other, '', 'other')].join('');
+      tHead.innerHTML = '<span>⚡ Thunderstruck finder</span><span class="mg-left" style="font-weight:600;color:#a3e635;"></span>';
+    }
+    const key = JSON.stringify(looks);
+    if (key !== tLast) {
+      tLast = key;
+      looks.forEach((l, i) => {
+        const cell = tCells[i];
+        cell.style.background = l.bg;
+        cell.style.boxShadow = l.glow ? `0 0 0 1px ${l.glow}, 0 0 8px 2px ${l.glow}` : '';
+        cell.style.position = l.glow ? 'relative' : '';
+        cell.style.zIndex = l.glow ? '1' : '';
+      });
+    }
+    tHead.lastChild.textContent = `${struck} left`;
+    tSum.textContent = `${struck} Thunderstruck crop${struck === 1 ? '' : 's'} on ${struckPlants} plant${struckPlants === 1 ? '' : 's'} · ${charged} Thundercharged. Keep your Thunder Wolf near the glowing ones.`;
+    tBox.style.display = '';
+    placeMap(tBox);
+  }
+  /* The riding map (v0.53.9): while you ride a pet with Dawn Capture (the
+   * Ostrich) or Amber Capture (the Phoenix), it takes those mutations off
+   * the crops near it and turns them into capsules (1 for lit, 2 for
+   * bound), and it goes where you go. The map shows what to ride over: the
+   * crops with that moon's mutations, bound ones brighter (2 capsules);
+   * the ones beside a binder of the other moon pulse, since capturing there
+   * also frees the spot (Dawn crops by a Moonbinder can then go Amberbound).
+   * The Thunderstruck finder steps aside while you ride. */
+  obs.mountOn = true;
+  let mBox = null;
+  let mCells = null;
+  let mHead = null;
+  let mSum = null;
+  let mLast = '';
+  const M_COL = {
+    // Only the Ostrich's spots are a clear win: Dawn crops by a Moonbinder
+    // can go Amberbound (x10) once the Dawn is off. The Phoenix's would be
+    // Amber crops by a Dawnbinder, and Amberbound (x10) beats Dawnbound (x7).
+    // Glow is for what's worth acting on: lit crops (cheap to capture) and
+    // the Ostrich's clear wins. Bound crops are a plain fill: two capsules,
+    // but the most value off the crop (Amberbound is x10).
+    dawn: { lit: '#d8b4fe', bound: '#8a6cb8', glow: '#c084fc', title: '🐦 Riding the Ostrich', name: 'Dawn', other: 'Moonbinder', otherKind: 'amber', win: true, boundNote: 'Dawnbound (2)' },
+    amber: { lit: '#ffb13b', bound: '#6b4a1e', glow: '#ffb13b', title: '🔥 Riding the Phoenix', name: 'Amber', other: 'Dawnbinder', otherKind: 'dawn', win: false, boundNote: 'Amberbound (2, loses ×10)' },
+  };
+  function findPet(slot, id) {
+    const d = (slot && slot.data) || {};
+    const pools = [d.petSlots, d.inventory && d.inventory.items];
+    for (const st of Object.values((d.inventory && d.inventory.storages) || {})) pools.push(st && st.items);
+    for (const pool of pools) {
+      for (const p of Array.isArray(pool) ? pool : []) if (p && p.id === id) return p;
+    }
+    return null;
+  }
+  // Which capture the ridden pet has: 'dawn', 'amber' or null.
+  function rideKind(slot) {
+    const id = slot && slot.riddenPetId;
+    if (!id) return null;
+    const pet = findPet(slot, id);
+    const abil = (pet && Array.isArray(pet.abilities) ? pet.abilities : []).join(' ');
+    if (/dawncapture/i.test(abil)) return 'dawn';
+    if (/ambercapture/i.test(abil)) return 'amber';
+    const sp = String((pet && (pet.petSpecies || pet.species)) || '');
+    if (/ostrich/i.test(sp)) return 'dawn';
+    if (/phoenix/i.test(sp)) return 'amber';
+    return null;
+  }
+  function mountMap() {
+    const slot = obs.mountOn ? mySlot() : null;
+    const kind = slot ? rideKind(slot) : null;
+    if (!kind) {
+      if (mBox) mBox.style.display = 'none';
+      mLast = '';
+      return;
+    }
+    const C = M_COL[kind];
+    const tiles = (slot.data && slot.data.garden && slot.data.garden.tileObjects) || {};
+    const now = Date.now();
+    const near = new Set();
+    for (let i = 0; i < 200; i += 1) {
+      const t = tiles[i] || tiles[String(i)];
+      if (t && Array.isArray(t.slots) && isBinderOf(t, C.otherKind)) for (const n of ring(i)) near.add(n);
+    }
+    const looks = [];
+    let crops = 0;
+    let caps = 0;
+    let freeing = 0;
+    for (let i = 0; i < 200; i += 1) {
+      const t = tiles[i] || tiles[String(i)];
+      let bg = '#18121f';
+      let glow = '';
+      let pulse = false;
+      if (t && typeof t === 'object' && Array.isArray(t.slots)) {
+        let lit = 0;
+        let bound = 0;
+        for (const cr of t.slots) {
+          if (!isCrop(cr)) continue;
+          const end = Number(cr.endTime);
+          if (Number.isFinite(end) && end > now) continue;
+          for (const m of cr.mutations) {
+            const k = mutationKey(m);
+            if (k === `${kind}lit`) lit += 1;
+            else if (k === `${kind}bound`) bound += 1;
+          }
+        }
+        if (lit || bound) {
+          crops += lit + bound;
+          caps += lit + bound * 2;
+          bg = lit ? C.lit : C.bound;
+          glow = lit ? C.glow : '';
+          if (C.win && near.has(i)) {
+            pulse = true;
+            glow = C.glow;
+            freeing += 1;
+          }
+        } else bg = '#2b2436';
+      } else if (t && typeof t === 'object') bg = '#231d2c';
+      looks.push({ bg, glow, pulse });
+    }
+    if (!mBox) {
+      if (!document.getElementById('mg-binder-style')) binderMapStyle();
+      const m = miniMapBox('mg-mount-map');
+      mBox = m.box;
+      mHead = m.head;
+      mSum = m.sum;
+      mCells = m.cells;
+    }
+    const key = JSON.stringify([kind, looks]);
+    if (key !== mLast) {
+      mLast = key;
+      looks.forEach((l, i) => {
+        const cell = mCells[i];
+        cell.style.background = l.bg;
+        cell.style.setProperty('--g', l.glow || 'transparent');
+        cell.style.boxShadow = l.glow && !l.pulse ? `0 0 0 1px ${l.glow}, 0 0 7px 1px ${l.glow}` : '';
+        cell.className = l.pulse ? 'pulse' : '';
+        cell.style.position = l.glow ? 'relative' : '';
+        cell.style.zIndex = l.glow ? '1' : '';
+      });
+      const sw = (bg, gl, text, pulse) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${bg};${gl ? `box-shadow:0 0 5px 1px ${gl};` : ''}${pulse ? 'outline:1px dashed #fff;outline-offset:1px;' : ''}"></i>${text}</span>`;
+      mBox.lastChild.innerHTML = [sw(C.lit, C.glow, `${C.name}lit (1 capsule)`), sw(C.bound, '', C.boundNote), C.win ? sw(C.bound, C.glow, `by a ${C.other}: can go Amberbound`, true) : '', sw('#2b2436', '', 'nothing to capture')].join('');
+      mHead.innerHTML = '';
+      const a = document.createElement('span');
+      a.textContent = C.title;
+      const b = document.createElement('span');
+      b.textContent = `${caps} capsule${caps === 1 ? '' : 's'}`;
+      b.style.cssText = `font-weight:600;color:${C.glow};`;
+      mHead.appendChild(a);
+      mHead.appendChild(b);
+      mSum.textContent = crops
+        ? `${crops} ${C.name} crop${crops === 1 ? '' : 's'} to ride over; capturing takes the ${C.name} off the crop.${freeing ? ` The ${freeing} pulsing, by a ${C.other}, can then go Amberbound.` : ''}`
+        : `No ${C.name} crops in your garden to capture.`;
+    }
+    mBox.style.display = '';
+    placeMap(mBox);
+  }
+  obs.setMountMap = function setMountMap(on) {
+    obs.mountOn = on !== false;
+    try {
+      mountMap();
+      thunderMap();
+    } catch (err) {
+      /* never in the way */
+    }
+  };
+  obs.setThunderMap = function setThunderMap(on) {
+    obs.thunderOn = on !== false;
+    try {
+      thunderMap();
+    } catch (err) {
+      /* never in the way */
+    }
+  };
+
+  // A corner map's box (the binder map and the Thunderstruck finder share
+  // one look): a header, a line of counts, the 20 x 10 grid with the gap
+  // between the two sides, and a key. Placed above the open-spot map.
+  function miniMapBox(id) {
+    const box = document.createElement('div');
+    box.id = id;
+    box.setAttribute('aria-hidden', 'true');
+    box.style.cssText = 'pointer-events:none;background:rgba(18,12,26,.9);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 10px 7px;'
+      + 'font:11.5px/1.3 system-ui,sans-serif;color:#eee;box-shadow:0 6px 20px rgba(0,0,0,.45);max-width:320px;';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:12.5px;margin-bottom:3px;';
+    const sum = document.createElement('div');
+    sum.style.cssText = 'color:#ddd;margin-bottom:6px;';
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(10,12px) 9px repeat(10,12px);grid-auto-rows:12px;gap:2px;';
+    const cells = [];
+    for (let r = 0; r < 10; r += 1) {
+      for (let c = 0; c < 21; c += 1) {
+        const cell = document.createElement('i');
+        cell.style.cssText = c === 10 ? 'display:block;' : 'display:block;border-radius:2px;background:#18121f;';
+        grid.appendChild(cell);
+        if (c !== 10) cells.push(cell);
+      }
+    }
+    const key = document.createElement('div');
+    key.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;color:#ccc;font-size:10.5px;';
+    box.appendChild(head);
+    box.appendChild(sum);
+    box.appendChild(grid);
+    box.appendChild(key);
+    dockMap(box);
+    makeMovable(box, head);
+    placeMap(box);
+    return { box, head, sum, cells, key };
+  }
+
+  /* Moving the corner maps (v0.53.9): drag one by its header to put it
+   * anywhere; double-click the header to send it back to the corner. Only
+   * the header takes the mouse (the map itself stays click-through, so it
+   * never blocks the game). Where each one sits is kept as a share of the
+   * window (so a resize doesn't lose it) and saved by the app. */
+  obs.mapPos = {};
+  let dragging = null;
+  function dockMap(box) {
+    box.style.position = '';
+    box.style.left = '';
+    box.style.top = '';
+    box.style.zIndex = '';
+    const corner = cornerStack();
+    const spot = document.getElementById('mg-spot-map');
+    if (spot && spot.parentNode === corner) corner.insertBefore(box, spot);
+    else corner.appendChild(box);
+  }
+  function floatMap(box, x, y) {
+    if (box.parentNode !== document.body) document.body.appendChild(box);
+    const w = box.offsetWidth || 300;
+    const h = box.offsetHeight || 240;
+    box.style.position = 'fixed';
+    box.style.left = `${Math.round(Math.max(0, Math.min(window.innerWidth - w, x)))}px`;
+    box.style.top = `${Math.round(Math.max(0, Math.min(window.innerHeight - h, y)))}px`;
+    box.style.zIndex = '2147483000';
+  }
+  // Where it was left, if it was moved (kept in view if the window shrank).
+  function placeMap(box) {
+    if (dragging && dragging.box === box) return;
+    const p = obs.mapPos[box.id];
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) floatMap(box, p.x * window.innerWidth, p.y * window.innerHeight);
+    else if (box.style.position === 'fixed') dockMap(box);
+  }
+  function makeMovable(box, handle) {
+    handle.style.pointerEvents = 'auto';
+    handle.style.cursor = 'grab';
+    handle.style.userSelect = 'none';
+    handle.title = 'Drag to move · double-click to put it back in the corner';
+    // While dragging, the whole window follows the pointer (and the game
+    // doesn't see those moves); the header alone would lose it the moment
+    // the pointer left it.
+    const move = (e) => {
+      if (!dragging || dragging.box !== box) return;
+      e.preventDefault();
+      e.stopPropagation();
+      floatMap(box, e.clientX - dragging.dx, e.clientY - dragging.dy);
+    };
+    const end = (e) => {
+      if (!dragging || dragging.box !== box) return;
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      dragging = null;
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', end, true);
+      window.removeEventListener('pointercancel', end, true);
+      handle.style.cursor = 'grab';
+      const r = box.getBoundingClientRect();
+      obs.mapPos[box.id] = { x: r.left / window.innerWidth, y: r.top / window.innerHeight };
+      send('mapPos', { id: box.id, x: obs.mapPos[box.id].x, y: obs.mapPos[box.id].y });
+    };
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const r = box.getBoundingClientRect();
+      dragging = { box, dx: e.clientX - r.left, dy: e.clientY - r.top };
+      handle.style.cursor = 'grabbing';
+      floatMap(box, r.left, r.top);
+      window.addEventListener('pointermove', move, true);
+      window.addEventListener('pointerup', end, true);
+      window.addEventListener('pointercancel', end, true);
+    });
+    handle.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      delete obs.mapPos[box.id];
+      dockMap(box);
+      send('mapPos', { id: box.id, x: null, y: null });
+    });
+  }
+  obs.setMapPositions = function setMapPositions(p) {
+    obs.mapPos = p && typeof p === 'object' ? Object.assign({}, p) : {};
+    for (const id of ['mg-binder-map', 'mg-thunder-map', 'mg-mount-map']) {
+      const b = document.getElementById(id);
+      if (b) placeMap(b);
+    }
+  };
+  window.addEventListener('resize', () => {
+    for (const id of ['mg-binder-map', 'mg-thunder-map', 'mg-mount-map']) {
+      const b = document.getElementById(id);
+      if (b && b.style.position === 'fixed') placeMap(b);
+    }
+  });
+  obs.setBinderMap = function setBinderMap(p) {
+    const x = p && typeof p === 'object' ? p : {};
+    obs.binderOn = x.on !== false;
+    const e = x.event;
+    obs.binderEvent = e && (e.kind === 'amber' || e.kind === 'dawn') ? { kind: e.kind, endsAt: Number(e.endsAt) || null } : null;
+    try {
+      binderMap();
+    } catch (err) {
+      /* never in the way */
+    }
+  };
   // The bottom-right corner: the money box on top, the hand map below it.
   let corner = null;
   function cornerStack() {
@@ -1414,12 +2088,32 @@
       cornerStack().insertBefore(hudBox, cornerStack().firstChild);
     }
     while (hudBox.firstChild) hudBox.removeChild(hudBox.firstChild);
+    // A line can count down: "{t}" in its text is the time left until `at`,
+    // ticking every second here (no need to hear from the app for that).
+    const counters = [];
     for (const l of data.lines.slice(0, 6)) {
       const row = document.createElement('div');
-      row.textContent = String((l && l.text) || l || '').slice(0, 90);
+      const text = String((l && l.text) || l || '').slice(0, 90);
       if (l && l.strong) row.style.fontWeight = '600';
+      if (l && l.big) row.style.fontSize = '14px';
+      if (l && l.faint) row.style.opacity = '.75';
+      if (l && Number(l.at) > 0 && text.includes('{t}')) counters.push({ row, text, at: Number(l.at) });
+      else row.textContent = text;
       hudBox.appendChild(row);
     }
+    const fmt = (ms) => {
+      const s = Math.max(0, Math.round(ms / 1000));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const ss = String(s % 60).padStart(2, '0');
+      return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+    };
+    const tick = () => {
+      for (const c of counters) c.row.textContent = c.text.replace('{t}', fmt(c.at - Date.now()));
+    };
+    clearInterval(obs.hudTicker);
+    obs.hudTicker = counters.length ? setInterval(tick, 1000) : null;
+    tick();
     hudBox.style.display = '';
   };
 
@@ -1455,6 +2149,57 @@
     if (lock && typeof lock.lockField === 'string' && LOCK_FIELDS.includes(lock.lockField)) obs.lockField = lock.lockField;
     lockBadge();
     return obs.harvestLock;
+  };
+
+  /* ---------------------------------------------------------------- *
+   * "You're about to step out for upcoming weather": a 20-second card with
+   * Confirm (step out now) and Ignore (stay in for this one). No answer:
+   * the app steps out when the countdown ends. Screen only.
+   * ---------------------------------------------------------------- */
+
+  let stepTimer = null;
+  obs.showStepOut = function showStepOut(info) {
+    obs.hideStepOut();
+    if (!document.body || !info) return;
+    const box = document.createElement('div');
+    box.id = '__mgStepOut';
+    box.style.cssText = 'position:fixed;left:50%;top:22px;transform:translateX(-50%);z-index:2147483647;background:rgba(42,27,54,.97);color:#f6f1f8;font:14px system-ui,sans-serif;padding:14px 18px;border-radius:14px;border:1px solid rgba(255,255,255,.2);box-shadow:0 10px 40px rgba(0,0,0,.45);text-align:center;min-width:300px;';
+    const title = document.createElement('div');
+    title.style.cssText = 'font-weight:700;font-size:15px;margin-bottom:4px;';
+    title.textContent = `${info.emoji || '🌦️'} You're about to step out for upcoming ${info.label || 'weather'}`;
+    const line = document.createElement('div');
+    line.style.cssText = 'opacity:.85;margin-bottom:10px;';
+    const row = document.createElement('div');
+    const button = (label, act, main) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'margin:0 4px;padding:7px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.2);cursor:pointer;font:600 13px system-ui,sans-serif;' +
+        (main ? 'background:#47624c;color:#eafbec;' : 'background:transparent;color:#f6f1f8;');
+      b.dataset.act = act;
+      b.addEventListener('click', () => {
+        send('stepOut', { act });
+        obs.hideStepOut();
+      });
+      return b;
+    };
+    row.appendChild(button('Confirm', 'confirm', true));
+    row.appendChild(button('Ignore', 'ignore', false));
+    box.appendChild(title);
+    box.appendChild(line);
+    box.appendChild(row);
+    document.body.appendChild(box);
+    const tick = () => {
+      const left = Math.max(0, Math.round((info.until - Date.now()) / 1000));
+      line.textContent = left > 0 ? `Stepping out in ${left}s, unless you press Ignore.` : 'Stepping out…';
+    };
+    tick();
+    stepTimer = setInterval(tick, 500);
+  };
+  obs.hideStepOut = function hideStepOut() {
+    clearInterval(stepTimer);
+    stepTimer = null;
+    const old = document.getElementById('__mgStepOut');
+    if (old) old.remove();
   };
 
   /* ---------------------------------------------------------------- *
@@ -1910,6 +2655,21 @@
       lastSaleCheck: obs.lastSaleCheck || null,
       // One example of each kind of thing in the bag (field names, short
       // values), so the sale guard's reading of the bag can be checked.
+      tileShapes: (() => {
+        try {
+          const tiles = (slot && slot.data && slot.data.garden && slot.data.garden.tileObjects) || {};
+          const out = {};
+          for (const o of Object.values(tiles)) {
+            if (!o || typeof o !== 'object') continue;
+            const kind = String(o.objectType || 'unknown').slice(0, 20);
+            if (out[kind]) continue;
+            out[kind] = Object.assign(shape(o, 3), { __seenAs: tileKind(o) });
+          }
+          return out;
+        } catch (err) {
+          return 'error';
+        }
+      })(),
       inventoryShapes: (() => {
         try {
           const inv = (slot && slot.data && slot.data.inventory) || {};

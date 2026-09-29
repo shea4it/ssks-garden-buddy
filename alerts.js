@@ -11,16 +11,17 @@ const weather = require('./weather');
 // Order matters: the first rule that matches an item wins, and alerts that
 // fire together are announced in this order.
 //
-// tier decides the sound:
-//   legendary  siren, fanfare, announcement twice      (the biggest)
-//   epic       shorter siren, fanfare, announcement
-//   big        fanfare, announcement
-//   alarm      klaxon and an excited voice
-//   named      chime, "<name> alert!"
-//   basic      soft ding, short announcement
+// tier is how big the alert is (the Alerts tab calls it the level):
+//   legendary  "Biggest": long siren, fanfare, announced twice
+//   epic       "Huge":    short siren, fanfare, announced twice
+//   big        "Big":     fanfare, announced
+//   named      "Callout": chime, announced
+//   basic      "Gentle":  soft ding, said once
+// Every item alert's level can be changed in the Alerts tab
+// (settings.alerts.levels, by rule id); `tier` here is the starting level.
+// `sound` is an item's own attention sound, used in place of the level's:
+// klaxon (Starweaver), egg (eggs), sunrise (Sunflower).
 //
-// Item rules match the start of the item's name or id, ignoring spaces and
-// case, so "firepit" matches "Fire Pit" and "dawnbinder" matches "Dawnbinder Pod".
 const RULES = [
   // ids: what the game itself calls the item (its species id), matched
   // exactly as well as the name, so a renamed shop entry can't slip past.
@@ -29,19 +30,19 @@ const RULES = [
   { id: 'dawnbreaker', label: 'Dawnbreaker', kind: 'item', match: 'dawnbreaker', tier: 'big' },
   { id: 'emberbloom', label: 'Emberbloom', kind: 'item', match: 'emberbloom', tier: 'big' },
   { id: 'thunderspire', label: 'Thunderspire', kind: 'item', match: 'thunderspire', ids: ['ThunderCelestial'], tier: 'big' },
-  { id: 'mythicalegg', label: 'Mythical Egg', kind: 'item', match: 'mythicalegg', tier: 'big' },
-  { id: 'amberegg', label: 'Amber Egg', kind: 'item', match: 'amberegg', ids: ['AmberEgg'], tier: 'big' },
-  { id: 'starweaver', label: 'Starweaver', kind: 'item', match: 'starweaver', tier: 'alarm' },
+  { id: 'mythicalegg', label: 'Mythical Egg', kind: 'item', match: 'mythicalegg', tier: 'big', sound: 'egg' },
+  { id: 'amberegg', label: 'Amber Egg', kind: 'item', match: 'amberegg', ids: ['AmberEgg'], tier: 'big', sound: 'egg' },
+  { id: 'starweaver', label: 'Starweaver', kind: 'item', match: 'starweaver', tier: 'epic', sound: 'klaxon' },
   { id: 'windturner', label: 'Windturner', kind: 'item', match: 'windturner', tier: 'named' },
   { id: 'firepit', label: 'Firepit', kind: 'item', match: 'firepit', tier: 'named' },
   // Late game's must-have.
   { id: 'xppotion', label: 'XP Potion', kind: 'item', match: 'xppotion', tier: 'named' },
   // Everyone gets excited about these. They shouldn't. They deserve a spot.
-  { id: 'sunflower', label: 'Sunflower', kind: 'item', match: 'sunflower', tier: 'basic' },
+  { id: 'sunflower', label: 'Sunflower', kind: 'item', match: 'sunflower', tier: 'basic', sound: 'sunrise' },
   { id: 'ube', label: 'Ube', kind: 'item', match: 'ube', tier: 'basic' },
   { id: 'milkcap', label: 'Milkcap', kind: 'item', match: 'milkcap', tier: 'basic' },
   { id: 'marigold', label: 'Marigold', kind: 'item', match: 'marigold', tier: 'basic' },
-  { id: 'legendaryegg', label: 'Legendary Egg', kind: 'item', match: 'legendaryegg', tier: 'basic' },
+  { id: 'legendaryegg', label: 'Legendary Egg', kind: 'item', match: 'legendaryegg', tier: 'basic', sound: 'egg' },
   { id: 'decor', label: 'Decor over 500M', kind: 'decor', minPrice: 500000000, tier: 'named' },
 
   { id: 'thunder', label: 'Thunder', kind: 'weather', pattern: /thunder/i, tier: 'weather' },
@@ -63,7 +64,13 @@ const RULES = [
   { id: 'luckprimed', label: 'Bad Luck Protection is primed', kind: 'pet', tier: 'pet' },
 ];
 
-const CUSTOM_TIERS = new Set(['basic', 'named', 'big', 'epic', 'legendary', 'alarm']);
+// The levels an item alert can have, smallest first.
+const LEVELS = ['basic', 'named', 'big', 'epic', 'legendary'];
+// Before v0.50 there was an "alarm" level (a klaxon and a squeaky voice).
+function levelOf(tier, fallback) {
+  if (tier === 'alarm') return 'epic';
+  return LEVELS.includes(tier) ? tier : fallback;
+}
 
 // Don't announce the same weather twice within this window. Events run about
 // ten minutes, and the shop opening and the weather starting are the same event.
@@ -104,18 +111,29 @@ function customRules(settings) {
       label: c.name,
       kind: 'item',
       match: c.name,
-      tier: CUSTOM_TIERS.has(c.tier) ? c.tier : 'basic',
+      // Picked from the list: the game's own id matches it exactly too.
+      ids: c.itemId ? [String(c.itemId)] : undefined,
+      tier: levelOf(c.tier, 'named'),
+      defaultTier: 'named',
       custom: true,
     }));
 }
 
+// The built-in rules with your own levels applied, then your own items.
 function allRules(settings) {
-  return [...RULES, ...customRules(settings)];
+  const levels = (settings.alerts && settings.alerts.levels) || {};
+  const builtIn = RULES.map((r) => {
+    if (r.kind !== 'item' && r.kind !== 'decor') return r;
+    const tier = levelOf(levels[r.id], r.tier);
+    return Object.assign({}, r, { tier, defaultTier: r.tier });
+  });
+  return [...builtIn, ...customRules(settings)];
 }
 
 function publicRules(settings) {
-  return allRules(settings).map(({ id, label, kind, tier, custom }) => ({
-    id, label, kind, tier, custom: Boolean(custom),
+  return allRules(settings).map(({ id, label, kind, tier, defaultTier, sound, match, ids, custom }) => ({
+    id, label, kind, tier, defaultTier: defaultTier || tier, sound: sound || null,
+    match: match || null, ids: ids || null, custom: Boolean(custom),
   }));
 }
 
@@ -206,6 +224,7 @@ function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
         fired.push({
           ruleId: rule.id,
           tier: rule.tier,
+          sound: rule.sound || null,
           kind: rule.kind,
           label: rule.label,
           itemName: item.name,
@@ -418,8 +437,23 @@ function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
     return out;
   }
 
+  // Every item every shop lists (in stock or not), for the Alerts tab's
+  // "pick from the list". Weather shops only list while they're open.
+  function listed() {
+    const out = [];
+    for (const [shopId, shop] of Object.entries((state.last && state.last.shops) || {})) {
+      for (const it of shop && Array.isArray(shop.items) ? shop.items : []) {
+        if (!it || !(it.itemId || it.name)) continue;
+        const price = Number(it.coinPrice);
+        out.push({ itemId: String(it.itemId || ''), name: String(it.name || it.itemId), type: String(it.itemType || ''), price: price > 0 ? price : null, shop: shopId });
+      }
+    }
+    return out;
+  }
+
   return {
     current,
+    listed,
     start() {
       if (state.running) return;
       state.running = true;
@@ -443,4 +477,4 @@ function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
   };
 }
 
-module.exports = { RULES, createWatcher, publicRules, allRules, inQuietHours, nameMatches, nameKeys, keysMatch };
+module.exports = { RULES, LEVELS, levelOf, createWatcher, publicRules, allRules, inQuietHours, nameMatches, nameKeys, keysMatch };

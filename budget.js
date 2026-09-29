@@ -68,6 +68,8 @@ const CAT_INFO = {
 };
 // The game's own ids for the celestial plants, and their names.
 const CELESTIAL = /celestial|moonbinder|dawnbinder|thunderspire|starweaver/i;
+// Wants that turn up again and again in the forecast: the celestial plants.
+const RECURRING = /celestial|moonbinder|dawnbinder|dawnbreaker|emberbloom|thunderspire|starweaver/i;
 
 function categoryOf({ type, shop, id, name }) {
   if (CELESTIAL.test(String(id || '')) || CELESTIAL.test(String(name || ''))) return 'celestials';
@@ -1193,7 +1195,18 @@ function foresightOf(settings, ctx, extra, now) {
     const t = 1 / r.perDay;
     wants.push({ ruleId: id, label: rule.label, name, price, pri, t, at: now + t * D_MS, gapDays: t, shop: r.shop || null });
   });
-  const events = wants.slice().sort((a, b) => a.t - b.t);
+  // Celestials keep coming back: each is also expected every gap after its
+  // first appearance, up to the edge of the forecast (the edge is set by
+  // the first appearances, so repeats never stretch it).
+  const edge = Math.max(0, ...wants.map((w) => w.t), harvest ? harvest.t : 0, mode === 'estimate' && Number.isFinite(tFull) ? Math.min(tFull, 21) : 0) * 1.06;
+  const repeats = [];
+  for (const w of wants) {
+    if (!RECURRING.test(w.ruleId) || !(w.gapDays > 0)) continue;
+    for (let k = 1, t = w.t + w.gapDays; t <= edge && k <= 20; k += 1, t += w.gapDays) {
+      repeats.push(Object.assign({}, w, { t, at: now + t * D_MS, repeat: k }));
+    }
+  }
+  const events = wants.concat(repeats).sort((a, b) => a.t - b.t);
   // The known harvest pays out when it's due; your usual pace (which is
   // what those cycles average to) carries on after it. Before it, growth
   // is the harvest itself, so it isn't counted twice.
@@ -1234,6 +1247,13 @@ function foresightOf(settings, ctx, extra, now) {
   const short = events.filter((e) => e.status === 'short');
   const tradeoffs = events.filter((e) => e.status === 'tradeoff');
   const safe = short.length ? 0 : Math.max(0, Math.min(W - extra, ...ready.map((e) => e.slack)));
+  // What's holding safe-to-spend down, to say it in words: the want where
+  // you'd have the least left over (if that's less than you have now).
+  let binding = null;
+  if (!short.length && ready.length) {
+    const tight = ready.reduce((m, e) => (!m || e.slack < m.slack ? e : m), null);
+    if (tight && tight.slack < W - extra) binding = { label: tight.label, ruleId: tight.ruleId, at: tight.at, keep: W - extra - safe };
+  }
   // How much faster you'd need to grow to catch the most important short want.
   let needMore = null;
   const worst = short.slice().sort((a, b) => a.pri - b.pri)[0];
@@ -1322,6 +1342,8 @@ function foresightOf(settings, ctx, extra, now) {
     unknown,
     safeToSpend: safe,
     signal,
+    binding,
+    readyCrops: parts.ready,
     needMore,
     horizonDays: horizon,
     cashAtEnd: cashAt(horizon, spent),
@@ -1336,10 +1358,19 @@ function whatIf(settings, ctx, price, now = Date.now()) {
 function whatIfOf(settings, ctx, price, now) {
   const base = foresight(settings, ctx, 0, now);
   const after = foresight(settings, ctx, Math.max(0, Number(price) || 0), now);
-  const lost = after.events.filter((e) => {
-    const was = base.events.find((b) => b.ruleId === e.ruleId);
+  // Each appearance against the same appearance before (celestials come
+  // back); each want listed once, at its first lost appearance.
+  const key = (e) => `${e.ruleId}#${e.repeat || 0}`;
+  const before = new Map(base.events.map((e) => [key(e), e]));
+  const lostAll = after.events.filter((e) => {
+    const was = before.get(key(e));
     return was && was.status === 'ready' && e.status !== 'ready';
-  }).map((e) => ({ label: e.label, status: e.status, short: e.short || null, at: e.at, costs: e.costs || null }));
+  });
+  const lost = [];
+  for (const e of lostAll) {
+    if (lost.some((l) => l.ruleId === e.ruleId)) continue;
+    lost.push({ ruleId: e.ruleId, label: e.label, status: e.status, short: e.short || null, at: e.at, costs: e.costs || null, times: lostAll.filter((x) => x.ruleId === e.ruleId).length });
+  }
   // Already short for something you want? Then any spending makes that
   // shortfall deeper: say how much, for the most important one.
   let deepens = null;
@@ -1384,39 +1415,6 @@ function seedWants(settings) {
   return true;
 }
 
-// The lines of the money box shown over the game.
-function hudLines(v, fmt) {
-  const n = fmt || ((x) => String(Math.round(x)));
-  const p = v.plan;
-  const lines = [];
-  const gp = v.foresight && v.foresight.garden;
-  if (p.wallet != null) lines.push({ text: `💰 ${n(p.wallet)}${gp && gp.ready > 0 ? ` + ${n(gp.ready)} ready` : ' in the bank'}`, strong: true });
-  const t = p.items.find((i) => i.ruleId === p.target);
-  // No saving-target / plan line on the overlay (taken off at the owner's request).
-  void t;
-  const fs = v.foresight;
-  if (fs && fs.signal !== 'wait') {
-    const sig = { open: '🟢 Open to spend', careful: '🟡 Careful', save: '🔴 Save' }[fs.signal];
-    lines.push({ text: `${sig} · safe to spend ${n(fs.safeToSpend)}`, strong: true });
-  } else if (p.free != null) {
-    lines.push({ text: `Free to spend: ${n(p.free)}`, strong: true });
-  }
-  if (t && p.delayHoursPerB != null) lines.push({ text: `1B spent now = ${t.label} ~${fmtHoursShort(p.delayHoursPerB)} later` });
-  return lines;
-}
-
-function fmtDaysShort(d) {
-  if (d < 1 / 24) return 'under an hour';
-  if (d < 1) return `${Math.max(1, Math.round(d * 24))} h`;
-  if (d < 14) return `${Math.round(d)} day${Math.round(d) === 1 ? '' : 's'}`;
-  if (d < 60) return `${Math.round(d / 7)} weeks`;
-  return `${Math.round(d / 30)} months`;
-}
-function fmtHoursShort(h) {
-  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
-  if (h < 48) return `${Math.round(h)} h`;
-  return `${Math.round(h / 24)} days`;
-}
 
 /* ---------------------------------------------------------------- *
  * Where the coins go: spending by category against what you earn
@@ -1778,4 +1776,4 @@ function buildView({ settings, now, ctx }) {
   };
 }
 
-module.exports = { KNOWN, CATS, CAT_INFO, CELESTIAL, STAGES, DEFAULT_WANTS, ICONS, DECOR, everything, pastMoney, cropStage, gardenParts, harvestCycles, predictHarvest, maturingRate, procRate, estimate, foresight, whatIf, seedWants, categoryOf, netWorthSeries, growth, engine, split, stage, SHOP_KINDS, BASELINE, shopKind, emptyStats, migrateStats, record, recordMoney, flows, daily, verdict, migratePurchases, itemOfCommand, resetPurchases, PURCHASES_VERSION, recordPurchase, patterns, rate, afford, planIds, setPlan, nextOpening, plan, hudLines, categories, options, setOptions, view };
+module.exports = { KNOWN, CATS, CAT_INFO, CELESTIAL, STAGES, DEFAULT_WANTS, ICONS, DECOR, everything, pastMoney, cropStage, gardenParts, harvestCycles, predictHarvest, maturingRate, procRate, estimate, foresight, whatIf, seedWants, categoryOf, netWorthSeries, growth, engine, split, stage, SHOP_KINDS, BASELINE, shopKind, emptyStats, migrateStats, record, recordMoney, flows, daily, verdict, migratePurchases, itemOfCommand, resetPurchases, PURCHASES_VERSION, recordPurchase, patterns, rate, afford, planIds, setPlan, nextOpening, plan, categories, options, setOptions, view };

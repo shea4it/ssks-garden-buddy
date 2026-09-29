@@ -3,6 +3,11 @@
 Everything the app does, tab by tab. New here? Start with the
 [README](README.md) for downloading and installing.
 
+**Every chart reads out its numbers:** move the mouse over any chart (Spend
+or save, Growth, Garden worth over time, Gold & Rainbow) and a dashed guide
+follows it, with a dot on each line and a little box saying exactly what each
+line is at that point, and when.
+
 ## Where things are
 
 The panel sits on the right of the game window. **Ctrl+Shift+D** hides it
@@ -27,7 +32,9 @@ and how wide it is are in Extras, under **Panel**.
   (what you're saving for, how far along, when its shop next opens), **can
   your garden afford this** (each alerted item, yes or no), **where your
   coins go** (by kind, with your room to spend), **your buying patterns**,
-  and the **money box** over the game.
+  and the **money box** over the game (bottom right, Ctrl+Shift+B): your net
+  worth (coins + garden) and the next weather with a live countdown (or how
+  long the weather that's on has left).
 - **🐾 Pets**: what your team is doing right now, each pet's strength and
   abilities in plain words, **the best pets you own for any goal**, your saved
   teams side by side, food, and what each pet has earned you.
@@ -37,7 +44,9 @@ and how wide it is are in Extras, under **Panel**.
   player counts and a Join button.
 - **🧰 Extras** (Ctrl+Shift+S): the **seed deleter**, anti-AFK, any other
   scripts, **🛠 Troubleshooting** (tucked away at the bottom: the "Save a
-  sample" button and the technical details a bug report may need),
+  sample" button and the technical details a bug report may need; if an
+  alert ever doesn't go off, save a sample right away: it records what
+  happened to each of the last alerts),
   and **Just for fun**: confetti, a disco with spotlights and a mirror
   ball, a spin, a glitch, and more. They're only on your screen; nothing is
   sent to the game.
@@ -52,65 +61,137 @@ window, closing that just hides it; alerts keep playing either way.
 
 ## Alerts
 
-**Play alerts on** (in Alerts) sends every alert, voice included, to the
-speaker you pick, like the house speaker, while the game stays on your
-laptop. If that speaker is off or unplugged, alerts play on the default one
-and switch back by themselves when it returns. **Test this speaker** checks
-it.
-
-Chimes and the voice have their own volume sliders, so you can have a loud
-cash register and a quiet voice, or the other way round. Both are separate
-from the game. Mute the game in its own settings and
-alerts still come through at whatever level you set here.
-
 Alerts check the official Magic Garden shop feed a few seconds after every
 restock. They only tell you; you do the buying.
 
+The card at the top of the Alerts tab shows every clock as a box, all
+counting down: the weather that's on (time left, and when it ends
+underneath), the next two weather events (time until they start, and the
+actual time underneath), and each shop's restock countdown.
+
+### Sound and voice
+
+- **Volume**: one slider for everything, separate from the game. Mute the
+  game in its own settings and alerts still come through. When you let go
+  of the slider you hear a chime and the voice at that level.
+- **Voice**: pick one card. ▶ plays a sample; a voice that isn't on your
+  computer yet has a **Download** button (once; after that it works
+  offline). Tapping a card switches to it and says a line.
+  - **Leah** (American, woman): the clearest. Start here.
+  - **Cori** (British, woman): a warm audiobook narrator.
+  - **Alan** (British, man): calm and steady.
+  - **Alba** (Scottish, woman): a soft lilt, a smaller download.
+  - **Computer voice**: built in, nothing to download, but flatter.
+  - **No voice**: just the sounds.
+- **Sound effects**: **Full**, **Soft** (the chimes and fanfares quieter
+  under the voice) or **Off** (voice only; the thunder, rain and cash
+  register alerts then say what happened instead, in a whole sentence).
+- **Speaking pace**: **Slow and clear** (the default: a little slower, with
+  longer pauses between sentences, easier across a room) or **Normal**.
+- **▶ Hear a sample alert** plays a Big alert with your settings.
+
+Under **Speaker, quiet hours and more**:
+
+- **Play alerts on** sends every alert, voice included, to the speaker you
+  pick, like the house speaker, while the game stays on your laptop. If that
+  speaker is off or unplugged, alerts play on the default one and switch
+  back by themselves when it returns. **Test this speaker** checks it.
+- **Quiet the game while an alert speaks** (on): the game's own sound goes
+  quiet for the length of the alert, so the voice isn't fighting the music.
+- **Keep speaker awake** (on) stops Bluetooth speakers like an Echo from
+  dozing off between alerts, so they don't announce "Now playing from…"
+  over your next alert. It sends a signal far too low to hear.
+- **Pop-up notifications** and **Quiet hours**.
+
+Every announcement is built the same way so it's easy to catch: the name
+first, on its own, then one short sentence. "Moonbinder! Moonbinder is in
+the shop." The bigger the alert, the more it's repeated. A playful line
+only ever comes after the news ("Sunflower is in the shop. Stay calm,
+everyone."). Made-up names are spelled out for the voice so they come out
+right ("Ember bloom", "Oobay" for Ube, "X P Potion"). The voice is
+levelled to land a little louder than the sound before it. Each voice
+also gets its own light tone adjustment, measured line by line: the ones
+with a slight synthetic fizz in the treble have it trimmed, so a small or
+Bluetooth speaker doesn't make them sound distorted. The downloaded voices
+never say a line exactly the same way twice; each one's randomness is set
+so it very rarely cracks into a squeak (Leah, the most expressive, used to on
+about one alert in three). "!" is read as a full stop, which came across
+more clearly, and the start and end of every line fade in and out over a
+few milliseconds so nothing clicks.
+
+If you used Ryan (0.50.0 and 0.50.1): he was replaced by Alan, who tested
+much steadier. The Alerts tab says so once and offers Alan's download.
+
+**Alerts that come together are one announcement.** When several go off at
+once (an Amber shop with five things in it), you hear the shop's chime once,
+one set of sounds at the biggest item's level, and one sentence with every
+name, biggest first: "Amber alert! The Amber shop is open. In stock:
+Moonbinder, Dawnbinder, Starweaver, an Amber Egg and Emberbloom." The Huge
+and Biggest ones get a "Once more: Moonbinder, Dawnbinder and Starweaver."
+Anything else that came with them (a hatch, a Gold proc) plays after, the
+same one twice said once. Alerts that arrive within half a second of each
+other, or while one is playing, count as together.
+
+### Shop items
+
+**Add an item**: type the start of its name and press **Add**. Items the
+app has seen in the shops are suggested as you type, and the line under the
+box says what it will catch ("Catches Kiwi Seed, Kiwi Pod") or that it
+hasn't been seen yet. It's added as a Callout, with its options open.
+
+Or use the dropdown under the box: **…or pick from everything the shops
+sell**. It lists every item, grouped by shop (Seed, Egg, Tool, Decor, Dawn,
+Amber, Thunder, Rain, Snow) with its price, cheapest first. Pick one and
+it's added straight away. Items an alert already covers are greyed out with
+✓ (including decor the "Decor over 500M" alert catches), and a built-in
+alert you removed shows "(add back)". The list comes from what the shops
+list right now (every item, in stock or not) and everything the app has
+seen them list before, plus the decor and eggs of weather shops that
+haven't opened yet. An item picked from the list is matched by the game's
+own id too, so it still rings if the shop renames it.
+
+Every alert in the list has **▶** to hear it and **✕** to remove it. A
+built-in alert you remove shows under **Add back** (typing its name does the
+same). Tap an alert's name for its options:
+
+- **How big**: pick a level. What it will say is shown underneath.
+
+| Level | Sounds like |
+| --- | --- |
+| Gentle | Soft ding, the name said once |
+| Callout | Chime, then the name |
+| Big | Fanfare, then the name |
+| Huge | Siren and fanfare, said twice |
+| Biggest | Long siren, fanfare, said twice with a fanfare between |
+
+  A few items keep their own sound at any level: Starweaver's klaxon, the
+  eggs' wobble, Sunflower's sunrise chime. **Back to …** returns a built-in
+  alert to its usual level.
+- **🌙 Ring during quiet hours and snooze** (see below).
+
+The usual levels: Moonbinder Biggest; Dawnbinder and Starweaver Huge;
+Dawnbreaker, Emberbloom, Thunderspire, Mythical Egg and Amber Egg Big;
+Windturner, Firepit, XP Potion and decor over 500M Callout (the decor alert
+says which decoration: "Decoration alert! Mini Fairy Castle is in the shop.");
+Sunflower, Ube, Milkcap, Marigold and Legendary Egg Gentle. Higher on the
+list wins when two alerts match the same item.
+
+### Weather and pets
+
+These have a switch each, ▶ to hear them, and the same 🌙 option when you
+tap their name.
+
 | Alert | Sounds like |
 | --- | --- |
-| Moonbinder | Siren, fanfare, announced twice |
-| Dawnbinder | Short siren, fanfare, announcement |
-| Mythical Egg | Egg wobble, fanfare, and a very excited announcement |
-| Amber Egg | Egg wobble, fanfare, and an announcement |
-| Dawnbreaker, Emberbloom, Thunderspire | Fanfare and announcement |
-| Starweaver | Klaxon and an excited "Starweaver alert!" |
-| Windturner, Firepit, XP Potion | Chime and "Windturner alert!" / "Firepit alert!" / "XP Potion alert!" |
-| Sunflower | Sunrise chime and a very excited (trying to stay calm) "Sunflower! Stay calm, everyone." |
-| Any decor over 500M | Quick ping and "Decor alert!" |
-| Ube, Milkcap, Marigold, Legendary Egg | Soft ding and a quick mention |
 | A pet turns a crop Gold | Cash register |
 | A pet turns a crop Rainbow | Cash register with a sparkle |
-| Any pet drops to 10% with none of its food in the trough (same as the game's warning) | Tummy rumble and a heads-up naming foods to add. One alert covers every hungry pet, and never more than one every 15 minutes |
+| Any pet drops to 10% with none of its food in the trough (same as the game's warning) | Tummy rumble and which foods to add. One alert covers every hungry pet, and never more than one every 15 minutes |
 | Thunder | A soft roll of distant thunder, no voice |
 | Rain | A rain shower, no voice |
 | Dawn | Sunrise chime and "Dawn shop!" |
 | Snow | Icy shimmer and "Snow!" |
 | Any other weather, including anything added to the game later | Chime and the weather's name |
 | Amber | Warm chime and "Amber alert!" |
-
-**Voice** (in Alerts) is one menu with every voice in it. Pick one to see
-its details underneath, then **Preview**, **Download** (once; after that it
-works offline), or **Use this voice**. ✓ marks the one in use and ⤓ marks
-ones not downloaded yet.
-
-- **Characters** (one download for all four; real actors performing
-  emotions, and each one talks in character, so every alert comes out a
-  little differently):
-  - **Poppy**, bubbly and delighted: "Ooh! Oh my gosh! …"
-  - **Spike**, grumpy and sarcastic: "Ugh. Fine. … Go on then."
-  - **Obadiah**, gloomy and deadpan: "Oh. … Not that it matters."
-  - **Prudence**, calm and sensible: "Just so you know, …"
-- **Storytellers**: **Storybook**, a warm audiobook narrator ("Once upon a
-  time…"), and **Amy**, warm and clear, just the news.
-- **Scottish**: **Alba** and **Callum** (press **Try another speaker** to
-  hear the other Scottish men).
-- **Showtime** (one download for all three): **Stadium announcer**, **Old
-  radio**, and **Movie trailer** ("In a world…").
-- Or a voice built into Windows, which needs no download.
-
-**Keep speaker awake** (in Alerts, on by default) stops Bluetooth speakers
-like an Echo from dozing off between alerts, so they don't announce "Now
-playing from…" over your next alert. It sends a signal far too low to hear.
 
 **Snooze** (top of Alerts, or the Alerts menu) silences alerts for 30
 minutes or an hour. Alerts still get logged, so nothing is lost.
@@ -133,7 +214,11 @@ a good way to check it works. Every swap is listed in Recent alerts.
 
 **Log off during weather.** Weather can only change your crops while you're
 in the game. Tap the weather you want to keep off your garden, and the app
-steps out about 30 seconds before it starts. The game window shows a "back
+steps out about 30 seconds before it starts. Twenty seconds before that, a
+card over the game asks first: "You're about to step out for upcoming
+Rain: **Confirm** / **Ignore**". Confirm steps out now, Ignore stays in for
+that one weather (the setting stays on for the next), and if you don't
+answer it steps out when the countdown ends. The game window shows a "back
 soon" page with a countdown, and (if **Come back when it's over** is on) the
 app rejoins by itself about 10 seconds after the weather ends. **Rejoin now**
 brings you back early. **Log off now** steps out for a break and never comes
@@ -149,8 +234,9 @@ Neither one buys, sells, harvests or plants anything.
 
 ## Alerts that ring through quiet hours
 
-Every alert in the Alerts tab has a 🌙 button. Light it up and that alert
-rings even during quiet hours and while alerts are snoozed. It's for the
+Tap any alert's name in the Alerts tab and switch on **🌙 Ring during
+quiet hours and snooze**: that alert rings even during quiet hours and while
+alerts are snoozed, and shows a 🌙 in the list. It's for the
 ones worth waking up for, like a Moonbinder at 4am. **Mute alerts** still
 silences everything. The computer has to be awake for any alert to ring,
 so leave it on (the screen can be off).
@@ -185,16 +271,21 @@ if you try. (The game starts its pick-up animation the instant you act, before
 anything is sent, so you may see it begin; it's undone straight away.)
 Press it again when you're ready to harvest.
 
+(The Harvest lock card sits at the top of the Garden tab.)
+
 **Always protect** (under it) lists the crops in your garden: tap one to
 make sure it's never harvested by accident, lock or no lock (your
 celestials, say). Tap it again to allow it.
 
 **Never sell pet food** (the switch in the same card). Pet food is
 whatever you carry in pots. When you sell, the app locks any crops of those
-plants that aren't locked yet (the same lock as right-clicking them in your
-bag), then lets the sale go through, and a message says what it kept:
-"Kept your pet food: locked Eggplant ×5, sold the rest." If a lock can't be
-made, nothing is sold and the message says so. Crops of plants you don't
+plants that aren't locked yet, one crop at a time (the same lock as
+right-clicking a crop in your bag), then lets the sale go through, and a
+message says what it kept: "Kept your pet food: locked Eggplant, sold the
+rest." If a lock can't be made, nothing is sold and the message says so.
+After the sale it checks the locked crops are still in your bag; if the game
+sold one anyway, it tells you, and from then on it stops sales with pet food
+in them instead (lock it by hand, then sell). Crops of plants you don't
 carry in pots are never in the way.
 
 The lock never sends anything of its own: it points the game's own harvest at
@@ -213,6 +304,11 @@ site, alongside everyone else who uses it. It never sends your garden,
 inventory or anything about the other players in your room. Turn it off and
 nothing is sent, and your room drops off the list within a few minutes. The
 switch is off unless you turn it on.
+
+When the app starts, it asks once: **Share your room with the public?**
+**Share my room** turns the switch on; **Not now** leaves it off and asks again
+next time, unless you tick **Don't ask me again**. It doesn't ask while
+sharing is already on.
 
 ## Playing on another device
 
@@ -285,6 +381,27 @@ count). "Ready" means the same thing everywhere in the app.
 ladder, building your pets, mutation farming) and where your crops are, from
 bare ground to ready to sell.
 
+**Mutations over time** charts how much of your garden carries each
+mutation, to time a harvest. The boxes at the top are three families, one
+row each: **💧 Hydro** (Wet, Chilled, Frozen, Thunder), **🌙 Lunar** (Dawn,
+Amber) and **🌈 Gold/Rainbow** (Gold, Rainbow). The family's own box ("💧
+93%") is its combined line; tick any mutation next to it to add its own
+line, in its own colour (Rainbow is drawn in rainbow). A box shows its share
+now while its line is on (hover a box for it any time; the Weather mutations
+bars under the chart have them all). Pick 12 h, 24 h, 3 days or 7 days.
+Right of **Now** is the forecast: every rain, snow and thunder and every
+dawn and amber moon coming up is a band for as long as it lasts, with its
+emoji in a strip above the chart, shown when a line it can move is on. With
+a few lines on, each has a soft fill under it; each line's share now is in
+the margin on the right while there's room. Hover the past for each line's
+exact share and count at that time ("Frozen 67% · 181 of 270"); hover
+ahead for the weather coming. Under the chart: how many crops still lack
+each family, and when the next chance is ("16 without hydro · next 🌧️
+Rain in 25m"). A break in a line is time the game wasn't open. Shares, not
+counts, so a harvest doesn't read as mutations lost. It reads your garden
+every 10 minutes and keeps a week; the separate lines start from 0.53.3
+(before it, only the family totals were kept).
+
 **Gold & Rainbow by your pets** is a line graph of how fast your pets turn
 crops Gold and Rainbow: a gold line and a rainbow line, a point for each
 hour (12 h, the default, or 24 h), 3 hours (3 days) or 6 hours (7 days),
@@ -297,11 +414,93 @@ few seconds and files what they went up by under the hour. Hours the game
 wasn't open here show as a faint line and don't count toward the rate (a
 day away isn't dumped into one bar). Two weeks are kept.
 
-**Open spots** also shows itself over the game: while a potted plant or an
-empty planter pot is in your hand, a small copy of the map sits in the
-bottom-right corner of the game so you can see where the open spots are
-while moving plants around. It disappears when you switch to anything else.
-The switch under the map turns it off.
+**Garden worth over time** has a scale up the side in round steps, so you
+can read where the line starts and every level it passes.
+
+**Garden map** shows your garden tile by tile, three ways (the buttons at
+the top; it remembers which):
+
+- **To-do**: each plant coloured by its next step, so a full late-game
+  garden tells you what's worth doing. **Cleanse** (orange): a plant beside
+  a Moonbinder with Dawnlit or Dawnbound crops. Dawn and Amber can't share a
+  crop, and only Amberlit crops beside a Moonbinder bind to Amberbound (x10),
+  so a Crop Cleanser (it takes hydro and lunar off the whole plant and keeps
+  Gold and Rainbow) opens that back up; the hydro comes back with the
+  weather. It's only suggested when what the Dawn crops would gain outweighs
+  what any Amber crops on the same plant would lose. **Pot beside a
+  Moonbinder** (purple): a plant with Amberlit crops that isn't next to one;
+  moved there with a Planter Pot, they bind to Amberbound at the next Amber
+  Moon. Only as many as there are open spots beside a Moonbinder, best
+  first, and the spot to use has a dashed outline; the rest say what they'd
+  gain if you freed up a spot. Everything else is quiet: **waiting** on
+  weather or pets, **growing**, or **done** (at its best for where it is).
+  A binder grows fruit of its own, and next to another binder it mutates
+  and binds like any crop, so a binder can be a to-do too ("Cleanse its
+  fruit": a Moonbinder with Dawnbound fruit beside another Moonbinder); it's
+  never suggested for a pot, since moving it moves its 8 spots. A cleanse
+  on a plant beside both a Moonbinder and a Dawnbinder says to step out
+  during Dawns afterwards (Weather tab), since Dawns come twice as often as
+  Amber Moons and it could go Dawn again.
+  Cleanse and pot tiles glow in their colour, like open spots do in Spots;
+  binders have a white outline and a soft glow, and the spot to pot into
+  pulses. Until you have a binder, the map opens on Spots, and To-do just
+  says suggestions start once you have one. "Next to" is the 8 tiles around a binder,
+  diagonals too, on the same side of the garden. A to-do has to be worth
+  at least 0.1% of your garden's value, so small chores stay off the list
+  (the tile still says what it would add).
+- **Value**: each plant from dim to bright gold by what it's worth now;
+  your ten most valuable glow.
+- **Spots**: what's on each spot (open, plant, egg, decoration, shard),
+  open ones glowing, for placing a pot.
+
+Tap any tile for its crops, their mutations, what it's worth and its next
+step (and how much that step adds). While you hold a pot, the open spots
+also show in the bottom-right corner of the game (the switch under the
+map).
+
+**The binder map** pops up in the bottom-right corner of the game during an
+Amber Moon if you have a Moonbinder (or a Dawn, with a Dawnbinder), for
+moving plants so lit crops bind before it ends. Bigger than the open-spot
+map, it's in the event's colours (amber for an Amber Moon, purple for a
+Dawn): the binder (white) and its 8 spots (outlined); lit crops glowing:
+steady beside a binder (binding now), pulsing anywhere else (move them in);
+open binder spots green; bound crops and the rest dimmed. A binder whose
+own fruit is lit glows too (binding, when it's beside another binder). The other moon's
+crops sitting in a binder spot (Amber crops by a Dawnbinder) keep their
+own muted colour, and only pulse (to swap out) when you have more lit
+crops waiting than open binder spots for them; an Amberbound crop is
+already worth more than Dawnbound would be, so otherwise they're left
+alone. A line on top counts it all ("1 binding · 3 to move in · 2 open
+spots") next to the time left. It follows every move you make and goes
+away when the event ends. The switch under the Garden map turns it off.
+
+**The Thunderstruck finder** pops up in the same corner while a pet with
+Thundercharger is out (the Thunder Wolf, which turns Thunderstruck crops
+near it into Thundercharged: x5 to x7) and you still have Thunderstruck
+crops. Same look as the binder map: plants with a Thunderstruck crop glow
+electric lime, Thundercharged ones are a dim green, the rest quiet, and
+the top says how many are left ("7 Thunderstruck crops on 5 plants · 223
+Thundercharged"). Walk the Wolf over to the glowing ones (or pot them
+beside it). It goes away once they're all Thundercharged, and steps aside
+for the binder map during an Amber Moon or Dawn. Where the Wolf itself is
+isn't drawn yet. Its own switch is under the Garden map.
+
+**The riding map** pops up while you ride an Ostrich (Dawn Capture) or a
+Phoenix (Amber Capture). The capture takes that moon's mutations off the
+crops near the pet and turns them into capsules (1 for lit, 2 for bound),
+and while you ride, it goes where you go. The map shows what to ride over,
+with the capsules on offer at the top: lit crops glow (1 capsule, the
+cheap ones to capture), bound crops are a plain fill (2 capsules, but the
+most value off the crop: Amberbound is x10). On the Ostrich, Dawn crops
+next to a Moonbinder pulse: once the Dawn is off they can go Amberbound, a
+clear win. (The Phoenix has no such spots: Amberbound beats Dawnbound.)
+The Thunderstruck finder steps aside while you ride.
+
+**Moving the maps:** drag the binder map, the Thunderstruck finder or the
+riding map by its title to put it anywhere over the game; double-click the
+title to send it back to the corner. Where you leave each one is
+remembered (as a share of the window, so resizing keeps it in place). Only
+the title takes the mouse: the map itself never blocks the game.
 
 The app listens to the same data the game already receives. The only thing
 it ever sends to the game is a pet team swap, and only when you've turned on
@@ -314,18 +513,20 @@ which you've opened and folded. Settings and the long lists start folded
 (sound and voice, the three alert lists, harvest lock, weather mutations,
 crop size, your stats, room settings, panel, backups, and so on), and a
 folded heading shows a one-line summary of what's underneath ("14 of 14
-on", "🔊 95% · voice 35%", "sharing off · copy prompts on"), so a tab reads at
+on", "🔊 95% · Leah", "sharing off · copy prompts on"), so a tab reads at
 a glance even with everything closed. Long explanations show two lines
 (the alert lists' sound descriptions one); tap one to read all of it.
 
 ## Money tab
 
-The Money tab isn't there at first: it appears by itself after a full day
-of coins in and out has been measured, or after two weeks when your garden
-and wallet together are worth over 1B (big accounts' numbers take longer to
-settle: one 50B purchase skews a day). The Garden tab's worth card says how
-far along that is. In the Extras tab, **Money tab** lets you show it now or
-keep it hidden instead. Purchases
+The Money tab is in the tab bar from the start, but at first it shows a
+welcome card: what the tab does, a bar for how far along it is, and what
+you'll get. It fills in by itself after a full day of coins in and out has
+been measured, or after two weeks when your garden and wallet together are
+worth over 1B (big accounts' numbers take longer to settle: one 50B purchase
+skews a day). **Show it now anyway** on the card opens it straight away. In
+the Extras tab, **Money tab** does the same, or **Keep it hidden** takes it
+out of the tab bar. Purchases
 are counted from the game's own record of what you bought in each shop's
 current restock, so they're exact — item, count, wherever you bought it —
 from the moment the app is running.
@@ -340,33 +541,47 @@ when they show up, and how much can you spend on decor meanwhile?
   items). Each
   one's next appearance is taken as its average gap from now. The shops
   are random, so this is an average, not a promise.
-- **The chart is your money**: the left quarter is the past (up to a week),
-  the rest is what's expected, with coins up the side (a y axis). One gold line, **solid for the past week**
-  (your wallet plus your ready-to-sell crops, from the app's half-hourly
-  readings) and **dashed for what's expected**. The dot is now, with what
-  you have; the number at the right end is what you're expected to have by
-  the last want's day. **Each purchase is a coral block hanging from the
-  line on its day, as tall as its price**, so you can see how big it is
-  next to what you'll have then; the two biggest are labelled with the
-  want's icon, price and the share of your money it takes ("🌙 −50B · 6%"). **The purple
-  line is the final boss**: your money if you bought everything (every
-  alert item and every decoration from 100M up, each time it shows up).
-  Each line's end amount is written at the right in its colour; a key
-  under the chart says which is which (with the ring colours), and **How
-  to read this** under it explains the chart in four sentences. If the purple line stays above the bottom you
-  could afford it all; if not it dips into red, with "runs out ~date" and
-  "short N". The race box under the chart is the long-run version (what
-  you make a day against what everything costs a day); the purple line is
-  the next couple of weeks with the money you actually have, so it shows
-  a squeeze the race can't. Your wants sit
-  along the bottom on the days they're due, ringed green (you'll have the
-  money), amber (worth skipping for a bigger one) or coral (you'll be
-  short); hover one for its price and date, or tap it (or **✏️ Edit what
-  you want** under the chart) to jump to Your wants with that want lit up,
-  to reorder or remove it. Until the app has some of your past, the left
-  quarter just says it fills in as you play.
-  With a "Can I buy this?" check, the dashed line shows what happens after
-  buying it, and today's forecast stays behind, faint.
+- **Celestials come back.** A celestial on your wants list (Moonbinder,
+  Dawnbinder, Starweaver, Dawnbreaker, Emberbloom, Thunderspire) is expected
+  again every time it usually turns up within the forecast, not just once,
+  and the money line steps down for each. The list under the chart says how
+  often: "Dawnbreaker ×4 · every ~2.8d". Eggs and decor are expected once.
+- **Under the number, one sentence says where it comes from** and what's
+  holding it down, in your own numbers: "You have 447B (36B coins + 411B in
+  ready crops). 74.1B of it is set aside for the Moonbinder around Oct 10:
+  spend more than 373B and you'd be short when it shows up." (Or that
+  what's coming in covers all your wants, so all of it is free; or which
+  want you'd be short for.) **How it's worked out** under it walks through
+  the four steps: what you have now (coins plus crops ready by your
+  "ready" rule), what's coming in, your wants on the days they usually
+  show up, and the walk forward through those days (✅ bought, *skip* when
+  it would cost you one higher on your list, 🔴 short). Safe to spend is
+  what's left at the tightest moment; if anything is short, it's 0. The
+  wants under the chart have a heading saying what ✅ means.
+- **The Money forecast** is the chart: your money from up to a week ago
+  to the last want's day, dates along the bottom and **Today** marked,
+  with "← last 7 days" and "next 14 days →" across the top. Every day is
+  the same width, past and future, so the slope means the same thing on
+  both sides. One gold line, **solid for the past** (your wallet plus your
+  ready-to-sell crops, from the app's half-hourly readings) and **dashed
+  for what's expected**; the dot is now. **Each purchase is a coral drop in
+  the line itself, as tall as its price** (a purchase too small to see
+  shows only as its icon). **The purple line** is your money if you bought
+  everything (every alert item and every decoration from 100M up, each time
+  it shows up); if it goes under zero it turns red, and a note under the
+  chart says when it would run out. Where each line ends up is written in
+  the margin on the right, in its colour. Nothing is written on the lines:
+  **hover anywhere** for that day's date and exact amounts, and any
+  purchase that day. Your wants sit in a row under the chart on the days
+  they're due, ringed green (you'll have the money), amber (worth skipping
+  for a bigger one) or coral (you'll be short); small dots on the zero line
+  are a celestial coming back again. **Hover a want** for its date, price
+  and whether you'll have it (its own popup, above it, so it never covers
+  the others), or tap it (or **✏️ Edit what you want**) to jump to Your
+  wants with that want lit up. A one-line key sits under the chart and
+  **How to read this** explains it. With a "Can I buy this?" check, the
+  dashed line shows what happens after buying it, and today's forecast
+  stays behind as a faint dotted "without it".
 - **The buy-everything line** is a race, under the chart. The 🏁 flag is
   what buying every item you have an alert for and every decoration from
   100M up costs a day (every time each shows up, at how often it does:
@@ -476,12 +691,6 @@ Below it, five sections, each answered with a picture first:
   reaches full strength) (worked out from its size
   and XP, the same way the game does), how long until it's fully grown, and
   what each ability does at that strength ("about 16.6M coins an hour").
-- **Team ideas**: pick a goal (Money, Gold crops, Rainbow crops, Gold &
-  Rainbow, a team for each kind of weather, Crop size, Faster growing,
-  Hatching, Leveling pets) and the app picks the best three pets you own for
-  it, says why, where each pet is now (out, inventory, hutch), and what the
-  team would do together. Only goals you have pets for are offered. Save a
-  team you like in the game's Pet Teams to swap it in with one tap.
 - **Best pets for…**: pick a goal (Gold crops, coins, crop size, selling,
   hatch XP, max strength, Gold/Rainbow pets, double hatch, and more) and
   every pet you own is ranked for it,
@@ -509,16 +718,33 @@ nothing for a Rare Egg's Turkey), but **Gold and Rainbow pets are one
 counter each across every egg**: any hatch that isn't Gold adds to the Gold
 counter, whichever egg it was.
 
-- **Primed now** lists everything whose next pull is guaranteed, and you get
-  a heads-up (a sparkle and "Lucky! Your next Mythical Egg is a guaranteed
-  Capybara") the moment one gets there. The 🌙 on that alert lets it ring
-  through quiet hours. The chips choose which kinds get heads-ups.
-- Each egg, plant and capsule is one line showing its closest guarantee;
-  open it to see every counter. Lines that are close open by themselves.
+- **The top of the tab answers "am I about to pull something rare?"**
+  Your nearest rare pull is up top, big: its icon, its name, the odds ("1
+  in 50"), how many more pulls until it's guaranteed ("4 more Amber Eggs
+  and it's guaranteed") and how long you've gone without it ("96 Amber
+  Eggs without a Phoenix so far"). When one's primed it glows gold: "🎉
+  It's yours next · Guaranteed on your next Mythical Egg!". Under it,
+  **Also close**: the other rare pulls near a guarantee, each with its icon,
+  odds and countdown, green when it's almost there and amber when it's
+  getting close. "Rare" means every egg's rare pets, Gold and Rainbow
+  pets, capsule items at 1% or rarer (a Dawnbreaker Spore) and a plant's
+  rare variant (Embercrown); a plant's Gold or Rainbow and the commoner
+  capsule items aren't headlined (they're all still in the lists below).
+  When one gets to its last pull you get a heads-up (a sparkle and "Lucky!
+  Your next Mythical Egg is a guaranteed Capybara"); switch on 🌙 Ring
+  during quiet hours in that alert's options (Alerts tab) to hear it at
+  night too.
+- Each egg, plant and capsule is one line with its closest guarantee (the
+  most urgent first, with a 🍀 next / 🔍 look / 👀 watch chip, and each
+  rare pet or item with its icon) and a
+  bar; open it to see every result with its chance a pull, its bar, and
+  **misses so far**, which you can type over. Lines that are close open by
+  themselves.
 - The game keeps the real counts to itself, so these are the app's own
   count. Accounts from before the update started halfway, so counters the
-  app hasn't seen yet start halfway too (marked ≈). Switch that off if your
-  account is new. **Click any number to type in your own.**
+  app hasn't seen yet start halfway too (tagged **estimate**; hover it).
+  Switch that off in **Luck settings** (bottom of the tab, with which kinds
+  get heads-ups) if your account is new.
 - What counts: hatches from the game's log (it catches up on recent ones when
   it starts), crops that start growing while the game is open in the app,
   and capsules from the game's own totals (so those catch up too). Double
@@ -560,7 +786,8 @@ save.
 ## On a Mac
 
 Settings live in `~/Library/Application Support/SSK's Garden Buddy`. Two
-things work differently on a Mac: **Play alerts on** sends chimes and the
-natural voices to the speaker you pick, but the built-in Mac voices always
-play on the default speaker. And the natural voices are less tested on a Mac:
-if one won't download or play, pick a built-in voice instead.
+things work differently on a Mac: **Play alerts on** sends the sounds and
+Leah, Cori, Alan and Alba to the speaker you pick, but the Mac's own
+(Computer) voice always plays on the default speaker. And the downloaded
+voices are less tested on a Mac: if one won't download or play, pick
+Computer voice instead.

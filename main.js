@@ -13,6 +13,8 @@ const {
   dialog,
   clipboard,
 } = require('electron');
+// The side panel's default width in pixels.
+const PANEL_WIDTH = 480;
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -34,6 +36,7 @@ const { spawn } = require('child_process');
 const fun = require('./fun');
 const luck = require('./luck');
 const budget = require('./budget');
+const gardenPlan = require('./garden-plan');
 const share = require('./share');
 
 const GAME_URL = 'https://magicgarden.gg';
@@ -333,25 +336,61 @@ function quietFor(settings, ruleId) {
   return alerts.inQuietHours(settings) || isSnoozed(settings);
 }
 
+// What happened to each alert, for the diagnostic sample (v0.53.7): here,
+// when it was sent to the panel or held back (and why); from the panel, what
+// it did with each batch (played, failed, or skipped because nothing is
+// audible). An alert that goes missing leaves a trail.
+const ALERT_LOG = [];
+function logAlert(entry) {
+  ALERT_LOG.push(Object.assign({ at: Date.now() }, entry));
+  if (ALERT_LOG.length > 40) ALERT_LOG.shift();
+}
+ipcMain.on('alerts:played', (event, report) => {
+  if (report && typeof report === 'object') logAlert(Object.assign({ from: 'panel' }, report));
+});
+
 function handleAlerts(list) {
   const settings = store.get();
   const loud = list.filter((a) => !quietFor(settings, a.ruleId));
   const hushed = list.filter((a) => quietFor(settings, a.ruleId));
-  if (hushed.length) recordAlerts(hushed, true);
-  if (loud.length) recordAlerts(loud, false);
-
+  const names = (l) => l.map((a) => a.itemName || a.label || a.ruleId);
+  // Sound first: nothing after this (history, pop-ups) can keep it quiet.
   if (loud.length) sendToControl('alerts:play', loud);
-
-  const popups = list.filter((a) => !isSnoozed(settings) || isAlways(settings, a.ruleId));
-  if (settings.alerts.popups && popups.length && Notification.isSupported()) {
-    for (const a of popups.slice(0, 3)) {
-      const toast = new Notification({ ...toastText(a), silent: true });
-      toast.on('click', focusGame);
-      toast.show();
-    }
+  logAlert({ from: 'main', sent: names(loud), held: names(hushed), why: hushed.length ? (isSnoozed(settings) ? 'snoozed' : 'quiet hours') : undefined });
+  try {
+    if (hushed.length) recordAlerts(hushed, true);
+    if (loud.length) recordAlerts(loud, false);
+  } catch (err) {
+    logAlert({ from: 'main', error: `recording: ${err && err.message}` });
   }
+  try {
+    const popups = list.filter((a) => !isSnoozed(settings) || isAlways(settings, a.ruleId));
+    if (settings.alerts.popups && popups.length && Notification.isSupported()) {
+      for (const a of popups.slice(0, 3)) {
+        const toast = new Notification({ ...toastText(a), silent: true });
+        toast.on('click', focusGame);
+        toast.show();
+      }
+    }
+    if (gameWindow && !gameWindow.isFocused()) gameWindow.flashFrame(true);
+  } catch (err) {
+    logAlert({ from: 'main', error: `pop-up: ${err && err.message}` });
+  }
+}
 
-  if (gameWindow && !gameWindow.isFocused()) gameWindow.flashFrame(true);
+// The alert settings that can keep an alert quiet, for the sample.
+function alertDiagnostics() {
+  const s = store.get();
+  const a = s.alerts || {};
+  return {
+    log: ALERT_LOG.slice(),
+    history: (s.alertHistory || []).slice(-20),
+    settings: {
+      muted: a.muted, volume: a.volume, sfx: a.sfx, voiceEngine: a.voiceEngine, naturalVoice: a.naturalVoice, voice: a.voice, popups: a.popups,
+      outputDevice: a.outputDeviceLabel || a.outputDevice || 'default',
+      quietHours: a.quietHours, inQuietHours: alerts.inQuietHours(s), snoozedUntil: a.snoozeUntil || null, disabled: a.disabled, always: a.always,
+    },
+  };
 }
 
 /* ================================================================== *
@@ -764,11 +803,66 @@ function planLogoff(status) {
   const lead = Math.max(0, Number(store.get().logoff.leadSeconds) || 30) * 1000;
   const next = (status.upcoming || []).find((e) => e.kind && kinds.has(e.kind));
   if (next) {
+    // Already asking about this one: its own timer carries on.
+    if (stepAsk && stepAsk.eventKey === next.startsAt) return;
+    if (skipEvent && skipEvent === next.startsAt) return;
     const at = Date.parse(next.startsAt) - lead;
     if (at - now < 6 * 60 * 60 * 1000) {
-      parkTimer = setTimeout(() => park(next.kind, next.endsAt, next.startsAt), Math.max(0, at - now));
+      // 20 seconds before stepping out, ask (Confirm / Ignore); no answer
+      // steps out as before.
+      parkTimer = setTimeout(() => askStepOut(next, at), Math.max(0, at - STEP_ASK_MS - now));
     }
   }
+}
+
+/* "You're about to step out for upcoming weather": a 20-second card over the
+ * game. Confirm steps out now, Ignore skips this weather event (the setting
+ * stays on), no answer steps out when the countdown ends. The countdown gets
+ * its full 20 seconds even when the warning comes late, but never runs past
+ * the weather's start. */
+const STEP_ASK_MS = 20000;
+if (process.env.MG_TEST_DIR) {
+  globalThis.__mgTest = Object.assign(globalThis.__mgTest || {}, {
+    askStepOut: (next, at) => askStepOut(next, at),
+    stepAsk: () => (stepAsk ? { label: stepAsk.label, until: stepAsk.until, eventKey: stepAsk.eventKey } : null),
+    parked: () => parked,
+    skipEvent: () => skipEvent,
+    rejoin: () => rejoin(true),
+  });
+}
+let stepAsk = null;
+function askStepOut(next, at) {
+  if (parked || stepAsk || (skipEvent && skipEvent === next.startsAt)) return;
+  const now = Date.now();
+  const start = Date.parse(next.startsAt) || now + STEP_ASK_MS;
+  const until = Math.min(Math.max(at || now, now + STEP_ASK_MS), Math.max(now + 1000, start));
+  const label = weather.label(next.kind);
+  const emoji = (weather.BY_ID[next.kind] && weather.BY_ID[next.kind].emoji) || '🌦️';
+  stepAsk = { kind: next.kind, endsAt: next.endsAt, eventKey: next.startsAt, until, label, emoji };
+  stepAsk.timer = setTimeout(() => stepOutAnswer('timeout'), Math.max(0, until - now));
+  showStepAsk();
+  sendToControl('stepout:ask', { label, emoji, until });
+}
+function showStepAsk() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const info = stepAsk ? { label: stepAsk.label, emoji: stepAsk.emoji, until: stepAsk.until } : null;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.${info ? `showStepOut(${JSON.stringify(info)})` : 'hideStepOut()'}`, true).catch(() => {});
+}
+function stepOutAnswer(act) {
+  if (!stepAsk) return false;
+  const ask = stepAsk;
+  clearTimeout(ask.timer);
+  stepAsk = null;
+  showStepAsk();
+  sendToControl('stepout:ask', null);
+  if (act === 'ignore') {
+    skipEvent = ask.eventKey;
+    recordNote(`🌦️ Staying in for ${ask.label} (you pressed Ignore). Stepping out is still on for the next one.`);
+    return true;
+  }
+  park(ask.kind, ask.endsAt, ask.eventKey);
+  return true;
 }
 
 // The live game state notices weather the instant it starts, which can be a
@@ -839,16 +933,6 @@ function enrichPets(st) {
     };
   });
   st.goals = abilityData.GOALS;
-  // Team ideas: the best three pets you own for each goal, and what that
-  // team would do (weather-only abilities count in their own weather).
-  const byId = Object.fromEntries(st.allPets.map((p) => [p.id, p]));
-  st.recommendations = abilityData.recommend(st.allPets, (w) => weather.kindOf(w)).map((r) => {
-    const team = r.picks.map((x) => byId[x.id]).filter(Boolean);
-    const wantWeather = r.weather;
-    return Object.assign(r, {
-      summary: abilityData.summarise(team, { weatherMatches: (w) => (wantWeather ? weather.kindOf(w) === wantWeather : matches(w)) }),
-    });
-  });
 }
 
 /* ================================================================== *
@@ -1000,10 +1084,63 @@ function recordGranters(st, t) {
   return dg > 0 || dr > 0 || fresh;
 }
 
+// The Garden map's to-do (garden-plan.js), worked out again only when the
+// garden changes (the status comes every few seconds).
+let planKey = '';
+let planLast = null;
+function gardenPlanOf(plants, tiles) {
+  if (!Array.isArray(plants)) return null;
+  const key = JSON.stringify(plants) + '|' + Object.keys(tiles || {}).join(',');
+  if (key !== planKey) {
+    planKey = key;
+    try {
+      planLast = gardenPlan.plan(plants, Object.keys(tiles || {}));
+    } catch (err) {
+      console.error('Garden plan failed:', err);
+      planLast = null;
+    }
+  }
+  return planLast;
+}
+
+// How much of the garden carries each kind of mutation, over time (the
+// Garden tab's "Mutations over time"): every 10 minutes (the latest reading
+// in each 10 minutes wins), a week kept. n = crops in the garden; h, l, c =
+// how many have a weather (hydro), a moon (lunar) and a Gold or Rainbow
+// mutation. Shares, not counts, are what's charted, so a harvest or a
+// replant doesn't read as mutations lost.
+const MUT_EVERY = 10 * 60 * 1000;
+const MUT_KEEP = 7 * 24 * 6;
+function recordMutations(st, t) {
+  const b = (st.crops || []).find((x) => /garden/i.test(x.name));
+  if (!b || !b.total || !b.have) return false;
+  const g = store.get().garden;
+  const h = Array.isArray(g.mutHistory) ? g.mutHistory : (g.mutHistory = []);
+  const mu = b.mutations || {};
+  // The totals, and (v0.53.3) each mutation on its own for the separate
+  // lines: wet, chilled, frozen, thunder (struck or charged), dawn and amber
+  // (lit or bound), gold, rainbow.
+  const p = {
+    t, n: b.total, h: b.have.hydro || 0, l: b.have.lunar || 0, c: b.have.color || 0,
+    w: mu.wet || 0, ch: mu.chilled || 0, f: mu.frozen || 0, th: (mu.thunderstruck || 0) + (mu.thundercharged || 0),
+    d: (mu.dawnlit || 0) + (mu.dawnbound || 0), a: (mu.amberlit || 0) + (mu.amberbound || 0), g: b.gold || 0, r: b.rainbow || 0,
+  };
+  const last = h[h.length - 1];
+  if (last && Math.floor(last.t / MUT_EVERY) === Math.floor(t / MUT_EVERY)) {
+    Object.assign(last, p);
+    return false;
+  }
+  h.push(p);
+  if (h.length > MUT_KEEP) h.splice(0, h.length - MUT_KEEP);
+  return true;
+}
+
 function recordWorth(st) {
   const t = Date.now();
   let changed = false;
-  if (recordGranters(st, t)) {
+  const granters = recordGranters(st, t);
+  const muts = recordMutations(st, t);
+  if (granters || muts) {
     changed = true;
     sendToControl('garden:stats', store.get().garden);
   }
@@ -1155,7 +1292,13 @@ function budgetView(fresh) {
     const s = store.get();
     s.budget = s.budget || {};
     let changed = false;
-    if (ev.ratio > (Number(s.budget.everythingBest) || 0) + 0.005) {
+    // A real crossing is celebrated: the app has seen you below the line
+    // before, and the Money tab is showing. Someone already past it when the
+    // app first measures (a new install with a big garden) gets the date
+    // noted quietly, not confetti out of nowhere.
+    const prevBest = Number(s.budget.everythingBest) || 0;
+    const wasBelow = prevBest > 0 && prevBest < 1;
+    if (ev.ratio > prevBest + 0.005) {
       s.budget.everythingBest = Math.round(ev.ratio * 1000) / 1000;
       changed = true;
     }
@@ -1163,11 +1306,13 @@ function budgetView(fresh) {
       s.budget.everythingCrossedAt = Date.now();
       ev.crossedAt = s.budget.everythingCrossedAt;
       changed = true;
-      recordNote('🏆 You crossed the buy-everything line: you make more a day than buying every alert item and every decoration costs.', 'Buy-everything line crossed!');
-      sendToControl('budget:crossed', { ratio: ev.ratio });
-      const js = fun.script('confetti');
-      const contents = gameView && gameView.webContents;
-      if (js && contents && !contents.isDestroyed() && isGameUrl(contents.getURL())) contents.executeJavaScript(js, true).catch(() => {});
+      if (wasBelow && view.unlocked) {
+        recordNote('🏆 You crossed the buy-everything line: you make more a day than buying every alert item and every decoration costs.', 'Buy-everything line crossed!');
+        sendToControl('budget:crossed', { ratio: ev.ratio });
+        const js = fun.script('confetti');
+        const contents = gameView && gameView.webContents;
+        if (js && contents && !contents.isDestroyed() && isGameUrl(contents.getURL())) contents.executeJavaScript(js, true).catch(() => {});
+      }
     }
     if (changed) store.save();
   }
@@ -1255,7 +1400,7 @@ function pushBudgetHud(force) {
   let payload = { shown: false, lines: [] };
   if (budgetHudOn()) {
     try {
-      payload = { shown: true, lines: budget.hudLines(budgetView(force), shortCoins) };
+      payload = { shown: true, lines: hudLines() };
     } catch (err) {
       payload = { shown: false, lines: [] };
     }
@@ -1264,6 +1409,29 @@ function pushBudgetHud(force) {
   if (!force && text === hudLast) return;
   hudLast = text;
   contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setBudgetHud(${text})`).catch(() => {});
+}
+// The money box (bottom right of the game): net worth (coins + garden), and
+// the next weather with a countdown (or how long the weather that's on has
+// left). The countdown ticks in the game page itself.
+function hudLines() {
+  const coins = gardenStatus && gardenStatus.wallet ? Number(gardenStatus.wallet.coins) || 0 : null;
+  const b = gardenStatus && (gardenStatus.crops || []).find((x) => /garden/i.test(x.name));
+  const garden = b && Number(b.value) > 0 ? Number(b.value) : 0;
+  const lines = [];
+  if (coins != null) {
+    lines.push({ text: `💰 ${shortCoins(coins + garden)} net worth`, strong: true, big: true });
+    lines.push({ text: `🪙 ${shortCoins(coins)} coins + 🌻 ${shortCoins(garden)} garden`, faint: true });
+  }
+  const st = watcher && watcher.status();
+  const now = Date.now();
+  const emojiOf = (kind) => (weather.BY_ID[kind] && weather.BY_ID[kind].emoji) || '🌦️';
+  const cur = st && st.current;
+  if (cur && cur.kind && cur.kind !== 'clear' && Date.parse(cur.endsAt) > now) {
+    lines.push({ text: `${emojiOf(cur.kind)} ${weather.label(cur.kind)} now · {t} left`, at: Date.parse(cur.endsAt) });
+  }
+  const next = st && (st.upcoming || []).find((e) => e.kind && e.kind !== 'clear' && Date.parse(e.startsAt) > now);
+  if (next && lines.length < 4) lines.push({ text: `${emojiOf(next.kind)} ${weather.label(next.kind)} in {t}`, at: Date.parse(next.startsAt) });
+  return lines;
 }
 function shortCoins(n) {
   const v = Number(n) || 0;
@@ -1294,6 +1462,75 @@ function pushSpotMap() {
   if (!contents || contents.isDestroyed()) return;
   contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setSpotMap(${spotMapOn()})`).catch(() => {});
 }
+/* The binder map drawn over the game during an Amber Moon or a Dawn
+ * (v0.53.4): the observer draws it from the live garden; this tells it
+ * whether one of those is on (and until when) and whether it's switched on. */
+function binderMapOn() {
+  const s = store.get();
+  return !(s.ui && s.ui.binderMap === false);
+}
+let binderKey = '';
+function pushBinderMap(force) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const st = watcher && watcher.status();
+  const cur = st && st.current;
+  const now = Date.now();
+  let ev = null;
+  if (cur && (cur.kind === 'amber' || cur.kind === 'dawn') && Date.parse(cur.endsAt) > now) ev = { kind: cur.kind, endsAt: Date.parse(cur.endsAt) };
+  else if (gardenStatus && (gardenStatus.weatherKind === 'amber' || gardenStatus.weatherKind === 'dawn')) ev = { kind: gardenStatus.weatherKind, endsAt: null };
+  const key = JSON.stringify({ on: binderMapOn(), event: ev });
+  if (!force && key === binderKey) return;
+  binderKey = key;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setBinderMap && window.__mgLoaderObserver.setBinderMap(${key})`).catch(() => {});
+}
+// The Thunderstruck finder over the game (v0.53.8): the observer draws it
+// while a Thundercharger pet is out; this only says whether it's switched on.
+function thunderMapOn() {
+  const s = store.get();
+  return !(s.ui && s.ui.thunderMap === false);
+}
+function pushThunderMap() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setThunderMap && window.__mgLoaderObserver.setThunderMap(${thunderMapOn()})`).catch(() => {});
+}
+// The riding map (v0.53.9) and where each corner map was moved to.
+function mountMapOn() {
+  const s = store.get();
+  return !(s.ui && s.ui.mountMap === false);
+}
+function pushMountMap() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const s = store.get();
+  const pos = JSON.stringify((s.ui && s.ui.mapPos) || {});
+  contents.executeJavaScript(`(() => { const o = window.__mgLoaderObserver; if (!o) return; if (o.setMapPositions) o.setMapPositions(${pos}); if (o.setMountMap) o.setMountMap(${mountMapOn()}); })()`).catch(() => {});
+}
+ipcMain.handle('ui:mountMap', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { mountMap: Boolean(on) });
+  store.save();
+  pushMountMap();
+  return mountMapOn();
+});
+ipcMain.handle('ui:thunderMap', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { thunderMap: Boolean(on) });
+  store.save();
+  pushThunderMap();
+  pushMountMap();
+  return thunderMapOn();
+});
+ipcMain.handle('ui:binderMap', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { binderMap: Boolean(on) });
+  store.save();
+  pushBinderMap(true);
+  pushThunderMap();
+  pushMountMap();
+  return binderMapOn();
+});
 ipcMain.handle('ui:spotMap', (event, on) => {
   const s = store.get();
   s.ui = Object.assign({}, s.ui, { spotMap: Boolean(on) });
@@ -1437,14 +1674,44 @@ function savedRooms() {
 }
 
 // Settings from older versions, brought up to date once at startup.
+// v0.50 rebuilt the alert sound: one volume (the voice is levelled against
+// the sounds instead of having its own slider), sound effects full / soft /
+// off, a "no voice" choice, and no "alarm" level. Runs once.
+function migrateAlertSound(s) {
+  const a = s.alerts || (s.alerts = {});
+  if (a.soundVersion >= 2) return;
+  a.soundVersion = 2;
+  // Someone who had turned the voice all the way down wanted sounds only.
+  if (a.voiceVolume === 0) {
+    a.voiceEngine = 'off';
+    // They weren't listening to it, so a note about its retirement is noise.
+    delete a.retiredVoice;
+    delete a.retiredTo;
+  }
+  if (!['full', 'soft', 'off'].includes(a.sfx)) a.sfx = 'full';
+  if (!['clear', 'normal'].includes(a.pace)) a.pace = 'clear';
+  for (const c of Array.isArray(a.custom) ? a.custom : []) {
+    if (c && c.tier === 'alarm') c.tier = 'epic';
+  }
+  delete a.voiceVolume;
+  delete a.voiceEffect;
+  delete a.voiceSpeakers;
+  store.save();
+}
+
 function migrateSettings() {
   const s = store.get();
+  migrateAlertSound(s);
   s.ui = s.ui || {};
   if (!s.ui.panel) {
     s.ui.panel = 'attached';
     s.ui.panelOpen = true;
   }
-  if (!s.ui.panelWidth) s.ui.panelWidth = 430;
+  // The panel's default width (480; it was 430 until 0.48). Anyone still on
+  // the old default moves up once; a width you chose yourself is kept.
+  if (!s.ui.panelWidth) s.ui.panelWidth = PANEL_WIDTH;
+  if (s.ui.panelWidth === 430 && !s.ui.width480) s.ui.panelWidth = PANEL_WIDTH;
+  s.ui.width480 = true;
   delete s.ui.dock;
   // Left over from an unreleased draft of the spending card.
   delete s.earnHistory;
@@ -1473,6 +1740,9 @@ function handleGardenMessage(type, payload) {
     gardenStatus.eta = gardenEta(gardenStatus);
     gardenStatus.size = sizeEta(gardenStatus);
     gardenStatus.weatherKind = weather.kindOf(gardenStatus.weather);
+    pushBinderMap(false);
+    gardenStatus.plan = gardenPlanOf(payload.gardenPlants, payload.gardenTiles);
+    delete gardenStatus.gardenPlants;
     if (gardenStatus.foundSelf) {
       checkGrown(gardenStatus);
       recordWorth(gardenStatus);
@@ -1608,6 +1878,19 @@ function handleGardenMessage(type, payload) {
     return;
   }
 
+  // A corner map dragged somewhere (or double-clicked back to the corner).
+  if (type === 'mapPos') {
+    const p = payload || {};
+    if (typeof p.id === 'string' && /^mg-[a-z-]{1,30}$/.test(p.id)) {
+      const s = store.get();
+      const pos = Object.assign({}, s.ui && s.ui.mapPos);
+      if (Number.isFinite(p.x) && Number.isFinite(p.y)) pos[p.id] = { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) };
+      else delete pos[p.id];
+      s.ui = Object.assign({}, s.ui, { mapPos: pos });
+      store.save();
+    }
+    return;
+  }
   if (type === 'superseded') {
     onSuperseded(payload);
     return;
@@ -1624,10 +1907,16 @@ function handleGardenMessage(type, payload) {
   }
 
   // The guard locked pet food and re-sent the sale (or couldn't).
+  if (type === 'stepOut') {
+    stepOutAnswer(payload && payload.act === 'ignore' ? 'ignore' : 'confirm');
+    return;
+  }
   if (type === 'sellGuard') {
     const pretty = (x) => String(x).replace(/([a-z])([A-Z])/g, '$1 $2');
     if (payload.ok) {
       recordNote(`🐾 Kept your pet food: locked ${(payload.locked || []).map(pretty).join(', ') || 'it'}, then sold the rest.`);
+    } else if (Array.isArray(payload.soldAnyway) && payload.soldAnyway.length) {
+      recordNote(`🐾 The game sold ${payload.soldAnyway.map(pretty).join(', ')} even though the app locked it. Until this is fixed, the app will stop sales with pet food in them instead of locking it for you: right-click your pet food to lock it, then sell. Please send a sample (Extras, 🛠 Troubleshooting).`, 'Pet food was sold');
     } else {
       recordNote(`🐾 Couldn't lock ${(payload.failed || []).map(pretty).join(', ') || 'your pet food'}${payload.error ? ` (${payload.error})` : ''}, so nothing was sold. Right-click to lock it and sell again; a sample (Extras, 🛠 Troubleshooting) would help.`, 'Sale stopped: pet food');
     }
@@ -1733,7 +2022,7 @@ const PANEL_MIN = 320;
 const PANEL_MAX = 700;
 
 function panelWidth() {
-  const w = Number(store.get().ui.panelWidth) || 430;
+  const w = Number(store.get().ui.panelWidth) || PANEL_WIDTH;
   return Math.max(PANEL_MIN, Math.min(PANEL_MAX, w));
 }
 
@@ -1945,12 +2234,18 @@ function createGameView() {
     relayoutSoon();
     pushHarvestLock();
     pushSpotMap();
+    pushBinderMap(true);
+    pushThunderMap();
+    pushMountMap();
     pushReadyRule();
     pushBudgetHud(true);
     // Again once the game has had a moment (the observer is ready by then).
     setTimeout(() => {
       pushHarvestLock();
       pushSpotMap();
+      pushBinderMap(true);
+      pushThunderMap();
+      pushMountMap();
       pushReadyRule();
       pushBudgetHud(true);
     }, 3000);
@@ -2192,6 +2487,21 @@ ipcMain.handle('settings:set', (event, next) => {
     folds: next.ui && next.ui.folds && typeof next.ui.folds === 'object'
       ? Object.fromEntries(Object.entries(next.ui.folds).slice(0, 120).map(([k, v]) => [String(k).slice(0, 60), Boolean(v)]))
       : current.ui.folds,
+    // The Garden map's view: to-do, value or spots.
+    gardenMap: next.ui && ['todo', 'value', 'spots'].includes(next.ui.gardenMap) ? next.ui.gardenMap : current.ui.gardenMap,
+    // The Garden tab's mutation chart: which lines are on, and the range.
+    mutChart: next.ui && next.ui.mutChart && typeof next.ui.mutChart === 'object'
+      ? Object.assign(
+        {
+          hydro: next.ui.mutChart.hydro !== false,
+          lunar: next.ui.mutChart.lunar !== false,
+          color: next.ui.mutChart.color !== false,
+          hours: [12, 24, 72, 168].includes(Number(next.ui.mutChart.hours)) ? Number(next.ui.mutChart.hours) : 24,
+        },
+        // The separate lines (v0.53.3), off unless ticked.
+        Object.fromEntries(['wet', 'chilled', 'frozen', 'thunder', 'dawn', 'amber', 'gold', 'rainbow'].map((k) => [k, next.ui.mutChart[k] === true])),
+      )
+      : current.ui.mutChart,
   });
   // The clipboard switch is the one rooms setting the panel changes directly.
   if (next.rooms && typeof next.rooms === 'object' && typeof next.rooms.clipboard === 'boolean') {
@@ -2219,6 +2529,29 @@ ipcMain.handle('game:rejoin', () => {
 });
 
 ipcMain.handle('alerts:rules', () => alerts.publicRules(store.get()));
+
+// Everything you could add an alert for, for the Alerts tab's dropdown:
+// what the shops list right now (every item, in stock or not), everything
+// the app has seen them list before, then a built-in list (decor, eggs)
+// for weather shops that haven't opened while the app was watching.
+// [{ name, itemId, shop, type, price, seen }], one per item name.
+const EGG_SHOPS = { CommonEgg: 'egg', UncommonEgg: 'egg', RareEgg: 'egg', LegendaryEgg: 'egg', MythicalEgg: 'egg', DawnEgg: 'dawn', AmberEgg: 'amber', SnowEgg: 'snow', WinterEgg: 'snow' };
+function itemCatalog() {
+  const byName = new Map();
+  const key = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const add = (it, seen) => {
+    const k = key(it.name);
+    if (!k || byName.has(k)) return;
+    byName.set(k, { name: String(it.name).slice(0, 60), itemId: String(it.itemId || '').slice(0, 80), shop: String(it.shop || ''), type: String(it.type || ''), price: Number(it.price) > 0 ? Number(it.price) : null, seen });
+  };
+  for (const it of watcher ? watcher.listed() : []) add(it, true);
+  const stats = budget.migrateStats(store.get().shopStats);
+  for (const [itemId, it] of Object.entries(stats.items)) add({ itemId, name: it.name || itemId, shop: it.shop, type: it.type, price: it.price }, true);
+  for (const d of budget.DECOR) add({ name: d.name, shop: d.shop, type: 'Decor', price: d.price }, false);
+  for (const [id, e] of Object.entries(petData.EGGS)) add({ itemId: id, name: e.name, shop: EGG_SHOPS[id] || '', type: 'Egg' }, false);
+  return [...byName.values()];
+}
+ipcMain.handle('alerts:catalog', () => itemCatalog());
 ipcMain.handle('alerts:history', () => store.get().alertHistory);
 ipcMain.handle('alerts:clearHistory', () => {
   store.get().alertHistory = [];
@@ -3020,6 +3353,14 @@ ipcMain.handle('rooms:shareSetting', (event, on) => {
 });
 ipcMain.handle('rooms:shareStatus', () => ensureSharer().status());
 
+// "Share your room with the public?" on launch: false = don't ask again.
+ipcMain.handle('rooms:askShare', (event, ask) => {
+  const s = store.get();
+  s.rooms = Object.assign({ saved: [] }, s.rooms, { askShare: Boolean(ask) });
+  store.save();
+  return s.rooms.askShare;
+});
+
 ipcMain.handle('rooms:clipboardSetting', (event, on) => {
   const s = store.get();
   s.rooms = Object.assign({ saved: [] }, s.rooms, { clipboard: Boolean(on) });
@@ -3082,7 +3423,7 @@ ipcMain.handle('garden:sample', async () => {
     const file = path.join(app.getPath('userData'), 'garden-sample.json');
     fs.writeFileSync(
       file,
-      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, lastStatus: gardenStatus, sample }, null, 2),
+      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, alertLog: alertDiagnostics(), lastStatus: gardenStatus, sample }, null, 2),
       'utf8'
     );
     shell.showItemInFolder(file);
@@ -3110,9 +3451,24 @@ ipcMain.handle('voices:remove', (event, id) => {
   voices.remove(String(id));
   return voices.list();
 });
-ipcMain.handle('voices:warm', (event, id) => voices.warm(String(id || '')));
-ipcMain.handle('voices:synthesize', async (event, id, text, speaker) =>
-  new Uint8Array(await voices.synthesize(String(id), String(text), speaker ? String(speaker) : undefined)));
+ipcMain.handle('voices:warm', (event, id, pace) => voices.warm(String(id || ''), String(pace || '')));
+ipcMain.handle('voices:synthesize', async (event, id, text, pace) =>
+  new Uint8Array(await voices.synthesize(String(id), String(text), String(pace || ''))));
+
+// Quiets the game's own sound while an alert is speaking, so the voice
+// doesn't have to compete with the music. The panel turns it on at the start
+// of an alert and off at the end; a safety timer turns it off regardless.
+let duckTimer = null;
+ipcMain.handle('game:duck', (event, on) => {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return false;
+  clearTimeout(duckTimer);
+  contents.setAudioMuted(Boolean(on));
+  if (on) duckTimer = setTimeout(() => {
+    if (!contents.isDestroyed()) contents.setAudioMuted(false);
+  }, 60000);
+  return true;
+});
 
 ipcMain.handle('scripts:list', () => listScripts());
 ipcMain.handle('scripts:toggle', (event, name, enabled) => {
@@ -3188,15 +3544,21 @@ if (!gotLock) {
   app.whenReady().then(() => {
     store.init(app.getPath('userData'));
     voices.init(app.getPath('userData'));
-    // The v0.18 voice lineup: remove downloads of voices that were retired,
-    // and move anyone using one of them to Prudence (with a note saying so).
+    // The v0.50 voice lineup: remove downloads of voices that were retired,
+    // and move anyone using one of them to the closest new voice that's
+    // downloaded (the old effect voices were Leah underneath, so they move
+    // straight over). With none downloaded, alerts use the computer's voice
+    // until one is; the Alerts tab says so once.
     try {
       voices.pruneUnused();
       const st = store.get();
       const ids = voices.CATALOG.map((v) => v.id);
       if (st.alerts.naturalVoice && !ids.includes(st.alerts.naturalVoice)) {
+        const { to, use } = voices.replacementFor(st.alerts.naturalVoice);
         st.alerts.retiredVoice = st.alerts.naturalVoice;
-        st.alerts.naturalVoice = 'char-prudence';
+        st.alerts.retiredTo = use || to;
+        st.alerts.naturalVoice = use || '';
+        if (!use && st.alerts.voiceEngine === 'natural') st.alerts.voiceEngine = 'system';
         store.save();
       }
     } catch (err) {

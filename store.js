@@ -8,15 +8,19 @@ const path = require('path');
 
 const DEFAULTS = {
   alerts: {
+    // One volume for everything; the voice is levelled to sit a little above
+    // the sounds. `sfx` is how loud the attention sounds are around the voice.
     volume: 95,
-    voiceVolume: 35,
+    sfx: 'full',            // 'full' | 'soft' | 'off'
     muted: false,
-    voice: '',
+    voice: '',              // the computer's own voice, by name
     voicePref: '',
-    voiceEngine: 'system',
+    voiceEngine: 'system',  // 'system' | 'natural' | 'off' (sounds only)
     naturalVoice: '',
-    voiceSpeakers: {},
-    voiceEffect: 'none',
+    pace: 'clear',          // 'clear' (a little slower) | 'normal'
+    duckGame: true,         // quiet the game while an alert speaks
+    // Your own level for a built-in item alert: { moonbinder: 'epic' }.
+    levels: {},
     snoozeUntil: 0,
     keepAwake: true,
     outputDevice: '',

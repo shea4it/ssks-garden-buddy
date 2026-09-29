@@ -10,7 +10,6 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { russianize } = require('./russian');
 
 const ENGINE_BASE = 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/';
 const ENGINES = {
@@ -22,65 +21,74 @@ const ENGINES = {
 
 const VOICE_BASE = 'https://huggingface.co/rhasspy/piper-voices/resolve/main/';
 
-// The voices, chosen for quality first and personality second (v0.18).
-// Quality notes from a listening test of every English Piper voice
-// (quick-tts.com, "Every Piper Voice, Ranked", May 2026): Lessac-high is the
-// best-sounding English voice, Amy the warmest for short alerts, Cori a
-// strong corpus, VCTK a clean multi-speaker set recorded in Edinburgh.
-
-// SEMAINE: four actors recorded for emotion research, each playing one
-// character: cheerful Poppy, grumpy Spike, gloomy Obadiah, sensible Prudence.
-// One download covers all four (speaker ids from Piper's voices.json:
-// prudence 0, spike 1, obadiah 2, poppy 3).
-const SEMAINE = { model: 'en_GB-semaine-medium', dir: 'en/en_GB/semaine/medium' };
-
-// The effect voices are Lessac (high quality) with sound effects on top, so
-// one download covers all of them. The effects are applied as the clip plays.
-const LESSAC = { model: 'en_US-lessac-high', dir: 'en/en_US/lessac/high' };
-
-// VCTK's Scottish men (the corpus's speaker notes list these as Scottish:
-// Edinburgh, Fife, Perth, Midlothian and more). "Try another" steps through.
-const SCOTTISH_MEN = ['p252', 'p272', 'p281', 'p285', 'p275', 'p237', 'p241', 'p246', 'p247', 'p255', 'p260', 'p263', 'p271', 'p284'];
-
+// v0.50: four voices, picked for one thing: being easy to understand from
+// across a room on a house speaker. No sound effects, no characters, no pitch
+// tricks: those made alerts hard to follow (measured: the old radio / stadium
+// / trailer effects cost 13-27 % of speech intelligibility, extended STOI).
+//
+// v0.50.2: every built-in line was rendered through every voice and checked
+// (Praat pitch and harmonics, Whisper small.en transcripts, the waveform;
+// tests/voice-audit.py and tests/README.md "Voice audit"). Ryan was
+// replaced by Alan: Ryan started speaking on the very first sample in 36 of
+// 41 lines (a click and a clipped first sound) and had 40 pitch breaks on 17
+// test lines; Alan had 7 (the steadiest of all nine voices tried) and Whisper
+// misheard 2 of the 17 lines against Ryan's 7.
+//
+// Per voice:
+//   tone.presence  dB lift around 3 kHz, where words are told apart
+//   tone.air       dB high-shelf above 7 kHz. Cori, Alba and Alan carry
+//                  about 15 dB more synthesis fizz on their vowels than Leah
+//                  (-35 vs -50 dB), which small speakers turn into something
+//                  that sounds distorted; -6 takes the edge off it and leaves
+//                  the "s" sounds (mostly 4-7 kHz) alone.
+//   noise          Piper's randomness [noise_scale, noise_w] (its default
+//                  is 0.667, 0.8). Piper never says a line the same way
+//                  twice, so a voice can crack on one alert and not the next.
+//                  Leah is the most expressive voice (a 16.7-semitone pitch
+//                  range, twice the others'), and 8 of 24 renders of the same
+//                  4 lines squeaked (a jump of 10+ semitones held 50 ms+,
+//                  Praat); at noise_scale 0 it was 1 of 24, with no loss in
+//                  Whisper's transcripts. Cori and Alba never squeaked;
+//                  0.4 / 0.5 gave them fewer pitch breaks and Cori fewer
+//                  misheard lines. Alan: none at his defaults, so left alone.
 const CATALOG = [
-  Object.assign({ group: 'Characters', id: 'char-poppy', name: 'Poppy', accent: 'British', gender: 'Female', speakers: ['poppy'], persona: 'poppy',
-    note: 'Bubbly and absolutely delighted about everything. Every restock is the best day of her life.',
-    preview: "Ooh! Hi, I'm Poppy! Oh my gosh, a Moonbinder is in the shop! Quick quick quick!" }, SEMAINE),
-  Object.assign({ group: 'Characters', id: 'char-spike', name: 'Spike', accent: 'British', gender: 'Male', speakers: ['spike'], persona: 'spike',
-    note: "Grumpy and sarcastic. He'll tell you, but he won't be happy about it.",
-    preview: "Ugh. I'm Spike. Fine. A Moonbinder is in the shop. Go on then, off you go." }, SEMAINE),
-  Object.assign({ group: 'Characters', id: 'char-obadiah', name: 'Obadiah', accent: 'British', gender: 'Male', speakers: ['obadiah'], persona: 'obadiah',
-    note: 'Gloomy and deadpan. Every alert is a small tragedy.',
-    preview: 'Oh. Hello. I am Obadiah. A Moonbinder is in the shop. Not that it matters, really.' }, SEMAINE),
-  Object.assign({ group: 'Characters', id: 'char-prudence', name: 'Prudence', accent: 'British', gender: 'Female', speakers: ['prudence'], persona: 'prudence',
-    note: 'Calm and sensible. Never flustered, always helpful.',
-    preview: "Hello, I'm Prudence. Just so you know, a Moonbinder is in the shop." }, SEMAINE),
-
-  { group: 'Storytellers', id: 'en_GB-cori-high', dir: 'en/en_GB/cori/high', name: 'Storybook', accent: 'British', gender: 'Female', persona: 'storybook',
-    note: 'A warm audiobook narrator. Every alert becomes a bedtime story.',
-    preview: 'Once upon a time, in a garden not far from here, a Moonbinder appeared in the shop.' },
-  { group: 'Storytellers', id: 'en_US-amy-medium', dir: 'en/en_US/amy/medium', name: 'Amy', accent: 'American', gender: 'Female',
-    note: 'Warm, friendly and clear. Just the news, nicely.',
-    preview: "Hi, I'm Amy. Heads up, a Moonbinder is in the shop!" },
-
-  { group: 'Scottish', id: 'en_GB-alba-medium', dir: 'en/en_GB/alba/medium', name: 'Alba', accent: 'Scottish', gender: 'Female',
-    note: 'A soft Scottish lilt.',
-    preview: "Hiya, I'm Alba. There's a Moonbinder in the shop!" },
-  { group: 'Scottish', id: 'scottish-male', model: 'en_GB-vctk-medium', dir: 'en/en_GB/vctk/medium', name: 'Callum', accent: 'Scottish', gender: 'Male',
-    note: 'A real Scottish voice, recorded in Edinburgh. Use "Try another" to hear the other Scottish speakers.',
-    speakers: SCOTTISH_MEN,
-    preview: "Hiya, I'm Callum. There's a Moonbinder in the shop!" },
-
-  Object.assign({ group: 'Showtime', id: 'fun-stadium', name: 'Stadium announcer', accent: 'Showtime', effect: 'stadium', persona: 'stadium',
-    note: 'A big, echoing arena voice.',
-    preview: 'Ladies and gentlemen! Moonbinder! Is in! The shop!' }, LESSAC),
-  Object.assign({ group: 'Showtime', id: 'fun-radio', name: 'Old radio', accent: 'Showtime', effect: 'radio', persona: 'radio',
-    note: 'A crackly vintage broadcast.',
-    preview: 'This is your garden bulletin. Moonbinder is in the shop. Over.' }, LESSAC),
-  Object.assign({ group: 'Showtime', id: 'fun-trailer', name: 'Movie trailer', accent: 'Showtime', effect: 'trailer', persona: 'trailer',
-    note: 'Deep, dramatic, and echoing through a cinema.',
-    preview: 'In a world... where the shop restocks without warning... one seed... changes everything. Moonbinder.' }, LESSAC),
+  { id: 'en_US-lessac-high', dir: 'en/en_US/lessac/high', name: 'Leah', accent: 'American', gender: 'Female', mb: 109, recommended: true,
+    tone: { presence: 3, air: 0 }, noise: [0, 0.5],
+    note: 'The clearest voice here. Crisp and even, easy to follow from across the room.' },
+  { id: 'en_GB-cori-high', dir: 'en/en_GB/cori/high', name: 'Cori', accent: 'British', gender: 'Female', mb: 114,
+    tone: { presence: 1.5, air: -6 }, noise: [0.4, 0.5],
+    note: 'A warm British voice, recorded by an audiobook narrator.' },
+  { id: 'en_GB-alan-medium', dir: 'en/en_GB/alan/medium', name: 'Alan', accent: 'British', gender: 'Male', mb: 63,
+    tone: { presence: 2, air: -6 },
+    note: 'A calm, steady British man\'s voice.' },
+  { id: 'en_GB-alba-medium', dir: 'en/en_GB/alba/medium', name: 'Alba', accent: 'Scottish', gender: 'Female', mb: 63,
+    tone: { presence: 1.5, air: -6 }, noise: [0.4, 0.5],
+    note: 'A soft Scottish lilt. A smaller download and a touch less crisp than the others.' },
 ];
+
+// Voices from before and the closest one now. The old effect voices
+// (stadium, radio, trailer) were Lessac underneath, so their download is
+// already there and they move over without downloading anything.
+const RETIRED = {
+  'fun-stadium': 'en_US-lessac-high',
+  'fun-radio': 'en_US-lessac-high',
+  'fun-trailer': 'en_US-lessac-high',
+  'en_US-amy-medium': 'en_US-lessac-high',
+  'char-poppy': 'en_GB-cori-high',
+  'char-prudence': 'en_GB-cori-high',
+  'char-spike': 'en_GB-alan-medium',
+  'char-obadiah': 'en_GB-alan-medium',
+  'scottish-male': 'en_GB-alan-medium',
+  'en_US-ryan-high': 'en_GB-alan-medium',
+};
+
+// How fast the voice talks. Piper takes this when it starts (not per line),
+// so a change restarts it. "clear" is a little slower, with longer pauses
+// between sentences: easier in a room with echo or game music.
+const PACES = {
+  clear: { length: 1.1, gap: 0.35 },
+  normal: { length: 1.0, gap: 0.25 },
+};
 
 // Several catalog entries can share one downloaded model file.
 function modelOf(v) {
@@ -148,35 +156,6 @@ function modelInstalled(model) {
 function voiceInstalled(id) {
   const v = voiceById(id);
   return Boolean(v) && modelInstalled(modelOf(v));
-}
-
-// Speaker names (like "p288") map to numbers inside a multi-speaker model.
-const speakerMaps = {};
-function speakerMap(model) {
-  if (!speakerMaps[model]) {
-    try {
-      speakerMaps[model] = JSON.parse(fs.readFileSync(modelPath(model) + '.json', 'utf8')).speaker_id_map || {};
-    } catch (err) {
-      return {};
-    }
-  }
-  return speakerMaps[model];
-}
-
-// The candidate speakers this voice can actually use, in order.
-function availableSpeakers(v) {
-  if (!v.speakers) return [];
-  const map = speakerMap(modelOf(v));
-  return v.speakers.filter((name) => Object.prototype.hasOwnProperty.call(map, name));
-}
-
-// The number Piper needs for this voice's speaker, or null for single-speaker voices.
-function speakerIdFor(v, speaker) {
-  const map = speakerMap(modelOf(v));
-  const speakers = availableSpeakers(v);
-  if (speakers.length) return map[speakers.includes(speaker) ? speaker : speakers[0]];
-  if (v.speakerIndex != null && Object.keys(map).length > v.speakerIndex) return v.speakerIndex;
-  return null;
 }
 
 /* ---------------------------------------------------------------- *
@@ -300,7 +279,6 @@ async function installVoice(id, onProgress) {
   }
   fs.renameSync(modelPath(model) + '.dl', modelPath(model));
   fs.renameSync(cfg + '.dl', cfg);
-  delete speakerMaps[model];
 }
 
 // Engine first (once), then the voice. Only one download at a time.
@@ -343,10 +321,9 @@ function remove(id) {
   const v = voiceById(id);
   if (!v) return;
   const model = modelOf(v);
-  if (procVoice === model) stopProcess();
+  if (procVoice && procVoice.startsWith(model + '|')) stopProcess();
   fs.rmSync(modelPath(model), { force: true });
   fs.rmSync(modelPath(model) + '.json', { force: true });
-  delete speakerMaps[model];
 }
 
 /* ---------------------------------------------------------------- *
@@ -376,15 +353,23 @@ function stopProcess() {
   failJobs('The voice was switched');
 }
 
-function startProcess(id) {
+function paceOf(pace) {
+  return PACES[pace] ? pace : 'clear';
+}
+
+function startProcess(model, pace) {
   stopProcess();
   const exe = enginePath();
-  proc = spawn(exe, ['--model', modelPath(id), '--json-input', '--quiet', '--output_dir', tmpDir()], {
+  const p = PACES[paceOf(pace)];
+  const voice = CATALOG.find((v) => modelOf(v) === model);
+  const steady = voice && voice.noise ? ['--noise_scale', String(voice.noise[0]), '--noise_w', String(voice.noise[1])] : [];
+  proc = spawn(exe, ['--model', modelPath(model), '--json-input', '--quiet', '--output_dir', tmpDir(),
+    '--length_scale', String(p.length), '--sentence_silence', String(p.gap), ...steady], {
     cwd: path.dirname(exe),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  procVoice = id;
+  procVoice = model + '|' + paceOf(pace);
   stdoutBuf = '';
   const mine = proc;
   proc.stdout.setEncoding('utf8');
@@ -414,18 +399,32 @@ function startProcess(id) {
   });
 }
 
-async function synthesize(id, text, speaker) {
+// `pace` is 'clear' (the default) or 'normal'.
+// One line at a time. Switching voice or pace restarts Piper, which would
+// cut off a line still being made (an alert speaking while you pick another
+// voice, change the pace or press a preview: the alert failed, or fell back
+// to the computer's voice halfway through). So every line, and every warm
+// start, waits its turn behind whatever is in progress.
+let queue = Promise.resolve();
+function inTurn(fn) {
+  const run = queue.then(fn);
+  queue = run.catch(() => {});
+  return run;
+}
+
+function synthesize(id, text, pace) {
+  return inTurn(() => synthesizeNow(id, text, pace));
+}
+
+async function synthesizeNow(id, text, pace) {
   const v = voiceById(id);
   if (!v || !engineInstalled() || !voiceInstalled(id)) throw new Error("That voice isn't downloaded");
-  const model = modelOf(v);
-  if (!proc || procVoice !== model) startProcess(model);
+  const key = modelOf(v) + '|' + paceOf(pace);
+  if (!proc || procVoice !== key) startProcess(modelOf(v), pace);
   counter += 1;
   const file = path.resolve(path.join(tmpDir(), `line-${Date.now()}-${counter}.wav`));
-  let clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 400);
-  if (v.transform === 'russian') clean = russianize(clean);
+  const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 400);
   const line = { text: clean, output_file: file };
-  const sid = speakerIdFor(v, speaker);
-  if (sid != null) line.speaker_id = sid;
   const finished = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       jobs.delete(file);
@@ -440,9 +439,11 @@ async function synthesize(id, text, speaker) {
   return bytes;
 }
 
-function warm(id) {
-  const v = voiceById(id);
-  if (v && engineInstalled() && voiceInstalled(id) && procVoice !== modelOf(v)) startProcess(modelOf(v));
+function warm(id, pace) {
+  return inTurn(() => {
+    const v = voiceById(id);
+    if (v && engineInstalled() && voiceInstalled(id) && procVoice !== modelOf(v) + '|' + paceOf(pace)) startProcess(modelOf(v), pace);
+  });
 }
 
 function list() {
@@ -450,18 +451,26 @@ function list() {
     available: Boolean(engineSpec()),
     engineInstalled: engineInstalled(),
     downloading,
-    voices: CATALOG.map((v) => Object.assign({}, v, {
-      installed: voiceInstalled(v.id),
-      speakers: voiceInstalled(v.id) ? availableSpeakers(v) : v.speakers || [],
-      sharesDownloadWith: CATALOG.filter((o) => o.id !== v.id && modelOf(o) === modelOf(v)).map((o) => o.name),
-    })),
+    voices: CATALOG.map((v) => Object.assign({}, v, { installed: voiceInstalled(v.id) })),
   };
+}
+
+// A voice from an older version: what to use now. `to` is the closest new
+// voice; `use` is the best one that's actually downloaded (the closest if
+// it is, else any downloaded one), or null if none are.
+function replacementFor(oldId) {
+  const to = RETIRED[oldId] || CATALOG[0].id;
+  const use = voiceInstalled(to) ? to : (CATALOG.find((v) => voiceInstalled(v.id)) || {}).id || null;
+  return { to, use };
 }
 
 module.exports = {
   init,
   pruneUnused,
   CATALOG,
+  RETIRED,
+  PACES,
+  replacementFor,
   list,
   download,
   remove,

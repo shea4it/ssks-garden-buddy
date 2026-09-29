@@ -78,7 +78,11 @@ app.whenReady().then(async () => {
       const gameSt = budgetMod.stage(ctx, 35982699984 + 487.26e9);
       await run(p, `(() => { window.__realRefresh = refreshBudget; refreshBudget = async () => {}; BUDGET = Object.assign({}, BUDGET, { unlocked: true, foresight: ${JSON.stringify(fsReal)}, stage: ${JSON.stringify(gameSt)}, cropStage: ${JSON.stringify(cropSt)} }); renderBudget(); })()`);
     }
-    const tabs = await run(p, "[...document.querySelectorAll('nav [data-tab]')].map((b) => b.dataset.tab)");
+    if (FRESH) fs.writeFileSync(path.join(OUT, 'launch.png'), (await p.capturePage()).toPNG());
+    // Answer the launch question (Not now) so it doesn't cover the tour.
+    await run(p, "(() => { const b = document.getElementById('shareAskNo'); if (b) b.click(); })()");
+    await wait(400);
+    const tabs = await run(p, "[...document.querySelectorAll('nav [data-tab]')].map((b) => b.dataset.tab).filter((t) => !document.querySelector(`nav [data-tab=\"${t}\"]`).hidden)");
     tabs.push('alerts-open');
     const index = [];
     for (const tab0 of tabs) {
@@ -99,6 +103,49 @@ app.whenReady().then(async () => {
         index.push({ tab, n, file, top });
         n += 1;
       }
+    }
+    // The status card with weather on right now (Thunderstorm, 12 minutes left).
+    if (!FRESH) {
+      await run(p, "(() => { showTab('alerts'); document.querySelector('main').scrollTop = 0; const T = Date.now(); STATUS = Object.assign({}, STATUS, { current: { kind: 'thunder', name: 'Thunderstorm', announced: true, startsAt: new Date(T - 60000).toISOString(), endsAt: new Date(T + 12 * 60000).toISOString() } }); renderStatus(); })()");
+      await wait(500);
+      fs.writeFileSync(path.join(OUT, 'status-now.png'), (await p.capturePage()).toPNG());
+    }
+    // Hover read-outs: move the mouse over each chart and capture it.
+    if (!FRESH) {
+      const hoverShot = async (tab, sel, file, fx) => {
+        const r = await run(p, `(() => { showTab('${tab}'); const e = document.querySelector('${sel}'); if (!e) return null; e.scrollIntoView({ block: 'center' }); const b = e.getBoundingClientRect(); return { x: b.left + b.width * ${fx}, y: b.top + b.height * 0.45 }; })()`);
+        if (!r) return;
+        await wait(350);
+        p.sendInputEvent({ type: 'mouseMove', x: Math.round(r.x), y: Math.round(r.y) });
+        await wait(350);
+        fs.writeFileSync(path.join(OUT, file), (await p.capturePage()).toPNG());
+        p.sendInputEvent({ type: 'mouseMove', x: 2, y: 2 });
+      };
+      // Garden worth: three days that start near 400B and end near 510B.
+      await run(p, "(() => { const T = Date.now(); WORTH = []; for (let i = 0; i <= 144; i += 1) { const t = T - 3 * 86400000 + i * 1800000; WORTH.push({ t, v: Math.round(400e9 + i * 0.75e9 + Math.sin(i / 7) * 12e9 - (i % 48 === 40 ? 30e9 : 0)) }); } WORTH_DAYS = 7; renderWorth(); })()");
+      // Gold & Rainbow: three days of hours.
+      await run(p, "(() => { const nowH = Math.floor(Date.now() / 3600000); const hourly = {}; for (let i = 0; i < 72; i += 1) hourly[nowH - i] = { g: Math.max(0, Math.round(1.2 + Math.sin(i / 4) * 1.2 + (i % 5 === 0 ? 2 : 0))), r: i % 7 === 0 ? 1 : 0, w: 1 }; GARDEN_STATS = Object.assign({}, GARDEN_STATS, { hourly, hourlySince: Date.now() - 72 * 3600000 }); GOLD_RANGE = 24; renderGoldRate(); })()");
+      await hoverShot('money', '#moneyForesight svg.money-chart', 'hover-money.png', 0.7);
+      await hoverShot('money', '#moneyForesight svg.money-chart', 'hover-money-past.png', 0.2);
+      await hoverShot('garden', '#worthChart svg', 'hover-worth.png', 0.35);
+      await hoverShot('garden', '#goldRate svg', 'hover-gold.png', 0.55);
+      await hoverShot('money', '#moneyGrowth svg', 'hover-growth.png', 0.6);
+    }
+    // The Luck tab with one guarantee a pull away and its egg opened.
+    if (!FRESH) {
+      await run(p, "(() => { showTab('pity'); document.querySelector('main').scrollTop = 0; const g = LUCK.groups.egg && LUCK.groups.egg[0]; if (g) { const r = g.rows[0]; r.value = r.threshold - 1; r.left = 1; r.primed = true; r.estimated = false; } renderLuck(); })()");
+      await wait(400);
+      fs.writeFileSync(path.join(OUT, 'luck-primed.png'), (await p.capturePage()).toPNG());
+      await run(p, "(() => { const d = document.querySelector('#luckEggs details:nth-of-type(2)'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } })()");
+      await wait(400);
+      fs.writeFileSync(path.join(OUT, 'luck-open.png'), (await p.capturePage()).toPNG());
+    }
+    // The money chart with only 6 hours of past (a fresh-ish install).
+    if (!FRESH) {
+      await run(p, "(() => { showTab('money'); document.querySelector('main').scrollTop = 0; const fsx = BUDGET.foresight; window.__fullHist = fsx.history; if (fsx.history) fsx.history = Object.assign({}, fsx.history, { line: fsx.history.line.filter((q) => q[0] >= -0.25), days: 0.25 }); renderBudget(); })()");
+      await wait(500);
+      fs.writeFileSync(path.join(OUT, 'money-short-past.png'), (await p.capturePage()).toPNG());
+      await run(p, "(() => { BUDGET.foresight.history = window.__fullHist; renderBudget(); })()");
     }
     // The money chart with "How to read this" open.
     if (!FRESH) {

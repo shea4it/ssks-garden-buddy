@@ -40,7 +40,8 @@ try {
     worth.push({ t, v: 20000 });
     money.push({ t, c: 0.8e9, s: 0, f: 0 });
   }
-  if (!fs0.existsSync(f)) fs0.writeFileSync(f, JSON.stringify({ worthHistory: worth, moneyHistory: money.concat([{ t: T - 26 * H0, c: 0.8e9, s: 0, f: 0 }, { t: T - 2 * H0, c: 1e9, s: 0, f: 0 }, { t: T - H0, c: 1.5e9, s: 1e9, f: 0 }]) }));
+  // ui.panelWidth 430: the old default, which should move up to 480 once.
+  if (!fs0.existsSync(f)) fs0.writeFileSync(f, JSON.stringify({ ui: { panelWidth: 430 }, worthHistory: worth, moneyHistory: money.concat([{ t: T - 26 * H0, c: 0.8e9, s: 0, f: 0 }, { t: T - 2 * H0, c: 1e9, s: 0, f: 0 }, { t: T - H0, c: 1.5e9, s: 1e9, f: 0 }]) }));
 } catch (e) { out.errors.push('seed: ' + e); }
 require('../main.js');
 app.whenReady().then(async () => {
@@ -48,6 +49,7 @@ app.whenReady().then(async () => {
   try {
     await wait(5000);
     out.steps.push({ gameUrl: game() && game().getURL(), panelUrl: panel() && panel().getURL() });
+    out.panelWidthAtStart = { saved: readSettings().ui && readSettings().ui.panelWidth, panel: await run(panel(), 'PANEL.width') };
     out.observer = await run(game(), 'Boolean(window.__mgLoaderObserver) && { welcomes: window.__mgLoaderObserver.welcomes, sockets: window.__mgLoaderObserver.sockets, canSend: !!window.__mgLoaderObserver.gameSocket }');
     const s1 = readSettings();
     out.afterBacklog = { syncConnection: s1.pity.syncConnection, lastEggsHatched: s1.pity.lastEggsHatched, totalHatches: s1.pity.totalHatches, trackedBase: s1.pity.trackedBase, gameBase: s1.pity.gameBase };
@@ -58,6 +60,12 @@ app.whenReady().then(async () => {
     const saved = await run(panel(), `window.app.setSettings(${JSON.stringify(stale)})`);
     out.whitelist = { volume: saved.alerts.volume, tab: saved.ui.tab, panel: saved.ui.panel, panelWidth: saved.ui.panelWidth, pityTotal: saved.pity.totalHatches, rooms: saved.rooms, harvestOn: saved.harvestLock && saved.harvestLock.on, worth: saved.worthHistory, logoff: saved.logoff.enabled, clipboard: saved.rooms.clipboard };
     await wait(6000); // the patch at 6 s and the status after it (2 s debounce) and the coins patch at 9 s
+    // On launch: "Share your room with the public?". Tick "Don't ask me
+    // again" and press Not now: nothing shared, and it won't ask again.
+    out.shareAsk = { shown: await run(panel(), "!!document.getElementById('shareAsk')"), title: await run(panel(), "(document.getElementById('shareAskTitle') || {}).textContent || null") };
+    await run(panel(), "(() => { const c = document.getElementById('shareAskNever'); if (c) c.checked = true; const b = document.getElementById('shareAskNo'); if (b) b.click(); })()");
+    await wait(2200); // settings are written in a batch 1.5 s later
+    out.shareAsk.after = { gone: await run(panel(), "!document.getElementById('shareAsk')"), askSaved: readSettings().rooms && readSettings().rooms.askShare, shareOn: Boolean(readSettings().rooms && readSettings().rooms.share) };
     const s2 = readSettings();
     out.afterPatch = { lastEggsHatched: s2.pity.lastEggsHatched, totalHatches: s2.pity.totalHatches, coinsSaved: s2.pity.syncConnection };
     out.status = await run(panel(), 'window.app.getGarden().then((g) => g && g.status && ({ session: g.status.session, eggsHatched: g.status.eggsHatched, connected: g.status.connected, foundSelf: g.status.foundSelf }))');
@@ -102,6 +110,14 @@ app.whenReady().then(async () => {
     await wait(800);
     const hud = () => run(game(), "(() => { const b = document.getElementById('mg-money-box'); const c = document.getElementById('mg-corner'); return { present: !!b, shown: !!b && b.style.display !== 'none', lines: b ? [...b.children].map((x) => x.textContent) : [], inCorner: !!(b && c && b.parentNode === c) }; })()");
     out.plan.hud = await hud();
+    // A picture of the money box (bottom right of the game).
+    {
+      const img = await game().capturePage();
+      const sz = img.getSize();
+      fs.writeFileSync((process.env.MG_TEST_DIR || __dirname) + '/money-box.png', img.crop({ x: Math.max(0, sz.width - 320), y: Math.max(0, sz.height - 220), width: Math.min(320, sz.width), height: Math.min(220, sz.height) }).toPNG());
+      await wait(2200);
+      out.plan.hudLater = await hud();
+    }
     await run(panel(), "showTab('garden'); refreshBudget(true)");
     await wait(800);
     out.plan.panelText = await run(panel(), "document.getElementById('budgetPlan').textContent.replace(/\\s+/g, ' ').slice(0, 420)");
@@ -116,14 +132,14 @@ app.whenReady().then(async () => {
       // The stand-in's wallet is 2B, so the automatic rule wants 14 days; 26 h is not enough.
       unlocked: bp.unlocked, unlockDays: bp.unlockDays, netWorth: bp.netWorth, measuredHours: Math.round(bp.measuredHours),
       tabShown: await run(panel(), "!document.querySelector('nav [data-tab=\"money\"]').hidden"),
-      progress: await run(panel(), "document.getElementById('moneyProgress').textContent"),
+      progress: await run(panel(), "document.getElementById('moneyIntro').hidden ? '' : document.getElementById('moneyIntro').textContent.replace(/\\s+/g, ' ').slice(0, 160)"),
       unlockedSaved: readSettings().budget && readSettings().budget.unlocked,
     };
     // Extras: show it now / keep it hidden / automatic.
     const modeCheck = async (mode) => {
       const v2 = await run(panel(), `window.app.budgetSet({ unlockMode: '${mode}' }).then((v) => { BUDGET = v; budgetFetchedAt = Date.now(); renderBudget(); return v; })`);
       await wait(200);
-      return { mode: v2.unlockMode, unlocked: v2.unlocked, tabShown: await run(panel(), "!document.querySelector('nav [data-tab=\"money\"]').hidden"), progress: await run(panel(), "document.getElementById('moneyProgress').textContent"), chip: await run(panel(), "document.querySelector('#moneyUnlock .chip.on') && document.querySelector('#moneyUnlock .chip.on').dataset.unlock") };
+      return { mode: v2.unlockMode, unlocked: v2.unlocked, tabShown: await run(panel(), "!document.querySelector('nav [data-tab=\"money\"]').hidden"), progress: await run(panel(), "document.getElementById('moneyIntro').hidden ? '' : 'welcome card'"), chip: await run(panel(), "document.querySelector('#moneyUnlock .chip.on') && document.querySelector('#moneyUnlock .chip.on').dataset.unlock") };
     };
     out.tally.modes = { on: await modeCheck('on'), off: await modeCheck('off'), auto: await modeCheck('auto') };
     // Reset: purchases go, the shop's seen counts stay, the tally seen is kept (no re-count).
@@ -155,6 +171,9 @@ app.whenReady().then(async () => {
       saw: await run(game(), 'window.__mgLoaderObserver.lastSaleCheck'),
       bannerShown: await run(game(), "[...document.body.children].some((e) => /Kept your pet food/.test(e.textContent))"),
       shapes: await run(game(), 'Object.keys(window.__mgLoaderObserver.sample().inventoryShapes)'),
+      // What's left in the bag: the pet food (Eggplant, Apple) must still be
+      // there, locked by its own ids; Carrots and Cactus sold.
+      cropsLeft: (serverLog().filter((l) => l.afterSell).slice(-1)[0] || {}).afterSell,
     };
     out.petFood.noted = (readSettings().alertHistory || []).slice(-1)[0] && (readSettings().alertHistory || []).slice(-1)[0].text;
     out.petFood.savedLockField = readSettings().harvestLock && readSettings().harvestLock.lockField;
@@ -338,11 +357,37 @@ app.whenReady().then(async () => {
         const row = id ? document.querySelector('.plan-item[data-want="' + id + '"]') : null;
         return { hadButton: !!btn, foldedBefore: folded0, openAfterButton, iconId: id, rowFlashed: !!(row && row.classList.contains('flash')) };
       })()`);
+      // Hover read-outs: move the mouse over charts and read the box.
+      {
+        const hoverRead = async (tab, sel, fx) => {
+          const r = await run(panel(), `(() => { showTab('${tab}'); const e = document.querySelector('${sel}'); if (!e) return null; e.scrollIntoView({ block: 'center' }); const b = e.getBoundingClientRect(); return { x: b.left + b.width * ${fx}, y: b.top + b.height * 0.45 }; })()`);
+          if (!r) return null;
+          await wait(300);
+          panel().sendInputEvent({ type: 'mouseMove', x: Math.round(r.x), y: Math.round(r.y) });
+          await wait(300);
+          const text = await run(panel(), "(() => { const t = document.getElementById('chartTip'); return t && !t.hidden ? t.textContent.replace(/\\s+/g, ' ').trim() : null; })()");
+          const dots = await run(panel(), `document.querySelectorAll('${sel} .hv-layer circle').length`);
+          panel().sendInputEvent({ type: 'mouseMove', x: 2, y: 2 });
+          await wait(200);
+          return { text, dots };
+        };
+        out.hover = {
+          money: await hoverRead('money', '#moneyForesight svg.money-chart', 0.7),
+          growth: await hoverRead('money', '#moneyGrowth svg', 0.6),
+          worth: await hoverRead('garden', '#worthChart svg', 0.5),
+          gone: await run(panel(), "document.getElementById('chartTip').hidden"),
+        };
+        if (process.env.MG_TEST_DIR) {
+          await run(panel(), "showTab('money'); document.querySelector('#moneyGrowth svg') && document.querySelector('#moneyGrowth svg').scrollIntoView({ block: 'center' })");
+        }
+      }
       // The buy-everything line: crossed once, remembered; the meter shows it.
       const bset = readSettings().budget || {};
       await run(panel(), 'refreshBudget(true)');
       await wait(800);
-      out.everything = { crossedAt: Boolean(bset.everythingCrossedAt), best: bset.everythingBest, meter: await run(panel(), "(document.querySelector('.ev-status') || {}).textContent || null") };
+      out.everything = { crossedAt: Boolean(bset.everythingCrossedAt), best: bset.everythingBest, meter: await run(panel(), "(document.querySelector('.ev-status') || {}).textContent || null"),
+        // A new install already past the line: noted quietly, no party.
+        celebrated: (readSettings().alertHistory || []).some((a) => /crossed the buy-everything line/.test(a.text || '')) };
       // A picture with three days of made-up procs, to check the chart.
       const fake = {};
       const nowH = Math.floor(T / 3600000);
@@ -386,6 +431,30 @@ app.whenReady().then(async () => {
     const s3 = readSettings();
     out.budget.saved = { statsItems: Object.keys((s3.shopStats && s3.shopStats.items) || {}), moneyPoints: (s3.moneyHistory || []).length, purchases: s3.purchases && s3.purchases.total, leftovers: { earnHistory: 'earnHistory' in s3, budget: 'budget' in s3 } };
     out.panelErrors = await run(panel(), 'window.__errs || null');
+    // A shard on the garden map: its own colour and its real name.
+    out.shardOnMap = await run(panel(), "(() => { showTab('garden'); renderGarden(); const cells = [...document.querySelectorAll('#spotMap i.s')]; const other = [...document.querySelectorAll('#spotMap i.o')].map((c) => c.title); return { shards: cells.map((c) => c.title), somethings: other, keyHasShard: !!document.querySelector('.spot-key .k-s') }; })()");
+    // Stepping out for weather asks first: Ignore skips that event, Confirm
+    // steps out (then come back). Last, because stepping out swaps the page.
+    {
+      const T = global.__mgTest;
+      const iso = (ms) => new Date(Date.now() + ms).toISOString();
+      const ev1 = { kind: 'rain', startsAt: iso(50000), endsAt: iso(300000) };
+      T.askStepOut(ev1, Date.now() + 20000);
+      await wait(700);
+      const card = await run(game(), "(document.getElementById('__mgStepOut') || {}).textContent || null");
+      await run(game(), "document.querySelector('#__mgStepOut [data-act=\"ignore\"]').click()");
+      await wait(700);
+      const afterIgnore = { asking: T.stepAsk(), parked: Boolean(T.parked()), skipped: T.skipEvent() === ev1.startsAt, cardGone: await run(game(), "!document.getElementById('__mgStepOut')") };
+      const ev2 = { kind: 'rain', startsAt: iso(60000), endsAt: iso(300000) };
+      T.askStepOut(ev2, Date.now() + 20000);
+      await wait(700);
+      await run(game(), "document.querySelector('#__mgStepOut [data-act=\"confirm\"]').click()");
+      await wait(1200);
+      const afterConfirm = { parked: T.parked() && T.parked().kind, asking: T.stepAsk() };
+      T.rejoin();
+      await wait(1500);
+      out.stepOut = { card, afterIgnore, afterConfirm, backIn: !T.parked() };
+    }
   } catch (e) {
     out.errors.push('probe: ' + (e.stack || e));
   }

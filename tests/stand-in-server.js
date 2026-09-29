@@ -12,7 +12,7 @@ const state = { child: { data: { roomId: 'TEST', players: [{ id: 'me', name: 'Te
   userSlots: [{ userId: 'me', data: { userId: 'me', coinsCount: 2e9, magicDustCount: 0,
     activityLogs: [{ action: 'hatchEgg', timestamp: Date.now() - 60000, parameters: { eggId: 'CommonEgg', pet: { id: 'pet-1', petSpecies: 'Worm', mutations: [], abilities: [], targetScale: 1 } } }],
     stats: { player: { numEggsHatched: 40, totalEarningsSellCrops: 2.5e9, totalEarningsSellPet: 0.5e9 }, petAbility: { GoldGranter: 500, RainbowGranter: 140 }, capsulePulls: {} },
-    garden: { tileObjects: { 5: { objectType: 'Plant', species: 'Carrot', slots: [
+    garden: { tileObjects: { 44: { objectType: 'Shard', shardId: 'HungerShard', id: 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e' }, 5: { objectType: 'Plant', species: 'Carrot', slots: [
       { species: 'Carrot', mutations: ['Gold', 'Wet', 'Dawnlit'], size: 100, endTime: Date.now() - 60000 },
       { species: 'Carrot', mutations: ['Gold'], size: 100, endTime: Date.now() - 60000 },
       { species: 'Pumpkin', mutations: [], size: 70, endTime: Date.now() + 3 * 3600000 },
@@ -123,14 +123,29 @@ wss.on('connection', (ws) => {
       }
       // The right-click lock: this stand-in only understands { species } (so
       // the app has to find the field name), and echoes the new locked list.
+      // Sell All, as the real game did it (Sept 2026): every crop whose own id
+      // isn't in the lock list is sold; a kind's name in the list keeps nothing.
+      if (m.command.type === 'SellAllCrops') {
+        const inv = state.child.data.userSlots[0].data.inventory;
+        const locked = new Set(inv.favoritedItemIds);
+        const isCrop = (it) => it && it.species && !Array.isArray(it.slots) && !/seed|tool|egg|decor|pet|plant/i.test(String(it.itemType || ''));
+        inv.items = inv.items.filter((it) => !isCrop(it) || locked.has(String(it.id)));
+        log({ afterSell: inv.items.filter(isCrop).map((it) => it.id + ':' + it.species) });
+        ws.send(JSON.stringify({ type: 'QuinoaCommandResult', requestId: m.requestId, commandType: m.command.type, ok: true }));
+        ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/inventory/items', value: inv.items.slice() }] } }));
+        return;
+      }
+      // The lock: the real game accepted itemId with any text and toggled that
+      // text in the lock list. (A field it doesn't know is refused here.)
       if (m.command.type === 'ToggleLockItem') {
-        if (typeof m.command.species !== 'string') {
+        const key = typeof m.command.itemId === 'string' ? m.command.itemId : null;
+        if (!key) {
           ws.send(JSON.stringify({ type: 'QuinoaCommandResult', requestId: m.requestId, commandType: m.command.type, ok: false, code: 'bad_command' }));
           ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [] } }));
           return;
         }
         const inv = state.child.data.userSlots[0].data.inventory;
-        inv.favoritedItemIds = inv.favoritedItemIds.includes(m.command.species) ? inv.favoritedItemIds.filter((x) => x !== m.command.species) : inv.favoritedItemIds.concat([m.command.species]);
+        inv.favoritedItemIds = inv.favoritedItemIds.includes(key) ? inv.favoritedItemIds.filter((x) => x !== key) : inv.favoritedItemIds.concat([key]);
         ws.send(JSON.stringify({ type: 'QuinoaCommandResult', requestId: m.requestId, commandType: m.command.type, ok: true }));
         ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/inventory/favoritedItemIds', value: inv.favoritedItemIds.slice() }] } }));
         return;

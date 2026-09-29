@@ -82,8 +82,9 @@ const CONDITIONS = {
 // The game's internal mutation names, where they differ from what the wiki
 // and the game's own labels say. The wiki's icon files give two of these
 // away: Dawnbound's icon is MutationDawncharged.png and Amberbound's is
-// MutationAmbercharged.png. Ambershine is the old name for Amberlit (it was
-// "Amberglow" before a rename) and is the one educated guess here.
+// MutationAmbercharged.png. Ambershine is the game's name for Amberlit (it was
+// "Amberglow" before a rename). All confirmed from the owner's garden in
+// v0.53.6: ambershine, ambercharged, dawncharged, dawnlit, thundercharged.
 const MUTATION_ALIASES = {
   dawncharged: 'dawnbound',
   ambercharged: 'amberbound',

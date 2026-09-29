@@ -324,13 +324,8 @@ const base = () => ({ alerts: { custom: [], disabled: [] }, shopStats: budget.em
   // Remove
   budget.setPlan(s, { remove: 'dawnbinder' });
   ok(budget.planIds(s).join(',') === 'moonbinder', 'removed');
-  // HUD lines
+  // (The money box's lines are built in main now: net worth and the next weather.)
   const v = budget.view({ settings: s, now, ctx });
-  const lines = budget.hudLines(v, (x) => Math.round(x / 1e9) + 'B').map((l) => l.text);
-  ok(lines[0] === '💰 30B in the bank', 'bank line: ' + lines[0]);
-  ok(!lines.some((l) => /saved|plan funded/.test(l)), 'no saving-target line on the overlay');
-  ok(!lines.some((l) => l.startsWith('⏱')), 'no next-opening line in the money box');
-  ok(/^(🟢 Open to spend|🟡 Careful|🔴 Save) · safe to spend \d/.test(lines[1]) && /^1B spent now = Moonbinder ~5 h later$/.test(lines[2]), 'signal + delay lines: ' + lines.slice(2).join(' | '));
   ok(v.afford.find((a) => a.ruleId === 'moonbinder').planned === true && v.afford.find((a) => a.ruleId === 'dawnbinder').planned === false, 'afford rows know what is planned');
 }
 console.log(`budget: ${n} checks passed`);
@@ -476,17 +471,20 @@ console.log(`budget: ${n} checks passed`);
   ok(budget.seedWants(had) === true && budget.planIds(had).join(',') === 'moonbinder,mythicalegg,amberegg', 'someone who already had the Mythical Egg gets just the Amber Egg');
   // The worked cases below use the original five.
   s.budget.plan = ['moonbinder', 'dawnbinder', 'starweaver', 'emberbloom', 'dawnbreaker'];
-  const byId = (f) => Object.fromEntries(f.events.map((e) => [e.ruleId, e]));
+  // Each want's first appearance (celestials also come back later).
+  const byId = (f) => Object.fromEntries(f.events.filter((e) => !e.repeat).map((e) => [e.ruleId, e]));
   // Comfortable: 30B in the bank, growing 5B a day.
   let f = budget.foresight(s, { wallet: 30e9, pace: 5e9 }, 0, now);
-  ok(f.events.map((e) => e.ruleId).join(',') === 'dawnbreaker,dawnbinder,emberbloom,starweaver,moonbinder', 'walked in time order: ' + f.events.map((e) => e.ruleId).join(','));
+  ok(f.events.filter((e) => !e.repeat).map((e) => e.ruleId).join(',') === 'dawnbreaker,dawnbinder,emberbloom,starweaver,moonbinder', 'first appearances in time order: ' + f.events.filter((e) => !e.repeat).map((e) => e.ruleId).join(','));
+  const reps = f.events.filter((e) => e.repeat);
+  ok(reps.filter((e) => e.ruleId === 'dawnbreaker').length === 3 && reps.filter((e) => e.ruleId === 'dawnbinder').length === 1 && reps.every((e) => e.t <= f.end), 'celestials come back within the forecast: Dawnbreaker 3 more times, Dawnbinder once more');
   ok(f.events.every((e) => e.status === 'ready') && f.signal === 'open', 'everything covered: open to spend');
-  ok(f.safeToSpend === 30e9, 'safe to spend: the Moonbinder\'s slack is 33.3B, capped at the 30B in the wallet');
+  ok(Math.abs(f.safeToSpend - 23.268e9) < 0.01e9, 'safe to spend: 23.3B, the Moonbinder\'s slack once the Dawnbinder is bought a second time before it (' + (f.safeToSpend / 1e9).toFixed(2) + 'B)');
   // Short: 5B, growing 2B a day: the Moonbinder is out of reach.
   f = budget.foresight(s, { wallet: 5e9, pace: 2e9 }, 0, now);
   let e = byId(f);
   ok(e.moonbinder.status === 'short' && e.dawnbinder.status === 'ready' && f.signal === 'save' && f.safeToSpend === 0, 'short for the Moonbinder: save, nothing safe to spend');
-  ok(f.needMore && f.needMore.label === 'Moonbinder' && f.needMore.perDay > 2e9 && f.needMore.perDay < 2.5e9, 'grow ~2.35B a day more to catch it: ' + (f.needMore && f.needMore.perDay / 1e9));
+  ok(f.needMore && f.needMore.label === 'Moonbinder' && f.needMore.perDay > 3.1e9 && f.needMore.perDay < 3.2e9, 'grow ~3.13B a day more to catch it (21B of wants before it, the second Dawnbinder included): ' + (f.needMore && f.needMore.perDay / 1e9));
   // Trade-off: 40B, growing 1B a day: buying the early Dawnbinder would cost the Moonbinder.
   f = budget.foresight(s, { wallet: 40e9, pace: 1e9 }, 0, now);
   e = byId(f);
@@ -593,8 +591,8 @@ console.log(`budget: ${n} checks passed`);
   const s2 = base();
   s2.budget = { plan: ['moonbinder', 'dawnbinder', 'starweaver', 'emberbloom', 'dawnbreaker'] };
   const f2 = budget.foresight(s2, { wallet: 30e9, pace: 5e9 }, 0, now);
-  ok(f2.allowances.length === 5 && f2.allowances.every((a, i, arr) => i === 0 || a.amount >= arr[i - 1].amount - 1), 'spend-up-to grows over time: ' + f2.allowances.map((a) => (a.amount / 1e9).toFixed(1)).join(','));
-  const mb = f2.events.find((e) => e.ruleId === 'moonbinder');
+  ok(f2.allowances.length === f2.events.filter((e) => e.status === 'ready').length && f2.allowances.length === 9 && f2.allowances.every((a, i, arr) => i === 0 || a.amount >= arr[i - 1].amount - 1), 'spend-up-to never shrinks over time, one step per purchase (repeat celestials included): ' + f2.allowances.map((a) => (a.amount / 1e9).toFixed(1)).join(','));
+  const mb = f2.events.filter((e) => e.ruleId === 'moonbinder').slice(-1)[0];
   ok(Math.abs(f2.allowances[f2.allowances.length - 1].amount - mb.cashAfter) < 1, 'after the last want: everything left');
   const f3 = budget.foresight(s2, { wallet: 5e9, pace: 2e9 }, 0, now);
   const mbT = f3.events.find((e) => e.ruleId === 'moonbinder').t;
@@ -609,7 +607,7 @@ console.log(`budget: ${n} checks passed`);
   let f = budget.foresight(s, { wallet: 35982699984, pace: 0, gardenLoaded: false }, 0, 50 * D);
   ok(f.waitingFor === 'garden' && f.signal === 'wait', 'no garden yet: waiting for it');
   f = budget.foresight(s, { wallet: 35982699984, pace: 0, gardenLoaded: true, garden: { total: 270, ready: 121, readyValue: 410667500000, growingValue: 76591180000, growingPotential: 143951250000, harvestHours: null } }, 0, 50 * D);
-  ok(f.waitingFor === null && f.signal === 'open' && Math.round(f.safeToSpend / 1e9) === 383, 'with the garden (his sample): open, ~383B safe (385B less a 2B Amber Egg now on the list)');
+  ok(f.waitingFor === null && f.signal === 'open' && Math.round(f.safeToSpend / 1e9) === 373, 'with the garden (his sample): open, ~373B safe (385B less a 2B Amber Egg, a second 10B Dawnbinder and three more Dawnbreakers)');
   console.log('budget (waiting for the garden): ok');
 }
 
@@ -790,4 +788,50 @@ console.log(`budget: ${n} checks passed`);
   ok(f1 === f2 && JSON.stringify(w.after.events.map((e) => e.ruleId)).length > 2, 'the forecast is the same called twice, and a what-if still works');
   ok(budget.view({ settings: s, ctx, now }).foresight.everything.perDay === JSON.parse(alone).perDay, 'and the same total');
   console.log('budget (cache): ok');
+}
+
+/* 23. Celestials come back in the forecast; a what-if names each want once */
+{
+  const now = 900 * D;
+  const s = base();
+  budget.seedWants(s);
+  s.budget.plan = ['moonbinder', 'dawnbinder', 'starweaver', 'emberbloom', 'dawnbreaker', 'mythicalegg'];
+  const f = budget.foresight(s, { wallet: 30e9, pace: 5e9 }, 0, now);
+  const count = (id) => f.events.filter((e) => e.ruleId === id).length;
+  ok(count('dawnbreaker') === 4 && count('dawnbinder') === 2 && count('moonbinder') === 1, 'celestials are expected again within the forecast (Dawnbreaker 4×, Dawnbinder 2×)');
+  ok(count('mythicalegg') === 1, 'eggs are expected once');
+  ok(f.events.every((e, i, a) => i === 0 || a[i - 1].t <= e.t) && f.events.filter((e) => e.repeat).every((e) => e.t <= f.end), 'all in time order, all within the forecast');
+  const w = budget.whatIf(s, { wallet: 30e9, pace: 5e9 }, 26e9, now);
+  const labels = w.lost.map((l) => l.label);
+  ok(labels.length === new Set(labels).size, 'a what-if lists each want once: ' + labels.join(', '));
+  console.log('budget (celestials come back): ok');
+}
+
+// Safe to spend in words (v0.52.1): what holds it down is reported, and it
+// adds up: what you have - what's set aside = safe to spend.
+{
+  const budgetMod = budget;
+  function state({ wallet, ready, potential, growing }) {
+    const bs = { alerts: { custom: [], disabled: [] }, shopStats: budgetMod.emptyStats(), moneyHistory: [], worthHistory: [], purchases: { log: [] }, budget: {} };
+    budgetMod.seedWants(bs);
+    const T = Date.now();
+    for (let i = 0; i <= 7 * 48; i += 1) {
+      const t = T - 7 * 86400000 + i * 1800000;
+      bs.moneyHistory.push({ t, c: wallet, s: 0, f: 0 });
+      bs.worthHistory.push({ t, v: ready + growing, r: 100, rv: ready, n: 270 });
+    }
+    const g = { total: 270, special: 176, gold: 85, rainbow: 91, ready: 121, readyValue: ready, growingValue: growing, growingPotential: potential,
+      missing: { grow: 3, size: 10, color: 94, hydro: 3, lunar: 81 }, have: { ripe: 267, size: 260, hydro: 267, lunar: 189, color: 176 },
+      harvestHours: null, goldPerHour: 1.21, stepHours: { ripe: 1, size: null, hydro: 0, lunar: 2.5, color: 77.4 } };
+    const ctx = { wallet, gardenWorth: ready + growing, garden: g, pace: 0, gardenLoaded: true, readyRule: { size: true, color: true, hydro: true, lunar: true } };
+    return budgetMod.view({ settings: bs, ctx }).foresight;
+  }
+  
+  const plenty = state({ wallet: 36e9, ready: 411e9, potential: 144e9, growing: 77e9 });
+  if (!plenty.binding || Math.abs(plenty.available - plenty.binding.keep - plenty.safeToSpend) > 1) throw new Error('binding: have - keep != safe');
+  if (plenty.binding.keep <= 0 || plenty.safeToSpend >= plenty.available) throw new Error('binding: nothing held back');
+  const poor = state({ wallet: 1e9, ready: 2e9, potential: 5e9, growing: 2e9 });
+  if (poor.binding || poor.safeToSpend !== 0 || poor.signal !== 'save') throw new Error('binding: short means 0, no binding');
+  if (plenty.readyCrops !== 411e9) throw new Error('readyCrops');
+  console.log('budget (safe to spend in words): ok');
 }

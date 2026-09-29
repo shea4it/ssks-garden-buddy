@@ -31,8 +31,10 @@ history are kept. You can also use **Help → Check for updates…**.
   Amber too), tools or decor are in the shop, when the weather changes, when
   a pet turns a crop Gold or Rainbow, and when your pets are hungry. Quiet
   hours, with a 🌙 for the alerts worth waking up for.
-- **🎭 Voices with personality:** cheerful Poppy, grumpy Spike, gloomy
-  Obadiah, a storybook narrator, a stadium announcer, and more.
+- **🎙️ Clear voices:** four natural voices (American, British, Scottish)
+  that run on your computer, levelled to sit just above the alert sounds and
+  built to be understood from across the room. Add, remove and resize any
+  alert in a tap.
 - **💰 Money:** one chart of your money — the last week as it happened and
   the next couple of weeks as expected — with each thing you want (celestials,
   Mythical and Amber Eggs) sitting on the day it's likely to show up, sized
@@ -47,7 +49,7 @@ history are kept. You can also use **Help → Check for updates…**.
   mutations, crop size, and an open-spot map that appears over the game
   while you hold a pot.
 - **🐾 Pets:** each pet's real strength, what its abilities do in plain words,
-  the best pets you own for any goal, team ideas, your saved teams with what
+  the best pets you own for any goal, your saved teams with what
   each one does, and pet food.
 - **🌦️ Weather helpers:** a pet team for each kind of weather (swapped in
   and back again for you), team swaps when your garden reaches a goal, and
@@ -122,7 +124,7 @@ Troubleshooting → Save a sample** makes a file that helps a lot.
 - **Arie's Mod** and **MG AFK** for showing how the game's commands and rooms
   work; the pet strength formula comes from the community's Gemini mod.
 - The natural voices are **[Piper](https://github.com/rhasspy/piper)** voices
-  (SEMAINE, Cori, Amy, Alba, VCTK and Lessac recordings).
+  (Lessac, Cori, Alan and Alba recordings).
 
 ## Building it yourself
 
