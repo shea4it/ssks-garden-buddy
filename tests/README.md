@@ -1,3 +1,7 @@
+**Unit suites:** `npm test` (tests/run-unit.js) runs every `tests/*-test.js`
+and exits non-zero if one fails; GitHub runs it on every push (Tests
+workflow).
+
 # Tests (not part of the app)
 
 Plain Node, no Electron:
@@ -319,8 +323,78 @@ Thunderstruck crops on 5 plants · 223 Thundercharged…"; `noWolf`,
 Screenshot: shots/thunder-finder.png.
 
 `MG_CHART=mount`: `mount.ostrich.text` "🐦 Riding the Ostrich 88 capsules 46
-Dawn crops…" with `pulses` 3; `mount.phoenix` "386 capsules · 200 Amber
-crops" with 0; `notRiding`, `switchedOff`, `thunderWhileRiding` null and
+Dawn crops to ride over: 4 Dawnlit, 42 Dawnbound…" and `mount.phoenix` "386
+capsules · 200 Amber crops… 14 Amberlit, 186 Amberbound", both with 0 `pulses`; `notRiding`, `switchedOff`, `thunderWhileRiding` null and
 `thunderBack` true; `dragged.rect` moved by (-300, -240) with `saved` {x, y};
 `forgot` false then `restored` fixed at the same spot; `docked` not fixed and
 `savedAfter` null. Screenshots: shots/mount-ostrich.png, mount-phoenix.png.
+
+`MG_CHART=spot`: `spot.alone` shown with "2 open", `notHolding` hidden,
+`whileRiding` shown below the riding map, `full` "No open spots…",
+`pottedPlant` (itemType Plant with growSlots) shown; `sampleHeld` has
+`index`, `item`, `isPot` true, `favorites`, `spotMapOn`.
+`mount.ostrichOut.text` starts "🐦 Ostrich out 88 capsules" and ends "Keep
+the Ostrich near the ones you want captured.", `thunderWithOstrichOut` true
+(the finder only steps aside while riding); `phoenixOut` "🔥 Phoenix out".
+
+`MG_CHART=sellpets`: `sellpets.real` is { petPart: 1, pets: [] } (the
+stand-in's pets can't help a sale); with a Peacock / Squirrel / Capybara
+team and 2 players, `garden` has "🎉 In a full room (+50%) with your best
+sell pets (Peacock, Squirrel, Capybara)…" and `estimate` "+ bonuses … room
++10% · Peacock, Squirrel, Capybara +48.4%" and "in a full room with your
+best sell pets … +50% · …".
+
+`MG_CHART=numbers` puts the owner's values (11.4B coins, 639.3B of crops,
+574.3B ready) through every money card: `gardenCard` "Worth about 639B…"
+and "574B of it is ready…"; `money.why` "You have 586B (11.4B coins + 574B
+… 65B more…)"; `money.growth` "651B net worth", "Garden 639B Wallet 11.4B";
+`view.fullValue` 670.7B (574.3B + 35 x 2.75B) at base value; with
+`MG_SALEMULT` unset it runs at x1.97 (full room x the owner's best sell
+pets): `view.available` 1142.5B, `safe` 1068.4B, `fullValue` 1320.9B,
+`money.growth` "✅ Checked against your last 2 sales: … 0.99×".
+
+`MG_CHART=screens` (run with xvfb `-screen 0 2600x1500x24`): for
+laptop150 (1280 x 680), laptop125 (1536 x 800) and monitor1440 (2560 x
+1380), `panel.cssWidth` 480 with `dpr` 0.8 / 0.9 / 1.35, `sideways` false,
+`navFits` true; `game.scale` 0.779 / 0.96 / 1.4 and `inside` true;
+`fold.before` > `fold.after` with `saved` true and `unfolded` true;
+`sizes.small.dpr` 0.85, `xlarge` 1.4. Screenshots: shots/screen-*.png.
+
+**QA modes (v0.54.1)** in chart-shots.js:
+- `MG_CHART=flows` (with `MG_TEST_DIALOGS=1`): backup round trip, panel pop
+  out and back, rooms, pet strength, luck counter, clearing history,
+  what-if, a panel script error in the sample, the View menu's zoom by
+  focus, a forced panel crash that recovers. Each result is in
+  `flows.<name>`; all ten should read as passed (see HANDOFF v0.54.1).
+- `MG_CHART=a11y`: every tab with its folds open: `namelessCount` 0, no
+  `fields`, no `lowContrast` entries.
+- `MG_CHART=perf`: 40 s of the stand-in: status messages and their size,
+  settings writes, and who called store.save (`saveCallers`: only
+  recordAlerts, because the stand-in fires alerts every few seconds).
+- `MG_CHART=sellpets` also: `gardenMissing` / `moneyMissing` have "🐾 Best
+  sell pets +31.3%: … ⚠️ put Capybara out before you sell …";
+  `moneyAllOut` ends "✅ all out now" and `gardenAllOut` has no reminder.
+
+**v0.54.3:** the per-map modes `binder`, `thunder`, `mount` and `spot` are
+replaced by `MG_CHART=onemap` (one map: `wolf` thunder, `wolfOstrich`
+thunder with a capture tab, `plusAmber` binder, `plusRide` binder with a ride
+tab, `plusPot` spots with binder / ride / thunder tabs, `tapped` and
+`pickHolds` thunder, `afterChange` binder, `nothing` null, `folded` and
+`foldSaved` true, `carriedOver.rect` at `expect`, `heldLog` with the pot).
+`MG_CHART=voicetime`: `dawnAhead.voiceWait` 0 and `prepared` true against
+`dawnAfter.voiceWait` 1500 (a stand-in 1.5 s voice).
+
+`MG_CHART=harvestmode` (v0.54.4): `harvestmode.cases.match.blocked` false;
+`noColour`, `notCharged`, `notBound`, `notFull` blocked with notes "🧺 Kept
+…: not Gold or Rainbow / not Thundercharged / not Amberbound / not full
+size"; `badge` "🧺 Harvest mode: Gold or Rainbow · Thundercharged ·
+Amberbound · full size"; `map.ctx` 'harvest'; `panelCount` "✅ 142 crops
+on 114 plants…". Screenshots: shots/chart-harvest-rule.png,
+chart-your-garden.png.
+
+`MG_CHART=levelnext` (set `MG_SAMPLE` to a saved sample to use its pets):
+`levelnext.panel` lists the picks with their abilities and "beats …" /
+"already your best"; `todo.sub` explains 🧼 Cleanse, `todo.tile` has the
+How step and `todo.outlined` the plant opened by itself. The stand-in now
+hands items over by `heldItem.itemId` (the game's way since v0.54.5).
+

@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Only its own inline script and styles; no network, no eval (v0.54.1). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Magic Garden (logged off)</title>
 <style>
   :root { --base: #2A1B36; --card: #36224a; --edge: #4b3459; --text: #f6f1f8; --muted: #cbb8d8; --moss: #7fc98a; --moss-dim: #47624c; }

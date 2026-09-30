@@ -30,7 +30,8 @@ const state = { child: { data: { roomId: 'TEST', players: [{ id: 'me', name: 'Te
       { id: 'teamA', name: 'Farm team', members: [{ petId: 'pet-1', petSpecies: 'Worm' }] },
       { id: 'teamB', name: 'Dawn team', members: [{ petId: 'pet-2', petSpecies: 'Bunny' }] },
     ] },
-    notAuthoritative_selectedItemIndex: 1 }] } } };
+    // What's in your hand, the way the game says it now (v0.54.5): by id.
+    heldItem: { itemId: 'Carrot', decorRotation: 0 } }] } } };
 state.child.data.userSlots[0].data.shopPurchases = { egg: { restockId: 'egg:1', startedAtMs: Date.now(), purchases: { CommonEgg: 1 } }, seed: { restockId: 'seed:1', startedAtMs: Date.now(), purchases: {} } };
 const srv = https.createServer({ key: fs.readFileSync(__dirname + '/key.pem'), cert: fs.readFileSync(__dirname + '/cert.pem') }, (req, res) => {
   // The community list's collect-state, for the room-sharing test: records the body.
@@ -85,8 +86,8 @@ wss.on('connection', (ws) => {
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/coinsCount', value: 1.5e9 }] } })), 9000);
       // 8 s: a Legendary Egg bought in the egg shop's current restock (the game's own tally grows).
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/shopPurchases/egg/purchases', value: { CommonEgg: 1, LegendaryEgg: 1 } }] } })), 8000);
-      setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/notAuthoritative_selectedItemIndex', value: 0 }] } })), 21000);
-      setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/notAuthoritative_selectedItemIndex', value: 1 }] } })), 26000);
+      setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/heldItem', value: { itemId: 'pot-1', decorRotation: 0 } }] } })), 21000);
+      setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/heldItem', value: { itemId: 'Carrot', decorRotation: 0 } }] } })), 26000);
     } else if (m.type === 'QuinoaCommand') {
       serverSeq = m.commandSequence;
       // Swapping teams: the pets out become that team's members.

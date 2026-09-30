@@ -1,14 +1,15 @@
 {
   "name": "magic-garden-loader",
   "productName": "SSK's Garden Buddy",
-  "version": "0.53.9",
+  "version": "0.54.5",
   "description": "SSK's Garden Buddy: a friendly helper for Magic Garden. Shop alerts, weather teams, pet and garden trackers, Bad Luck Protection counters, and more.",
   "author": "Spread Sheet King",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist:win": "electron-builder --win --publish never",
-    "dist:mac": "electron-builder --mac --publish never"
+    "dist:mac": "electron-builder --mac --publish never",
+    "test": "node tests/run-unit.js"
   },
   "devDependencies": {
     "electron": "32.3.3",
@@ -29,6 +30,9 @@
       "preload-game.js",
       "garden-observer.js",
       "garden-plan.js",
+      "sell-team.js",
+      "harvest-rule.js",
+      "pet-plan.js",
       "preload-control.js",
       "control.html",
       "parked.html",

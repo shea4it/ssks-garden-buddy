@@ -54,3 +54,13 @@ macOS show a warning the first time (see the README).
 
 The download page is `docs/index.html`, published with GitHub Pages
 (Settings → Pages → Deploy from a branch → main, /docs).
+
+## Testing
+
+`npm test` runs the unit suites (plain Node: the money maths, alerts, the
+Garden map's plan, rooms, sharing, settings, updates, voices). GitHub runs
+them on every push (the Tests workflow). The fuller checks drive the real
+app against a stand-in game server and need a desktop (or xvfb on Linux);
+tests/README.md explains how to run them: the full app harness, the chart
+and map screenshots (including three screen sizes), and the sound harness.
+

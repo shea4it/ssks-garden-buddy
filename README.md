@@ -35,36 +35,48 @@ history are kept. You can also use **Help → Check for updates…**.
   that run on your computer, levelled to sit just above the alert sounds and
   built to be understood from across the room. Add, remove and resize any
   alert in a tap.
-- **💰 Money:** one chart of your money — the last week as it happened and
-  the next couple of weeks as expected — with each thing you want (celestials,
-  Mythical and Amber Eggs) sitting on the day it's likely to show up, sized
-  against what you'll have. How much is safe to spend right now, "Can I buy
-  this?" for anything you're eyeing, what your garden will be worth when it's
-  all ready (and with your room and pet bonuses), and **the final boss**: the
-  line for buying *everything* — every alert item and every decoration as it
-  shows up. There's a race to cross it, and a party when you do.
-- **🌻 Garden:** what your garden is worth, how many crops are ripe and ready
-  to sell, how fast your pets are turning crops Gold and Rainbow (hour by
-  hour), where you are in the game and in your crops' lives, weather
-  mutations, crop size, and an open-spot map that appears over the game
-  while you hold a pot.
+- **💰 Money:** one chart of your money: the last week as it happened and
+  the next couple of weeks as expected, with each thing you want
+  (celestials, Mythical and Amber Eggs) on the day it's likely to show up.
+  How much is safe to spend right now (and in plain words, why), "Can I buy
+  this?" for anything you're eyeing, what your garden will be worth when
+  it's all ready, and the line for buying *everything*. Crops are counted at
+  what you'd actually get selling them (a full room with your best sell
+  pets, or base value if you prefer), and the app checks its numbers
+  against your real sales.
+- **🌻 Garden:** what your garden is worth and how much of it is ready to
+  sell, a **Garden map** with a to-do (which plants to cleanse, which to pot
+  beside a Moonbinder, and what each is worth), mutations over time (hydro,
+  lunar, Gold/Rainbow, or each one on its own) with the weather coming up,
+  how fast your pets turn crops Gold and Rainbow, crop size, and where you
+  are in the game.
+- **🗺️ Maps over the game** when they're useful: open spots while you hold a
+  pot, your binder and what to move during an Amber Moon or Dawn, where your
+  Thunderstruck crops are while a Thunder Wolf is out, and what an Ostrich
+  or Phoenix can capture. Drag them anywhere, tap to fold them.
 - **🐾 Pets:** each pet's real strength, what its abilities do in plain words,
   the best pets you own for any goal, your saved teams with what
   each one does, and pet food.
 - **🌦️ Weather helpers:** a pet team for each kind of weather (swapped in
   and back again for you), team swaps when your garden reaches a goal, and
   stepping out during weather you want to keep off your crops.
-- **🍀 Luck:** Bad Luck Protection counters for every egg, plant and capsule,
-  with a heads-up when a guarantee is one pull away.
+- **🍀 Luck:** "am I about to pull something rare?": your nearest rare pulls
+  (with odds and how many more to go), and Bad Luck Protection counters for
+  every egg, plant and capsule, with a heads-up when a guarantee is one pull
+  away.
 - **🎮 Rooms:** your room's sell bonus, rooms other players share, your
   saved rooms with how full they are, and an opt-in switch to share your own
   room on the community list.
 - **🧰 Extras:** a harvest lock for moving pots without harvesting by
   accident, a "never sell pet food" guard, a seed deleter, backups, and some
   just-for-fun effects.
+- **🖥️ Any screen:** from a 13" laptop to a 1440p monitor, the window, the
+  panel and the maps size themselves to fit (Panel size in Extras to
+  adjust), and they work with touch.
 
-The **[guide](GUIDE.md)** explains every part of it, and
-**[FEATURES.md](FEATURES.md)** is the full list.
+The **[guide](GUIDE.md)** explains every part of it,
+**[FEATURES.md](FEATURES.md)** is the full list, and
+**[CHANGELOG.md](CHANGELOG.md)** says what changed in each version.
 
 ## Fair play and what it sends
 
@@ -103,14 +115,17 @@ and tells you things. Here is everything it does that touches the game:
   site (at most once a minute), so others can find and join your room. It's off
   until you turn it on, and nothing is sent while it's off.
 
-All of the code is plain, readable JavaScript, right here.
+All of the code is plain, readable JavaScript, right here. Security
+problems: see [SECURITY.md](SECURITY.md).
 
 ## Help
 
 Found a bug or have an idea? Open an issue on this page (**Issues**, then
-**New issue**), or post in the app's thread on the Magic Garden Discord. If
+**New issue**: there's a form for each), or post in the app's thread on the Magic Garden Discord. If
 something's wrong with what the app sees in your game, **Extras → 🛠
-Troubleshooting → Save a sample** makes a file that helps a lot.
+Troubleshooting → Save a sample** makes a file that helps a lot. It
+includes your in-game name, your room code and your garden, so share it
+somewhere you're comfortable with (a private message is fine).
 
 ## Thanks
 
@@ -128,7 +143,7 @@ Troubleshooting → Save a sample** makes a file that helps a lot.
 
 ## Building it yourself
 
-See **[BUILDING.md](BUILDING.md)**.
+See **[BUILDING.md](BUILDING.md)**. `npm test` runs the unit tests.
 
 ## License
 

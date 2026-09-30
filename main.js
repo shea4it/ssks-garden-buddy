@@ -12,9 +12,29 @@ const {
   session,
   dialog,
   clipboard,
+  screen,
 } = require('electron');
 // The side panel's default width in pixels.
 const PANEL_WIDTH = 480;
+
+/* Keeping going when something goes wrong (v0.54.1): anything unexpected in
+ * the app itself, the panel's page or the game's page is logged instead of
+ * quietly breaking things; a crashed panel or game page is reloaded. The
+ * last 50 are kept and go in a saved sample, so a beta bug report shows what
+ * happened. */
+const ERROR_LOG = [];
+function logError(where, err) {
+  const msg = String((err && (err.stack || err.message)) || err || 'unknown').slice(0, 1500);
+  ERROR_LOG.push({ at: new Date().toISOString(), where: String(where).slice(0, 60), msg });
+  if (ERROR_LOG.length > 50) ERROR_LOG.shift();
+  try {
+    console.error(`[${where}]`, msg);
+  } catch (e) {
+    /* nowhere to print */
+  }
+}
+process.on('uncaughtException', (err) => logError('app', err));
+process.on('unhandledRejection', (err) => logError('app (promise)', err));
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -26,6 +46,9 @@ const voices = require('./voices');
 const petData = require('./pet-data');
 const cropData = require('./crop-data');
 const abilityData = require('./ability-data');
+const sellTeam = require('./sell-team');
+const harvestRule = require('./harvest-rule');
+const petPlan = require('./pet-plan');
 const weather = require('./weather');
 const gameData = require('./game-data');
 const pity = require('./pity');
@@ -897,6 +920,8 @@ function weatherMatcher(status) {
   return (w) => weather.kindOf(w) === now;
 }
 
+// Your best sell team: sell-team.js (v0.54.2).
+
 function enrichPets(st) {
   const all = Array.isArray(st.allPets) ? st.allPets : [];
   const describeOne = (p) => {
@@ -933,6 +958,16 @@ function enrichPets(st) {
     };
   });
   st.goals = abilityData.GOALS;
+  st.idealSell = sellTeam.idealSellTeam(st.allPets, matches);
+  // The pets out right now, for the reminder to put the best ones out.
+  st.idealSell.outNow = sellTeam.fromRows(st.abilities.rows);
+  // Which pet to level next (pet-plan.js, v0.54.5).
+  try {
+    st.levelNext = petPlan.recommend(st.allPets);
+  } catch (err) {
+    logError('level next', err);
+    st.levelNext = null;
+  }
 }
 
 /* ================================================================== *
@@ -962,7 +997,7 @@ function applyCatalog(catalog, fresh) {
     enrichPets(gardenStatus);
     gardenStatus.eta = gardenEta(gardenStatus);
     gardenStatus.size = sizeEta(gardenStatus);
-    sendToControl('garden:status', gardenStatus);
+    sendGardenStatus(gardenStatus);
   }
   sendPity();
 }
@@ -1135,6 +1170,34 @@ function recordMutations(st, t) {
   return true;
 }
 
+// Each sale against what the app expected (budget.saleCheckStep): the
+// lifetime coins from selling crops, the value of the crops in your
+// inventory, the room, and the sell boost of the pets out.
+let saleCheckState = null;
+function checkSale(st) {
+  const pl = st.lifetime && st.lifetime.player;
+  const inv = st.inventoryCrops;
+  const sold = pl && Number(pl.totalEarningsSellCrops);
+  if (!inv || !Number.isFinite(sold)) return;
+  const rows = ((st.abilities && st.abilities.rows) || []).filter((r) => !r.weather);
+  const snap = {
+    t: Date.now(),
+    sold,
+    invV: Number(inv.v) || 0,
+    invN: Number(inv.n) || 0,
+    sized: Number(inv.sized) === Number(inv.n),
+    roomPct: st.room && st.room.players ? Math.min(50, Math.max(0, st.room.players - 1) * 10) : 0,
+    sellPct: rows.filter((r) => r.goal === 'sell' && r.sellChance).reduce((a, r) => a + (r.score || 0), 0),
+  };
+  const r = budget.saleCheckStep(saleCheckState, snap);
+  saleCheckState = r.state;
+  if (r.record) {
+    const s = store.get();
+    s.saleChecks = (Array.isArray(s.saleChecks) ? s.saleChecks : []).concat([r.record]).slice(-30);
+    store.save();
+  }
+}
+
 function recordWorth(st) {
   const t = Date.now();
   let changed = false;
@@ -1262,6 +1325,9 @@ function budgetContext() {
       goldPerHour: gardenStatus && gardenStatus.eta && Number(gardenStatus.eta.perHour) > 0 ? Number(gardenStatus.eta.perHour) : null,
     } : null,
     readyRule: readyRule(),
+    // Crops at what you'd get (v0.53.15): a full room (x1.5) with your best
+    // sell pets out, unless that's turned off in Money options.
+    saleMult: budget.options(store.get()).saleValue ? 1.5 * (gardenStatus && gardenStatus.idealSell && gardenStatus.idealSell.petPart > 1 ? gardenStatus.idealSell.petPart : 1) : 1,
     // false until the garden's report (with ready/growing) has arrived
     gardenLoaded: Boolean(garden && garden.missing),
     upcoming: w.upcoming || [],
@@ -1505,7 +1571,8 @@ function pushMountMap() {
   if (!contents || contents.isDestroyed()) return;
   const s = store.get();
   const pos = JSON.stringify((s.ui && s.ui.mapPos) || {});
-  contents.executeJavaScript(`(() => { const o = window.__mgLoaderObserver; if (!o) return; if (o.setMapPositions) o.setMapPositions(${pos}); if (o.setMountMap) o.setMountMap(${mountMapOn()}); })()`).catch(() => {});
+  const folds = JSON.stringify((s.ui && s.ui.mapFold) || {});
+  contents.executeJavaScript(`(() => { const o = window.__mgLoaderObserver; if (!o) return; if (o.setMapPositions) o.setMapPositions(${pos}, ${folds}); if (o.setMountMap) o.setMountMap(${mountMapOn()}); })()`).catch(() => {});
 }
 ipcMain.handle('ui:mountMap', (event, on) => {
   const s = store.get();
@@ -1727,6 +1794,33 @@ function migrateSettings() {
   store.save();
 }
 
+let lastCapsuleSig = '';
+
+/* The garden status to the panel (v0.54.1): with a big garden it's ~180 KB,
+ * and most of it (team summaries, the Garden map's plan, every pet) only
+ * changes when you edit a team, move a plant or a pet levels. Those parts go
+ * only when they've changed; the panel keeps its last copy (`sameAsBefore`
+ * names them). When the panel's page (re)loads it has none, so all go. */
+const STATUS_HEAVY = ['teamSummaries', 'plan', 'allPets', 'teams'];
+let heavySent = {};
+function sendGardenStatus(st) {
+  if (!st || typeof st !== 'object') return sendToControl('garden:status', st);
+  const out = Object.assign({}, st);
+  const same = [];
+  for (const k of STATUS_HEAVY) {
+    if (!(k in st)) continue;
+    const sig = JSON.stringify(st[k]);
+    if (heavySent[k] === sig) {
+      delete out[k];
+      same.push(k);
+    } else {
+      heavySent[k] = sig;
+    }
+  }
+  if (same.length) out.sameAsBefore = same;
+  return sendToControl('garden:status', out);
+}
+
 function handleGardenMessage(type, payload) {
   if (!payload || typeof payload !== 'object') return;
 
@@ -1742,10 +1836,13 @@ function handleGardenMessage(type, payload) {
     gardenStatus.weatherKind = weather.kindOf(gardenStatus.weather);
     pushBinderMap(false);
     gardenStatus.plan = gardenPlanOf(payload.gardenPlants, payload.gardenTiles);
+    // What harvest mode would let through right now (the panel shows it).
+    gardenStatus.harvestMatch = harvestRule.count(payload.gardenPlants, harvestLock().mode);
     delete gardenStatus.gardenPlants;
     if (gardenStatus.foundSelf) {
       checkGrown(gardenStatus);
       recordWorth(gardenStatus);
+      checkSale(gardenStatus);
       applyShopPurchases(payload.shopPurchases);
       if (sharer && shareOn()) sharer.nudge().catch(() => {});
       pushBudgetHud(false);
@@ -1788,12 +1885,19 @@ function handleGardenMessage(type, payload) {
       const p = pityState();
       if (p.autoCount && connectionId && connectionId === p.syncConnection) pity.syncTotal(p, gardenStatus.eggsHatched);
     }
+    // Capsule totals only change when you open a capsule: count, save and
+    // tell the panel then, not on every status (v0.54.1: this saved the
+    // settings file every few seconds, all session).
     if (gardenStatus.capsulePulls && pityState().autoCount) {
-      const ev = luck.onCapsuleStats(luckState(), gardenStatus.capsulePulls);
-      if (ev.length) celebrateLuck(ev, false);
-      checkPrimed();
-      store.save();
-      sendLuck();
+      const sig = JSON.stringify(gardenStatus.capsulePulls);
+      if (sig !== lastCapsuleSig) {
+        lastCapsuleSig = sig;
+        const ev = luck.onCapsuleStats(luckState(), gardenStatus.capsulePulls);
+        if (ev.length) celebrateLuck(ev, false);
+        checkPrimed();
+        store.save();
+        sendLuck();
+      }
     }
     checkLogoffFromGame(gardenStatus);
     checkPendingTeam(gardenStatus);
@@ -1803,7 +1907,7 @@ function handleGardenMessage(type, payload) {
     } else {
       checkWeatherTeam(gardenStatus);
     }
-    sendToControl('garden:status', gardenStatus);
+    sendGardenStatus(gardenStatus);
     return;
   }
 
@@ -1887,6 +1991,19 @@ function handleGardenMessage(type, payload) {
       if (Number.isFinite(p.x) && Number.isFinite(p.y)) pos[p.id] = { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) };
       else delete pos[p.id];
       s.ui = Object.assign({}, s.ui, { mapPos: pos });
+      store.save();
+    }
+    return;
+  }
+  // A corner map folded to its title, or opened again (v0.53.16).
+  if (type === 'mapFold') {
+    const p = payload || {};
+    if (typeof p.id === 'string' && /^mg-[a-z-]{1,30}$/.test(p.id)) {
+      const s = store.get();
+      const folds = Object.assign({}, s.ui && s.ui.mapFold);
+      if (p.folded) folds[p.id] = true;
+      else delete folds[p.id];
+      s.ui = Object.assign({}, s.ui, { mapFold: folds });
       store.save();
     }
     return;
@@ -2026,17 +2143,41 @@ function panelWidth() {
   return Math.max(PANEL_MIN, Math.min(PANEL_MAX, w));
 }
 
+/* Panel size (v0.53.16): the panel keeps its layout width (ui.panelWidth,
+ * in the panel's own pixels) and is drawn bigger or smaller with the
+ * screen: 'auto' picks a zoom from the window's height (a 13" laptop's
+ * ~700 px gets 0.8, a 1440p monitor's ~1400 gets 1.35), or a fixed size.
+ * It never takes more than 42% of the window, so the game keeps the most. */
+const PANEL_SIZES = { small: 0.85, medium: 1, large: 1.2, xlarge: 1.4 };
+function panelScale(h) {
+  const pick = store.get().ui.panelSize;
+  if (PANEL_SIZES[pick]) return PANEL_SIZES[pick];
+  return Math.round(Math.max(0.8, Math.min(1.35, (Number(h) || 900) / 900)) * 20) / 20;
+}
+let panelZoomNow = null;
+function applyPanelZoom(z) {
+  if (!panelView || panelView.webContents.isDestroyed()) return;
+  const zoom = Math.round(Math.max(0.5, Math.min(2, z)) * 1000) / 1000;
+  if (panelZoomNow === zoom && panelView.webContents.getZoomFactor() === zoom) return;
+  panelZoomNow = zoom;
+  panelView.webContents.setZoomFactor(zoom);
+}
+
 function layout() {
   if (!gameWindow || gameWindow.isDestroyed() || !gameView) return;
   const [w, h] = gameWindow.getContentSize();
   const ui = store.get().ui;
   const attached = ui.panel !== 'window' && panelView && gameWindow.contentView.children.includes(panelView);
   const showPanel = attached && ui.panelOpen !== false;
-  const pw = showPanel ? Math.min(panelWidth(), Math.max(0, w - 480)) : 0;
+  const scale = panelScale(h);
+  let pw = 0;
+  if (showPanel) pw = Math.max(0, Math.min(Math.round(panelWidth() * scale), Math.round(w * 0.42), w - 480));
   gameView.setBounds({ x: 0, y: 0, width: Math.max(0, w - pw), height: h });
   if (attached) {
     panelView.setBounds({ x: w - pw, y: 0, width: pw, height: h });
     panelView.setVisible(showPanel);
+    // The zoom that fits the panel's layout width into the room it got.
+    if (pw > 0) applyPanelZoom(pw / panelWidth());
   }
 }
 
@@ -2061,6 +2202,8 @@ function layoutPanelWindow() {
   if (!panelWindow.contentView.children.includes(panelView)) return;
   const [w, h] = panelWindow.getContentSize();
   panelView.setBounds({ x: 0, y: 0, width: w, height: h });
+  // In its own window it takes the size you pick (or its height's auto).
+  applyPanelZoom(panelScale(h));
 }
 
 function createPanelWindow() {
@@ -2119,7 +2262,7 @@ function placePanel(showIt) {
 
 function panelState() {
   const ui = store.get().ui;
-  return { mode: ui.panel === 'window' ? 'window' : 'attached', open: ui.panelOpen !== false, width: panelWidth() };
+  return { mode: ui.panel === 'window' ? 'window' : 'attached', open: ui.panelOpen !== false, width: panelWidth(), size: PANEL_SIZES[ui.panelSize] ? ui.panelSize : 'auto', zoom: panelZoomNow };
 }
 
 function setPanel(change) {
@@ -2127,9 +2270,27 @@ function setPanel(change) {
   if (change.mode === 'window' || change.mode === 'attached') ui.panel = change.mode;
   if (typeof change.open === 'boolean') ui.panelOpen = change.open;
   if (change.width) ui.panelWidth = Math.max(PANEL_MIN, Math.min(PANEL_MAX, Math.round(Number(change.width))));
+  if (typeof change.size === 'string') ui.panelSize = PANEL_SIZES[change.size] ? change.size : 'auto';
   store.save();
   placePanel(Boolean(change.show));
   return panelState();
+}
+
+const PANEL_ORDER = ['small', 'medium', 'large', 'xlarge'];
+function zoomFocused(step) {
+  const pc = panelView && !panelView.webContents.isDestroyed() ? panelView.webContents : null;
+  if (pc && pc.isFocused()) {
+    const cur = PANEL_SIZES[store.get().ui.panelSize] ? store.get().ui.panelSize : null;
+    let next = 'auto';
+    if (step !== 0) next = cur ? PANEL_ORDER[Math.max(0, Math.min(PANEL_ORDER.length - 1, PANEL_ORDER.indexOf(cur) + step))] : (step > 0 ? 'large' : 'small');
+    const st = setPanel({ size: next });
+    sendToControl('ui:panel', Object.assign({}, st, { sizeChanged: true }));
+    return next;
+  }
+  const gc = gameView && !gameView.webContents.isDestroyed() ? gameView.webContents : null;
+  if (!gc) return null;
+  gc.setZoomLevel(step === 0 ? 0 : Math.max(-3, Math.min(3, gc.getZoomLevel() + step * 0.5)));
+  return gc.getZoomLevel();
 }
 
 function togglePanel() {
@@ -2183,14 +2344,21 @@ async function installObserver(contents) {
 
 function createGameWindow() {
   const ui = store.get().ui;
+  // Fit the screen it opens on (v0.53.16): a 13" laptop at 150% scaling has
+  // ~1280 x 680 to work with, less than the old fixed 1760 x 860. Small
+  // screens open maximised.
+  const area = screen.getPrimaryDisplay().workAreaSize;
+  const wantW = ui.panel === 'window' ? 1280 : 1280 + Math.round(panelWidth() * panelScale(Math.min(900, area.height)));
+  const small = area.width < 1500 || area.height < 860;
   gameWindow = new BaseWindow({
-    width: ui.panel === 'window' ? 1280 : 1280 + panelWidth(),
-    height: 860,
-    minWidth: 900,
-    minHeight: 600,
+    width: Math.max(900, Math.min(wantW, area.width - 24)),
+    height: Math.max(600, Math.min(900, area.height - 24)),
+    minWidth: Math.min(900, area.width),
+    minHeight: Math.min(600, area.height),
     backgroundColor: '#2A1B36',
     title: 'Magic Garden',
   });
+  if (small && !process.env.MG_NO_MAXIMIZE) gameWindow.maximize();
   createGameView();
   wireGameWindow();
   relayoutSoon();
@@ -2229,6 +2397,16 @@ function createGameView() {
       if (!contents.isDestroyed()) contents.loadURL(GAME_URL);
     });
 
+  // A crashed game page is reloaded (not on a clean exit); a hang is noted.
+  contents.on('render-process-gone', (event, details) => {
+    logError('game page', `stopped: ${details && details.reason}`);
+    if (details && details.reason !== 'clean-exit') {
+      setTimeout(() => {
+        if (!contents.isDestroyed()) contents.loadURL(GAME_URL).catch((err) => logError('game page', err));
+      }, 1500);
+    }
+  });
+  contents.on('unresponsive', () => logError('game page', 'stopped responding'));
   contents.on('did-finish-load', () => {
     injectScripts(contents);
     relayoutSoon();
@@ -2348,11 +2526,33 @@ function createPanel() {
       preload: path.join(__dirname, 'preload-control.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       backgroundThrottling: false,
       autoplayPolicy: 'no-user-gesture-required',
     },
   });
   panelView.setBackgroundColor('#251730');
+  // The panel only ever shows control.html: a web link opens in your browser
+  // instead of replacing it, and a crashed panel comes back by itself.
+  const pc = panelView.webContents;
+  pc.on('will-navigate', (event, url) => {
+    if (/^file:/i.test(url)) return;
+    event.preventDefault();
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  });
+  pc.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  pc.on('render-process-gone', (event, details) => {
+    logError('panel', `stopped: ${details && details.reason}`);
+    setTimeout(() => {
+      if (!pc.isDestroyed()) pc.reload();
+    }, 1000);
+  });
+  pc.on('did-start-loading', () => {
+    heavySent = {};
+  });
   panelView.webContents.loadFile(path.join(__dirname, 'control.html'));
   panelView.webContents.once('did-finish-load', relayoutSoon);
   placePanel(false);
@@ -2394,6 +2594,7 @@ function buildMenu() {
       submenu: [
         { label: 'Show or hide the panel', accelerator: 'CmdOrCtrl+Shift+D', click: togglePanel },
         { label: 'Harvest lock', type: 'checkbox', checked: Boolean(store.get().harvestLock && store.get().harvestLock.on), accelerator: 'CmdOrCtrl+Shift+L', click: () => setHarvestLock({ on: !harvestLock().on }) },
+        { label: 'Harvest mode', type: 'checkbox', checked: Boolean(harvestLock().mode.on), accelerator: 'CmdOrCtrl+Shift+M', click: () => setHarvestLock({ mode: { on: !harvestLock().mode.on } }) },
         { label: 'Money box over the game', type: 'checkbox', checked: budgetHudOn(), accelerator: 'CmdOrCtrl+Shift+B', click: () => setBudgetHud(!budgetHudOn()) },
         { type: 'separator' },
         { label: 'Attached to the game', type: 'radio', checked: store.get().ui.panel !== 'window', click: () => setPanel({ mode: 'attached', open: true }) },
@@ -2434,9 +2635,13 @@ function buildMenu() {
     {
       label: 'View',
       submenu: [
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        // Zoom follows focus (v0.54.1): in the panel it steps the panel's
+        // size; in the game it zooms the game page. (The standard zoom roles
+        // took these keys from the panel and zoomed it behind the layout's
+        // back.)
+        { label: 'Actual size', accelerator: 'CmdOrCtrl+0', click: () => zoomFocused(0) },
+        { label: 'Zoom in', accelerator: 'CmdOrCtrl+=', click: () => zoomFocused(1) },
+        { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: () => zoomFocused(-1) },
         { type: 'separator' },
         { role: 'togglefullscreen' },
         {
@@ -2570,6 +2775,10 @@ ipcMain.on('garden:msg', (event, msg) => {
 });
 
 ipcMain.handle('ui:panel', (event, change) => (change ? setPanel(change) : panelState()));
+// The panel's own script errors (v0.54.1), for the log.
+ipcMain.on('panel:error', (event, e) => {
+  if (e && typeof e === 'object') logError('panel script', `${String(e.message || '').slice(0, 400)}${e.where ? ` (${String(e.where).slice(0, 120)})` : ''}`);
+});
 
 ipcMain.handle('garden:get', () => ({ status: gardenStatus, stats: store.get().garden }));
 
@@ -2586,7 +2795,7 @@ ipcMain.handle('garden:strength', (event, petId, strength) => {
     enrichPets(gardenStatus);
     gardenStatus.eta = gardenEta(gardenStatus);
     gardenStatus.size = sizeEta(gardenStatus);
-    sendToControl('garden:status', gardenStatus);
+    sendGardenStatus(gardenStatus);
   }
   return g.strength;
 });
@@ -2725,6 +2934,8 @@ ipcMain.handle('reclaim:act', (event, act) => onReclaimAction(String(act)));
 function harvestLock() {
   const s = store.get();
   s.harvestLock = Object.assign({ on: false, species: [], petFood: false, lockField: null }, s.harvestLock);
+  // Harvest mode (v0.54.4): only crops matching this rule can be harvested.
+  s.harvestLock.mode = harvestRule.clean(s.harvestLock.mode);
   return s.harvestLock;
 }
 
@@ -2741,6 +2952,7 @@ function setHarvestLock(change) {
   if (change && typeof change.on === 'boolean') lock.on = change.on;
   if (change && typeof change.petFood === 'boolean') lock.petFood = change.petFood;
   if (change && Array.isArray(change.species)) lock.species = change.species.map(String).slice(0, 100);
+  if (change && change.mode && typeof change.mode === 'object') lock.mode = harvestRule.clean(Object.assign({}, lock.mode, change.mode));
   store.save();
   pushHarvestLock();
   sendToControl('harvest:lock', lock);
@@ -3130,7 +3342,7 @@ ipcMain.handle('backup:restore', async (event, testPath) => {
   const keepUi = store.get().ui;
   const next = JSON.parse(JSON.stringify(data.settings));
   // Where the panel sits is about this computer, not the backup.
-  next.ui = Object.assign({}, next.ui, { panel: keepUi.panel, panelOpen: keepUi.panelOpen, panelWidth: keepUi.panelWidth });
+  next.ui = Object.assign({}, next.ui, { panel: keepUi.panel, panelOpen: keepUi.panelOpen, panelWidth: keepUi.panelWidth, panelSize: keepUi.panelSize });
   store.set(next);
   pityState();
   store.save();
@@ -3423,7 +3635,7 @@ ipcMain.handle('garden:sample', async () => {
     const file = path.join(app.getPath('userData'), 'garden-sample.json');
     fs.writeFileSync(
       file,
-      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, alertLog: alertDiagnostics(), lastStatus: gardenStatus, sample }, null, 2),
+      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, errors: ERROR_LOG.slice(), alertLog: alertDiagnostics(), maps: (() => { const u = store.get().ui || {}; return { spotMap: u.spotMap, binderMap: u.binderMap, thunderMap: u.thunderMap, mountMap: u.mountMap, mapPos: u.mapPos }; })(), lastStatus: gardenStatus, sample }, null, 2),
       'utf8'
     );
     shell.showItemInFolder(file);

@@ -1,4 +1,4 @@
-# 🌱 SSK's Garden Buddy: everything it does (beta 0.52)
+# 🌱 SSK's Garden Buddy: everything it does (beta 0.54)
 
 hey! this is my helper app for Magic Garden. it runs the game in its own window with a side panel that keeps an eye on things for you. it's a beta, so there'll be bugs. if you find one, tell me (Extras → 🛠 Troubleshooting → Save a sample helps a ton).
 
@@ -41,8 +41,12 @@ it doesn't buy, harvest or sell anything for you. it watches, tells you things, 
 - **Mutations over time**: how much of your garden has each mutation: hydro, lunar and Gold/Rainbow as families, or split out (wet, chilled, frozen, thunder; dawn, amber; gold, rainbow), each its own line, with the next rain, snow, thunder, dawn and amber coming up marked ahead, so you can time the harvest
 - **Gold & Rainbow by your pets**: a gold line and a rainbow line showing how fast your pets are turning crops, hour by hour (12h / 24h / 3 days / 7 days), straight from the game's own counters, with a ✨ on your best stretch and how long until every crop is Gold or Rainbow
 - garden worth over time, weather mutations, crop size
-- **riding map while you ride an Ostrich or Phoenix**: the crops its Dawn or Amber Capture can turn into capsules as you ride over them, how many capsules, and (on the Ostrich) the Dawn crops by a Moonbinder that can then go Amberbound
-- **every map over the game can be moved**: drag it by its title, double-click to put it back
+- **capture map while an Ostrich or Phoenix is out or ridden**: the crops its Dawn or Amber Capture can turn into capsules, and how many capsules
+- **your best sell pets, with a reminder**: each one's share (the Capybara's Double Harvest and Crop Refund included), ✅ when they're all out, or which to put out before you sell and what it's worth
+- **level next** (Pets tab): which pet to level next for the most gain across your account's best abilities (Sell Boost IV over III...), weighted, for the time it takes; three picks that build on each other and a quick win
+- **harvest mode**: only crops that match your rule (Gold/Rainbow, weather, moon, full size) can be harvested, so you can sweep the whole garden without looking; it shows how many match and what they're worth
+- **one map over the game that follows what you're doing**: open spots with a pot in hand, the binder map during Amber / Dawn, riding, the Thunderstruck finder, capture pets; tabs on its title switch when more than one fits. drag it by its title, tap to fold, double-click to put it back
+- **fits any screen**: the window, the panel and the maps over the game size themselves to your screen, from a 13" laptop to a 1440p monitor (Panel size: Auto, Small to Extra large; Ctrl + / Ctrl −), and work with touch
 - **Thunderstruck finder over the game while a Thunder Wolf is out**: your Thunderstruck crops glowing, how many are left, so the Wolf can turn them Thundercharged
 - **binder map over the game during Amber Moons and Dawns**: your binder and its 8 spots, lit crops to move in (pulsing), the other moon's crops to swap out, open binder spots, and the time left, live as you move pots
 - **garden map with a to-do.** your garden tile by tile: which plants to **cleanse** (Dawn crops next to a Moonbinder, blocking Amberbound) and which to **pot beside a Moonbinder** (Amberlit crops that would bind to Amberbound there), with where to put them and what each is worth. also a value view, and the open spots view, which pops up over the game while you hold a pot

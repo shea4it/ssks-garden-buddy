@@ -777,6 +777,39 @@ function pace(settings, ctx, now) {
   return { perDay: Math.max(0, raw), measured: true, raw };
 }
 
+// Crops at what you'd get for them (v0.53.15): view() and whatIf() set this
+// from ctx.saleMult (a full room x your best sell pets, when the "count
+// crops at what you'd get" option is on), and every crop value read here,
+// today's and the history's, goes through it, so the forecast, safe to
+// spend, net worth and the full-garden estimate all count the same way.
+// Outside those calls it's 1.
+let SALE_M = 1;
+function withSale(ctx, fn) {
+  const prev = SALE_M;
+  const m = ctx && Number(ctx.saleMult);
+  SALE_M = Number.isFinite(m) && m > 0 ? m : 1;
+  try {
+    return fn();
+  } finally {
+    SALE_M = prev;
+  }
+}
+// Scaled once and reused (v0.53.17): a view reads the history four times,
+// and it only changes when a reading is added or the multiplier moves.
+let WORTH_SCALED = { src: null, len: -1, last: null, m: 1, out: null };
+function worthHistory(settings) {
+  const h = Array.isArray(settings.worthHistory) ? settings.worthHistory : [];
+  if (SALE_M === 1) return h;
+  const c = WORTH_SCALED;
+  if (c.src === h && c.len === h.length && c.last === h[h.length - 1] && c.m === SALE_M) return c.out;
+  const out = h.map((p) => (p && typeof p === 'object' ? Object.assign({}, p, {
+    v: Number.isFinite(p.v) ? p.v * SALE_M : p.v,
+    rv: Number.isFinite(p.rv) ? p.rv * SALE_M : p.rv,
+  }) : p));
+  WORTH_SCALED = { src: h, len: h.length, last: h[h.length - 1], m: SALE_M, out };
+  return out;
+}
+
 // The crops' side of the money, from the garden report under the "ready to
 // sell" rule: what's sellable now, what's still growing (worth now, and at
 // least worth once ready), and when that harvest is due.
@@ -785,10 +818,10 @@ function gardenParts(ctx) {
   // null / undefined means "not known" (Number(null) would read as 0 = now).
   const hours = g.harvestHours != null && Number.isFinite(Number(g.harvestHours)) ? Number(g.harvestHours) : null;
   return {
-    ready: Number(g.readyValue) || 0,
+    ready: (Number(g.readyValue) || 0) * SALE_M,
     readyCount: Number(g.ready) || 0,
-    growing: Number(g.growingValue) || 0,
-    potential: Number(g.growingPotential) || 0,
+    growing: (Number(g.growingValue) || 0) * SALE_M,
+    potential: (Number(g.growingPotential) || 0) * SALE_M,
     total: Number(g.total) || 0,
     harvestHours: hours,
   };
@@ -882,7 +915,7 @@ const HISTORY_DAYS = 7;
 function pastMoney(settings, now = Date.now(), days = HISTORY_DAYS) {
   const from = now - days * D_MS;
   const money = (Array.isArray(settings.moneyHistory) ? settings.moneyHistory : []).filter((p) => p && p.t >= from - 2 * H_MS && Number.isFinite(p.c));
-  const worth = (Array.isArray(settings.worthHistory) ? settings.worthHistory : []).filter((p) => p && p.t >= from && p.t <= now && p.rv != null);
+  const worth = worthHistory(settings).filter((p) => p && p.t >= from && p.t <= now && p.rv != null);
   const pts = [];
   let j = 0;
   for (const w of worth) {
@@ -925,7 +958,7 @@ const HARVEST_SOLD = 0.3; // and at least 30% of that shows up as sold
 const CYCLES_WANTED = 3; // fully trusted after this many
 
 function harvestCycles(settings) {
-  const worth = (Array.isArray(settings.worthHistory) ? settings.worthHistory : []).filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.v)).sort((a, b) => a.t - b.t);
+  const worth = worthHistory(settings).filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.v)).sort((a, b) => a.t - b.t);
   const money = (Array.isArray(settings.moneyHistory) ? settings.moneyHistory : []).filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.s)).sort((a, b) => a.t - b.t);
   const soldAt = (t) => {
     let best = null;
@@ -1049,7 +1082,7 @@ function predictHarvest(settings, ctx = {}, now = Date.now()) {
 const RATE_MIN_HOURS = 3;
 
 function maturingRate(settings, now = Date.now()) {
-  const pts = (Array.isArray(settings.worthHistory) ? settings.worthHistory : [])
+  const pts = worthHistory(settings)
     .filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.r) && p.t >= now - 48 * H_MS)
     .sort((a, b) => a.t - b.t);
   let gained = 0;
@@ -1107,7 +1140,12 @@ function estimate(settings, ctx = {}, pred = null, now = Date.now()) {
   const candidates = [];
   if (R >= 5 && parts.ready > 0) candidates.push({ v: parts.ready / R, src: 'ready' });
   else if (obs.perCrop) candidates.push({ v: obs.perCrop, src: 'history' });
-  if (G > 0 && parts.potential > 0) candidates.push({ v: parts.potential / G, src: 'floor' });
+  // The floor is the growing crops' full-size-and-gold value per crop. It's
+  // summed over every crop not ready yet, stuck ones included, so it's
+  // divided by that many (v0.53.14: it was divided by G, the ones that can
+  // still mature, which inflated it by the stuck ones' share).
+  const notReady = Math.max(0, N - R);
+  if (G > 0 && notReady > 0 && parts.potential > 0) candidates.push({ v: parts.potential / notReady, src: 'floor' });
   if (pred && pred.valueSource === 'cycles' && pred.predictedGrowing > 0 && G > 0) candidates.push({ v: pred.predictedGrowing / G, src: 'cycles' });
   const best = candidates.reduce((m, c) => (!m || c.v > m.v ? c : m), null);
   const perCrop = best ? best.v : null;
@@ -1352,7 +1390,7 @@ function foresightOf(settings, ctx, extra, now) {
 
 // "If I buy something for `price` now, what happens to my wants?"
 function whatIf(settings, ctx, price, now = Date.now()) {
-  return cached(settings, () => whatIfOf(settings, ctx, price, now));
+  return withSale(ctx, () => cached(settings, () => whatIfOf(settings, ctx, price, now)));
 }
 
 function whatIfOf(settings, ctx, price, now) {
@@ -1429,6 +1467,9 @@ function options(settings) {
     keepPct: Number.isFinite(pct) ? Math.max(0, Math.min(90, pct)) : 10,
     unlockMode: UNLOCK_MODES.includes(b.unlockMode) ? b.unlockMode : 'auto',
     readyRule: { size: r.size !== false, color: r.color !== false, hydro: r.hydro !== false, lunar: r.lunar !== false },
+    // Count crops at what you'd get selling them: a full room with your best
+    // sell pets (v0.53.15; on unless turned off).
+    saleValue: b.saleValue !== false,
   };
 }
 
@@ -1439,6 +1480,7 @@ function setOptions(settings, change) {
     settings.budget.keepPct = Number.isFinite(v) ? Math.max(0, Math.min(90, Math.round(v))) : 10;
   }
   if (change && 'unlockMode' in change) settings.budget.unlockMode = UNLOCK_MODES.includes(change.unlockMode) ? change.unlockMode : 'auto';
+  if (change && typeof change.saleValue === 'boolean') settings.budget.saleValue = change.saleValue;
   if (change && change.readyRule && typeof change.readyRule === 'object') {
     const cur = options(settings).readyRule;
     const next = Object.assign({}, cur);
@@ -1523,7 +1565,7 @@ function categories(settings, f) {
 function netWorthSeries(settings, days = 30, now = Date.now()) {
   const from = now - days * 86400000;
   const wallet = (Array.isArray(settings.moneyHistory) ? settings.moneyHistory : []).filter((p) => p && p.t >= from && Number.isFinite(p.c)).sort((a, b) => a.t - b.t);
-  const garden = (Array.isArray(settings.worthHistory) ? settings.worthHistory : []).filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.v)).sort((a, b) => a.t - b.t);
+  const garden = worthHistory(settings).filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.v)).sort((a, b) => a.t - b.t);
   const out = [];
   let j = 0;
   for (const w of wallet) {
@@ -1548,7 +1590,7 @@ function netWorthSeries(settings, days = 30, now = Date.now()) {
 // Now, and the change over the last `days` (from the earliest point in it).
 function growth(settings, ctx = {}, days = 7, now = Date.now()) {
   const series = netWorthSeries(settings, 30, now);
-  const live = Number.isFinite(Number(ctx.wallet)) ? { wallet: Number(ctx.wallet), garden: Number(ctx.gardenWorth) || 0 } : null;
+  const live = Number.isFinite(Number(ctx.wallet)) ? { wallet: Number(ctx.wallet), garden: (Number(ctx.gardenWorth) || 0) * SALE_M } : null;
   const last = series[series.length - 1] || null;
   const nowPoint = live ? { t: now, wallet: live.wallet, garden: live.garden, total: live.wallet + live.garden } : last;
   const start = series.find((p) => p.t >= now - days * 86400000) || null;
@@ -1587,6 +1629,42 @@ function incomeBetween(history, from, to) {
   if (span < 3600000) return null;
   const earned = Math.max(0, (b.s - a.s) + ((b.f || 0) - (a.f || 0)));
   return { perDay: (earned * 86400000) / span, earned, hours: span / 3600000 };
+}
+
+/* Checking the app's crop values against real sales (v0.53.15). Each
+ * snapshot: { t, sold (the game's lifetime coins from selling crops), invV
+ * (the app's value of the crops in your inventory), invN, sized (every one
+ * of them has a readable size), roomPct, sellPct (the pets out: expected
+ * sell boost, %) }. When `sold` goes up, the snapshot before it is held; a
+ * few seconds later (the sale has settled) the coins it brought and the
+ * inventory value that left give one check: coins against value x room x
+ * sell boost. A harvest in between (inventory up) or crops with no size
+ * can't be checked, and are skipped. */
+function saleCheckStep(state, snap) {
+  const s = Object.assign({ last: null, pending: null }, state);
+  let record = null;
+  if (s.pending && snap.t - s.pending.t >= 4000) {
+    const p = s.pending;
+    const coins = snap.sold - p.sold;
+    const base = p.invV - snap.invV;
+    const crops = p.invN - snap.invN;
+    if (coins > 0 && base > 0 && crops > 0 && p.sized) {
+      const expected = base * (1 + (p.roomPct || 0) / 100) * (1 + (p.sellPct || 0) / 100);
+      record = { t: p.t, coins, base, crops, roomPct: p.roomPct || 0, sellPct: p.sellPct || 0, expected, ratio: coins / expected };
+    }
+    s.pending = null;
+  }
+  if (!s.pending && s.last && snap.sold > s.last.sold) s.pending = s.last;
+  s.last = snap;
+  return { state: s, record };
+}
+// The last (up to) 10 checks together: coins over what was expected.
+function saleCheckSummary(list) {
+  const recent = (Array.isArray(list) ? list : []).filter((r) => r && r.expected > 0).slice(-10);
+  if (!recent.length) return null;
+  const coins = recent.reduce((a, r) => a + r.coins, 0);
+  const expected = recent.reduce((a, r) => a + r.expected, 0);
+  return { n: recent.length, coins, expected, ratio: coins / expected, lastAt: recent[recent.length - 1].t };
 }
 
 function engine(settings, now = Date.now()) {
@@ -1706,7 +1784,10 @@ function cropStage(ctx = {}) {
  * The whole card
  * ---------------------------------------------------------------- */
 
-function view({ settings, now = Date.now(), ctx = {} }) {
+function view(args) {
+  return withSale(args && args.ctx, () => viewAt(args));
+}
+function viewAt({ settings, now = Date.now(), ctx = {} }) {
   return cached(settings, () => buildView({ settings, now, ctx }));
 }
 
@@ -1724,7 +1805,7 @@ function buildView({ settings, now, ctx }) {
   // take longer to settle: one 50B purchase skews a day). Then it stays
   // shown. The owner can also force it shown or hidden (Extras).
   const measuredHours = periods[30].hours || 0;
-  const netWorth = (Number.isFinite(Number(ctx.wallet)) ? Number(ctx.wallet) : steady.ok ? steady.coinsNow : 0) + (Number(ctx.gardenWorth) || 0);
+  const netWorth = (Number.isFinite(Number(ctx.wallet)) ? Number(ctx.wallet) : steady.ok ? steady.coinsNow : 0) + (Number(ctx.gardenWorth) || 0) * SALE_M;
   const unlockDays = netWorth > 1e9 ? 14 : 1;
   const mode = options(settings).unlockMode;
   const earned = Boolean(settings.budget && settings.budget.unlocked) || measuredHours >= unlockDays * 24;
@@ -1772,8 +1853,12 @@ function buildView({ settings, now, ctx }) {
     netWorth,
     measuredHours,
     options: options(settings),
+    // What crops are counted at (1 = their base value).
+    saleMult: SALE_M,
+    // The app's values against your real sales.
+    saleCheck: saleCheckSummary(settings.saleChecks),
     at: now,
   };
 }
 
-module.exports = { KNOWN, CATS, CAT_INFO, CELESTIAL, STAGES, DEFAULT_WANTS, ICONS, DECOR, everything, pastMoney, cropStage, gardenParts, harvestCycles, predictHarvest, maturingRate, procRate, estimate, foresight, whatIf, seedWants, categoryOf, netWorthSeries, growth, engine, split, stage, SHOP_KINDS, BASELINE, shopKind, emptyStats, migrateStats, record, recordMoney, flows, daily, verdict, migratePurchases, itemOfCommand, resetPurchases, PURCHASES_VERSION, recordPurchase, patterns, rate, afford, planIds, setPlan, nextOpening, plan, categories, options, setOptions, view };
+module.exports = { saleCheckStep, saleCheckSummary, KNOWN, CATS, CAT_INFO, CELESTIAL, STAGES, DEFAULT_WANTS, ICONS, DECOR, everything, pastMoney, cropStage, gardenParts, harvestCycles, predictHarvest, maturingRate, procRate, estimate, foresight, whatIf, seedWants, categoryOf, netWorthSeries, growth, engine, split, stage, SHOP_KINDS, BASELINE, shopKind, emptyStats, migrateStats, record, recordMoney, flows, daily, verdict, migratePurchases, itemOfCommand, resetPurchases, PURCHASES_VERSION, recordPurchase, patterns, rate, afford, planIds, setPlan, nextOpening, plan, categories, options, setOptions, view };

@@ -14,3 +14,10 @@ tests/cert.pem
 tests/server.log
 tests/server.out
 tests/result.json
+tests/shots/
+tests/*.png
+tests/chart-result.json
+tests/sound-result*.json
+tests/bench-*.json
+tests/__pycache__/
+tests/_*

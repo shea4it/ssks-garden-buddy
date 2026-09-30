@@ -15,6 +15,18 @@ and brings it back. The ⧉ button at its top (or the **Panel** menu) pops it
 out into a window of its own; the same button puts it back. Where it sits
 and how wide it is are in Extras, under **Panel**.
 
+**Any screen size.** The window opens to fit your screen (maximised on a
+small one, like a 13" laptop). The panel sizes itself to your screen too:
+smaller on a laptop, bigger on a large monitor, always leaving the game most
+of the window. Extras → Panel → **Panel size** picks Auto (the default),
+Small, Medium, Large or Extra large; **Ctrl +** and **Ctrl −** step it,
+**Ctrl+0** goes back to Auto. The maps and the money box over the game
+scale with the game's view the same way, and if several are up at once
+they shrink to fit its height. **Tap a map's title to fold it** to one line
+(▸) and tap again to open it (▾); drag the title to move it; double-click
+to send it back to the corner. On a touch screen, the charts' read-outs
+follow your finger and buttons are bigger to tap.
+
 - **🔔 Alerts** (Ctrl+Shift+A): volume, voice, quiet hours, test buttons for
   every alert, and a box to add more items.
 - **🌦️ Weather**: today's weather, one line per event, plus **a pet team for
@@ -292,6 +304,25 @@ The lock never sends anything of its own: it points the game's own harvest at
 a crop spot that doesn't exist, so the game's server refuses it like any bad
 click and nothing is harvested.
 
+**Harvest mode** (Garden tab, under Harvest lock; **Ctrl+Shift+M**): only
+crops that match what you pick can be harvested, and everything else is
+kept, so you can sweep the whole garden harvesting without looking. Pick
+what a crop needs in each row (all rows must match; in a row, any one you
+pick will do; nothing picked in a row means any):
+
+- **Colour:** Any, Gold or Rainbow, or Rainbow.
+- **Weather:** Wet, Chilled, Frozen, Thunderstruck, Thundercharged.
+- **Moon:** Dawnlit, Dawnbound, Amberlit, Amberbound.
+- **Size:** Full size only.
+
+For example Gold or Rainbow + Thundercharged + Amberbound + Full size only.
+Under the rows it says how many ripe crops match right now and what they're
+worth. A kept crop shows one short note in the game ("🧺 Kept Marigold: not
+Amberbound") instead of a pile of them while you sweep; a badge in the
+corner says harvest mode is on and what it lets through, and the map over
+the game shows the plants with crops to harvest. Crops you protect are
+never harvested, and the Harvest lock still stops everything.
+
 ## Sharing your room
 
 The Rooms tab's **Open rooms right now** list comes from the community (Arie's
@@ -453,10 +484,32 @@ the top; it remembers which):
 - **Spots**: what's on each spot (open, plant, egg, decoration, shard),
   open ones glowing, for placing a pot.
 
+**Cleanse** means a plant with Dawn crops next to a Moonbinder: Dawn and
+Amber can't be on the same crop, so a Crop Cleanser (it clears weather and
+moon mutations, and keeps Gold and Rainbow) lets it go Amberbound instead,
+which is worth more (x10, against Dawnbound's x7). **Pot** means an Amberlit
+crop that isn't next to a Moonbinder: pot it and plant it in a dashed spot
+next to one. The To-do view says this under its count and opens the plant
+with the most to gain, with a How step.
+
 Tap any tile for its crops, their mutations, what it's worth and its next
-step (and how much that step adds). While you hold a pot, the open spots
-also show in the bottom-right corner of the game (the switch under the
-map).
+step (and how much that step adds). While you hold a pot (empty or with a
+plant in it), **🪴 Open spots** shows in the corner of the game, like the
+other maps: open spots glowing green, the count at the top, and in a full
+garden "No open spots: every tile has something on it. Pot a plant to
+free one." (the switch under the map).
+
+**One map over the game.** Everything below shows on a single map in the
+bottom-right corner, and what it shows follows what you're doing, most
+pressing first: a pot in your hand (open spots), harvest mode (what it
+lets you harvest), then an Amber Moon or Dawn
+with that binder (the binder map), riding an Ostrich or Phoenix, a Thunder
+Wolf out (the Thunderstruck finder), and an Ostrich or Phoenix out. When
+more than one fits, small tabs on its title show the others with their
+counts ("🌕 5 · ⚡ 7"); tap one to switch. Your pick holds until something
+new comes up (you pick up a pot, a Dawn starts). Drag the title to move the
+map, tap the title to fold it, double-click to put it back in the corner.
+The switches under the Garden map turn each view on or off.
 
 **The binder map** pops up in the bottom-right corner of the game during an
 Amber Moon if you have a Moonbinder (or a Dawn, with a Dawnbinder), for
@@ -485,19 +538,19 @@ beside it). It goes away once they're all Thundercharged, and steps aside
 for the binder map during an Amber Moon or Dawn. Where the Wolf itself is
 isn't drawn yet. Its own switch is under the Garden map.
 
-**The riding map** pops up while you ride an Ostrich (Dawn Capture) or a
-Phoenix (Amber Capture). The capture takes that moon's mutations off the
-crops near the pet and turns them into capsules (1 for lit, 2 for bound),
-and while you ride, it goes where you go. The map shows what to ride over,
-with the capsules on offer at the top: lit crops glow (1 capsule, the
-cheap ones to capture), bound crops are a plain fill (2 capsules, but the
-most value off the crop: Amberbound is x10). On the Ostrich, Dawn crops
-next to a Moonbinder pulse: once the Dawn is off they can go Amberbound, a
-clear win. (The Phoenix has no such spots: Amberbound beats Dawnbound.)
-The Thunderstruck finder steps aside while you ride.
+**The capture map** pops up while an Ostrich (Dawn Capture) or a Phoenix
+(Amber Capture) is out, like the Thunderstruck finder does for the Wolf,
+and while you ride one. The capture takes that moon's mutations off the
+crops near the pet and turns them into capsules (1 for lit, 2 for bound).
+The map shows the capsules on offer at the top, how many lit and bound
+crops there are, lit crops glowing (1 capsule) and bound ones a plain fill
+(2 capsules, but more value off the crop: Amberbound is x10). Out, it says
+"Ostrich out" and to keep it near the ones you want captured; riding, it
+says "Riding the Ostrich" and what to ride over (the one you ride wins if
+another is out too). The Thunderstruck finder steps aside only while you
+ride.
 
-**Moving the maps:** drag the binder map, the Thunderstruck finder or the
-riding map by its title to put it anywhere over the game; double-click the
+**Moving the map:** drag it by its title to put it anywhere over the game; double-click the
 title to send it back to the corner. Where you leave each one is
 remembered (as a share of the window, so resizing keeps it in place). Only
 the title takes the mouse: the map itself never blocks the game.
@@ -699,6 +752,18 @@ Below it, five sections, each answered with a picture first:
 - **Your saved teams** lists every team from the game with what it would do,
   and an **Apply** button.
 
+**Level next** (Pets tab) says which pet is most worth levelling next.
+For each ability line (Sell Boost I-IV, Gold Granter, Coin Finder I-IV...)
+your account's best is the strongest one any of your pets has now; a higher
+tier wins (Sell Boost IV beats III). For each pet that hasn't reached its max
+strength, it works out which of those bests it would take over once
+levelled, and by how much, weighted by what matters most (Rainbow and Gold
+crops first, then selling and crop size, then weather mutations, captures
+and pet boosts, then coins, XP and hunger; an ability that only works in
+some weather counts a quarter), for the time it takes. It shows three, each
+building on the one before (levelling one of two identical pets is enough),
+and a quick win: a pet that's close to its max.
+
 Strength is calculated, so there's nothing to type. If one ever looks wrong,
 type the right number over it (✎ marks one you set); clear the box to go
 back to the calculated one. A "≈" means that species' max size isn't known
@@ -754,13 +819,68 @@ counter, whichever egg it was.
   odds say to expect. **Rare finds** lists each rare result and how many
   pulls it took.
 
+## How the money numbers fit together
+
+**Your best sell pets, and a reminder to put them out.** Under the Growth
+chart on the Money tab: "🐾 Best sell pets +31.3%: Pig (+3.2% sell) · Pig
+(+3.2% sell) · Capybara (Double Harvest 4.0%, Crop Refund 15.8%)", then
+✅ when they're all out, or "⚠️ put Capybara out before you sell (about X
+more on your ripe crops, in a full room)". The Garden tab shows that
+reminder too, only while one of them isn't out. The team is the three pets
+you own (out, in your inventory or the hutch) that multiply a sale the most,
+at their strength now, so it changes as pets grow or you get new ones. Sell
+Boosts add to the price; the Capybara's Double Harvest gives extra crops
+when you harvest, and its Crop Refund can give a sold crop back.
+
+**Crops are counted at what you'd get for them.** The Money tab values
+crops at a full room's +50% with your best sell pets out (the three you own
+whose sell abilities multiply a sale the most, named on the tab: for
+example "at full-room prices with Pig, Pig, Capybara (×1.97)"). If you
+usually sell in a smaller room or without sell pets, switch it to **Base
+value** under the Wallet · Ready · Growing bar (⚙ How crops are counted).
+
+Three totals appear, counting different things on purpose:
+
+- **Garden tab, "Worth about"**: your ripe crops at their base value
+  (crops still growing are noted separately). Its "In a full room with
+  your best sell pets" line is the same crops at what you'd get, and
+  matches the garden part of net worth on the Money tab.
+- **Net worth** (Money, Growth; the money box over the game): your coins
+  plus every crop at what you'd get. The Wallet · Ready · Growing bar adds
+  up to it.
+- **Your money** (the Money forecast and safe to spend): your coins plus
+  only the crops that are ready by your "ready" rule (ripe, and full size,
+  Gold/Rainbow, hydro and lunar if you ask for them), at what you'd get.
+  The sentence under safe to spend says how much more is in crops that
+  aren't ready yet.
+
+So net worth = your money + the crops that aren't ready yet. The Money
+engine is different again: the coins you actually earned a day (selling
+crops and pets, and what your pets found). The forecast's "growing ~X a
+day" is crops becoming ready times what they're worth. "Estimated value
+when full" is your ready crops plus the ones that can still get there, each
+at least at its full-size-and-Gold value (with the base value beside it).
+
+**Checked against your sales.** Each time you sell, the app compares the
+coins with the value of the crops that left your inventory, times the room
+and the sell boost of the pets out, and says how they compare ("✅ Checked
+against your last 3 sales: they paid 0.99× what the app expected"). Sell
+boosts are chances, so single sales vary; a ⚠️ means the values look off,
+and a sample saved right after a sale helps fix them.
+
 ## Rooms tab
 
 Every other player in your room adds 10% to what you get for selling crops,
 up to +50% in a full room of 6. The top of the tab shows your room, its
 bonus, and a check that the app's player-count lookups are working. The
 Garden tab's worth line also shows what you'd get with that bonus and your
-pets' sell boosts included, and what it would fetch in a full room (+50%).
+pets' sell boosts included, and what it would fetch in a full room (+50%)
+with your best sell pets: the three pets you own (out, in your inventory
+or the hutch) whose Sell Boost, Double Harvest and Crop Refund multiply a
+sale the most, named, since few people look at these numbers with their
+sell pets already out. The Money tab's "Estimated value when full" uses
+the same team for "+ bonuses" and "in a full room with your best sell
+pets".
 
 **Open rooms right now** lists rooms other players have chosen to share
 through Arie's Mod (read from his public room list, no account needed), most

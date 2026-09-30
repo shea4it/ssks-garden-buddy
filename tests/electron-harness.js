@@ -75,7 +75,7 @@ app.whenReady().then(async () => {
     // purchase made in the game page is noticed, priced and attributed.
     // Watch the hand map for 26 s (the stand-in hands over the pot 21 s after
     // its Welcome and the seed again at 26 s), sending the purchase meanwhile.
-    const mapState = () => run(game(), "(() => { const b = document.getElementById('mg-spot-map'); return { present: !!b, shown: !!b && b.style.display !== 'none', text: b ? b.lastChild.textContent : null, held: window.__mgLoaderObserver.sample().held }; })()");
+    const mapState = () => run(game(), "(() => { const b = document.getElementById('mg-map'); return { present: !!b, shown: !!b && b.style.display !== 'none' && b.dataset.ctx === 'spots', text: b ? (b.children[1] || b.lastChild).textContent : null, held: window.__mgLoaderObserver.sample().held }; })()");
     out.spotMap = { timeline: [] };
     let prev = '';
     for (let i = 0; i < 52; i += 1) {

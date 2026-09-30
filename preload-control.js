@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('app', {
   thunderMapSetting: (on) => ipcRenderer.invoke('ui:thunderMap', on),
   mountMapSetting: (on) => ipcRenderer.invoke('ui:mountMap', on),
   reportPlayed: (report) => ipcRenderer.send('alerts:played', report),
+  reportError: (e) => ipcRenderer.send('panel:error', e),
   onPurchase: on('budget:purchase'),
   reclaimGet: () => ipcRenderer.invoke('reclaim:get'),
   reclaimSet: (change) => ipcRenderer.invoke('reclaim:set', change),

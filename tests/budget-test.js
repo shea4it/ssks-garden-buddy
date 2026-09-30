@@ -720,7 +720,6 @@ console.log(`budget: ${n} checks passed`);
   ok(fp && Math.abs(fp.perDay - 2 / (40 / 1.98)) < 1e-9 && fp.source === 'app', 'in stock 2 of 40 Amber openings: ~0.1 a day, ~9.9B a day for the Firepit');
   delete stats.items.StoneFirepit;
   // On the chart: his garden (≈ 98.6B a day maturing) can afford it all; a small one runs out.
-  const H0 = 3600000;
   const garden = { total: 270, ready: 121, readyValue: 410.6675e9, growingValue: 76.59e9, growingPotential: 143.95e9, missing: { grow: 3, size: 10, color: 94, hydro: 3, lunar: 81 }, harvestHours: null, goldPerHour: 1.21, stepHours: { size: null } };
   let f = budget.foresight(s, { wallet: 36e9, garden, pace: 0, gardenLoaded: true, readyRule: {} }, 0, 400 * D);
   ok(f.everything && f.everything.canAll === true && f.everything.runsOut === null && f.everything.line.length > 10, 'his garden: buying everything stays above zero');
@@ -834,4 +833,47 @@ console.log(`budget: ${n} checks passed`);
   if (poor.binding || poor.safeToSpend !== 0 || poor.signal !== 'save') throw new Error('binding: short means 0, no binding');
   if (plenty.readyCrops !== 411e9) throw new Error('readyCrops');
   console.log('budget (safe to spend in words): ok');
+}
+
+// The full-garden estimate's floor (v0.53.14): the growing crops' potential
+// is per crop over every crop not ready yet, not just the ones that can
+// still mature. The owner's garden: 270 crops, 225 ready (574.3B), 45 not
+// (potential 123.9B), 10 of them stuck on size with no size-boost pet.
+{
+  const s = { moneyHistory: [], worthHistory: [], alerts: { custom: [], disabled: [] }, shopStats: budget.emptyStats(), purchases: { log: [] }, budget: {} };
+  const g = { total: 270, ready: 225, readyValue: 574.3e9, growingValue: 65e9, growingPotential: 123.9e9,
+    missing: { grow: 0, size: 10, color: 21, hydro: 0, lunar: 18 }, have: { ripe: 270 }, goldPerHour: 1.21, stepHours: { ripe: 0, size: null, hydro: 0, lunar: 2.5, color: 17 } };
+  const f = budget.view({ settings: s, ctx: { wallet: 11.4e9, garden: g, gardenLoaded: true, readyRule: { size: true, color: true, hydro: true, lunar: true } } }).foresight;
+  const est = f.estimate;
+  if (!est || est.canMature !== 35) throw new Error('floor: 35 can mature (45 - 10 stuck), got ' + (est && est.canMature));
+  const floor = 123.9e9 / 45;
+  if (Math.abs(est.perCrop - floor) > 1e3) throw new Error('floor: per crop should be potential / 45 = ' + floor + ', got ' + est.perCrop);
+  if (Math.abs(est.fullValue - (574.3e9 + 35 * floor)) > 1e4) throw new Error('floor: full value');
+  console.log('budget (full-garden floor): ok', (est.fullValue / 1e9).toFixed(1) + 'B');
+}
+
+// Checking values against real sales (v0.53.15): a sale is the lifetime
+// sell counter going up; a few seconds on, coins vs the inventory value that
+// left, times room and sell boost.
+{
+  let st = null;
+  const step = (snap) => {
+    const r = budget.saleCheckStep(st, snap);
+    st = r.state;
+    return r.record;
+  };
+  const T = 1e12;
+  const base = { roomPct: 50, sellPct: 10, sized: true };
+  if (step(Object.assign({ t: T, sold: 1000, invV: 100e9, invN: 50 }, base))) throw new Error('sale: nothing yet');
+  if (step(Object.assign({ t: T + 2000, sold: 1000 + 165e9, invV: 0, invN: 0 }, base))) throw new Error('sale: not settled yet');
+  const rec = step(Object.assign({ t: T + 7000, sold: 1000 + 165e9, invV: 0, invN: 0 }, base));
+  if (!rec || rec.crops !== 50 || Math.abs(rec.expected - 100e9 * 1.5 * 1.1) > 1 || Math.abs(rec.ratio - 1) > 1e-9) throw new Error('sale: one check, ratio 1: ' + JSON.stringify(rec));
+  // Crops without a readable size can't be checked.
+  st = null;
+  step({ t: T, sold: 0, invV: 50e9, invN: 10, roomPct: 0, sellPct: 0, sized: false });
+  step({ t: T + 1000, sold: 60e9, invV: 0, invN: 0, roomPct: 0, sellPct: 0, sized: true });
+  if (step({ t: T + 6000, sold: 60e9, invV: 0, invN: 0, roomPct: 0, sellPct: 0, sized: true })) throw new Error('sale: unsized skipped');
+  const sum = budget.saleCheckSummary([{ coins: 90, expected: 100 }, { coins: 110, expected: 100 }]);
+  if (!sum || sum.n !== 2 || Math.abs(sum.ratio - 1) > 1e-9) throw new Error('sale: summary');
+  console.log('budget (sale checks): ok');
 }

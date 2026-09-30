@@ -429,7 +429,7 @@ async function synthesizeNow(id, text, pace) {
     const timer = setTimeout(() => {
       jobs.delete(file);
       reject(new Error('The voice took too long'));
-    }, 20000);
+    }, 8000); // v0.54.3: was 20 s; past 8 s the computer's voice is the better choice
     jobs.set(file, { resolve, reject, timer });
   });
   proc.stdin.write(JSON.stringify(line) + '\n');

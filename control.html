@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Only its own inline script and styles; no network, no eval (v0.54.1). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>SSK's Garden Buddy</title>
 <style>
   :root {
@@ -14,7 +16,7 @@
     --gold: #e8c170;
     --text: #f6f1f8;
     --muted: #cbb8d8;
-    --faint: #93809f;
+    --faint: #9c8aa7; /* v0.54.1: was #93809f (4.1:1 on cards); now 4.7:1+, WCAG AA */
     --warn: #e8a07a;
   }
 
@@ -136,7 +138,7 @@
   .restock .nm { font-size: 11.5px; color: var(--muted); }
   .restock .tm { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
   .restock .sub { font-size: 10.5px; color: var(--faint); }
-  .restock .nm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .restock .nm { max-width: 100%; text-align: center; line-height: 1.15; overflow-wrap: anywhere; }
   .restock.now { border-color: rgba(252, 211, 77, .55); background: rgba(252, 211, 77, .08); }
   .status-tiles { margin-top: 10px; }
   .restock.soon { border-color: var(--moss); background: rgba(127, 201, 138, 0.1); }
@@ -222,6 +224,13 @@
   .money-chart .tick.now { fill: var(--text); font-weight: 700; }
   .money-chart .bite { font-size: 10px; font-weight: 700; fill: #fda4af; }
   .money-chart .tag { font-size: 8.5px; font-weight: 600; opacity: .9; }
+  /* Touch (v0.53.16): charts scrub sideways and still scroll up and down;
+     on a touch screen, things to tap are at least 40 px tall. */
+  svg[data-hover] { touch-action: pan-y; }
+  @media (pointer: coarse) {
+    .chip, .seg button, nav button, .btn, select { min-height: 40px; }
+    .mut-legend .mut-check, .luck-src summary { min-height: 36px; }
+  }
   .mut-legend { display: grid; gap: 5px; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .ml-row { display: flex; align-items: center; gap: 8px; }
@@ -502,6 +511,33 @@
   .luck-row .luck { margin: 0; }
   .luck-row input { width: 76px; padding: 3px 6px; font-size: 12px; }
   .luck-row.primed .nm { color: var(--moss); font-weight: 600; }
+  .ln-pick { padding: 8px 0; border-top: 1px solid rgba(75, 52, 89, .45); }
+  .ln-pick:first-child { border-top: none; padding-top: 0; }
+  .ln-top { display: flex; align-items: center; gap: 8px; }
+  .ln-ic { font-size: 22px; width: 28px; text-align: center; flex: none; }
+  .ln-name { flex: 1; min-width: 0; }
+  .ln-str { text-align: right; font-size: 12.5px; white-space: nowrap; }
+  .ln-str small { display: block; font-size: 11px; color: var(--faint); }
+  .ln-pick ul { margin: 4px 0 0 36px; padding-left: 14px; font-size: 12.5px; }
+  .ln-pick li { margin: 2px 0; }
+  .faint { color: var(--faint); }
+  .gc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .gc-stat { background: var(--base); border: 1px solid var(--edge); border-radius: 10px; padding: 6px 6px 5px; text-align: center; }
+  .gc-stat b { display: block; font-size: 19px; font-variant-numeric: tabular-nums; }
+  .gc-stat span { font-size: 11.5px; color: var(--faint); }
+  .gc-worth { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0 4px; }
+  .gc-worth > div { background: var(--base); border: 1px solid var(--edge); border-radius: 10px; padding: 7px 10px; min-width: 0; }
+  .gc-worth span { display: block; font-size: 12px; color: var(--muted); }
+  .gc-worth b { display: block; font-size: 21px; font-variant-numeric: tabular-nums; }
+  .gc-worth b.gold { color: var(--gold); }
+  .gc-worth small { display: block; font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hv-rule { margin: 6px 0 2px; padding: 8px 10px; border-radius: 10px; background: var(--base); border: 1px solid var(--edge); }
+  .hv-rule.off { opacity: .55; }
+  .hv-rule .hv-row { display: flex; align-items: baseline; gap: 8px; margin: 3px 0; }
+  .hv-rule .hv-row > span { width: 62px; flex: none; font-size: 12px; color: var(--faint); }
+  .hv-rule .chips { margin: 0; gap: 4px; }
+  .hv-rule .chip { padding: 3px 9px; font-size: 12px; }
+  .hv-match { font-size: 12.5px; margin-top: 6px; }
   .lk-hero { display: flex; gap: 12px; align-items: center; margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--edge); background: var(--base); }
   .lk-hero.lt-look { border-color: rgba(110, 231, 168, .45); background: linear-gradient(135deg, rgba(110, 231, 168, .10), rgba(110, 231, 168, .02)); }
   .lk-hero.lt-next { border-color: rgba(255, 211, 92, .6); background: linear-gradient(135deg, rgba(255, 211, 92, .16), rgba(255, 211, 92, .03)); animation: lkGlow 1.8s ease-in-out infinite; }
@@ -1176,6 +1212,11 @@
         <button class="switch" role="switch" id="lockOn" aria-label="Harvest lock"></button>
       </div>
       <div class="row" style="margin-top:8px">
+        <span>Harvest mode<div class="rule-desc">Only crops that match what you pick below can be harvested; everything else is kept, so you can sweep the whole garden without looking. Ctrl+Shift+M.</div></span>
+        <button class="switch" role="switch" id="harvestModeOn" aria-label="Harvest mode"></button>
+      </div>
+      <div id="harvestRule" class="hv-rule"></div>
+      <div class="row" style="margin-top:8px">
         <span>Never sell pet food<div class="rule-desc">Pet food is whatever you carry in pots. When you sell, the app locks those crops first, so the sale can't take them.</div></span>
         <button class="switch" role="switch" id="petFoodOn" aria-label="Never sell pet food"></button>
       </div>
@@ -1236,10 +1277,10 @@
         <button class="switch" role="switch" id="thunderMapOn" aria-label="Show the Thunderstruck finder over the game while a Thunder Wolf is out"></button>
       </div>
       <div class="rule">
-        <div class="rule-text"><div class="rule-name">Show the riding map over the game while you ride an Ostrich or Phoenix</div><div class="rule-desc">The crops its Dawn or Amber Capture can turn into capsules as you ride over them.</div></div>
-        <button class="switch" role="switch" id="mountMapOn" aria-label="Show the riding map over the game while you ride an Ostrich or Phoenix"></button>
+        <div class="rule-text"><div class="rule-name">Show the capture map over the game while an Ostrich or Phoenix is out</div><div class="rule-desc">Out or ridden: the crops its Dawn or Amber Capture can turn into capsules.</div></div>
+        <button class="switch" role="switch" id="mountMapOn" aria-label="Show the capture map over the game while an Ostrich or Phoenix is out"></button>
       </div>
-      <div class="note" style="margin-top:4px">Drag any of these maps by its title to move it; double-click the title to put it back in the corner.</div>
+      <div class="note" style="margin-top:4px">These all show on one map over the game: whichever fits what you're doing (a pot in hand first, then an Amber Moon or Dawn, riding, the Thunder Wolf, a capture pet). When more than one fits, tabs on its title switch between them. Drag the title to move it, tap it to fold, double-click to put it back in the corner.</div>
     </div>
 
     <h2>Your stats</h2>
@@ -1317,6 +1358,9 @@
       <div id="goalRank" style="margin-top:6px"></div>
       <p class="hint" style="margin-bottom:0">Every pet you own (out, in your inventory, or in the hutch), ranked at its current strength.</p>
     </div>
+
+    <h2>Level next</h2>
+    <div class="card" id="levelNext"></div>
 
     <h2>Your saved teams</h2>
     <div class="card" id="teamCompare"></div>
@@ -1486,7 +1530,11 @@
         <span>Panel width</span>
         <input type="range" id="panelWidth" min="320" max="700" step="10" style="width: 55%" aria-label="Panel width">
       </div>
-      <p class="hint" style="margin-bottom:0">Ctrl+Shift+D shows or hides the panel from anywhere in the app.</p>
+      <div class="note" style="margin:8px 0 4px">Panel size</div>
+      <div class="seg" id="panelSize" role="radiogroup" aria-label="Panel size">
+        <button role="radio" data-val="auto">Auto</button><button role="radio" data-val="small">Small</button><button role="radio" data-val="medium">Medium</button><button role="radio" data-val="large">Large</button><button role="radio" data-val="xlarge">Extra large</button>
+      </div>
+      <p class="hint" style="margin-bottom:0">Auto sizes the panel to your screen: smaller on a laptop, bigger on a large monitor. Ctrl and + or − changes it too, Ctrl+0 goes back to Auto. Ctrl+Shift+D shows or hides the panel from anywhere in the app.</p>
     </div>
 
     <h2>Money tab</h2>
@@ -1516,6 +1564,22 @@
 <div class="toast" id="toast" role="status"></div>
 
 <script>
+// Errors in the panel's script go to the app's log (v0.54.1), so a sample
+// shows them; at most 20 a session, so one repeating bug can't flood it.
+(() => {
+  let sent = 0;
+  const report = (message, where) => {
+    if (sent >= 20 || !window.app || !window.app.reportError) return;
+    sent += 1;
+    try {
+      window.app.reportError({ message: String(message).slice(0, 400), where: String(where || '').slice(0, 120) });
+    } catch (err) {
+      /* nothing more to do */
+    }
+  };
+  window.addEventListener('error', (e) => report(e.message, `${e.filename ? e.filename.split('/').pop() : ''}:${e.lineno || ''}`));
+  window.addEventListener('unhandledrejection', (e) => report((e.reason && (e.reason.stack || e.reason.message)) || e.reason, 'promise'));
+})();
 'use strict';
 
 /* ================================================================== *
@@ -2644,6 +2708,35 @@ function wireVoiceCards() {
 
 // `override` plays a voice without switching to it (previews):
 // { natural: voice } or { system: 'computer voice name' }.
+/* Voice lines made ahead (v0.54.3): an alert asks for its sentence as its
+ * sounds start, so the downloaded voice has it ready (or nearly) when they
+ * end, instead of only starting then (the Dawn shop's long sentence could
+ * leave seconds of silence). Keyed by the exact line, voice and pace; each
+ * is used once. BATCH_TIME notes when the voice started and how long it
+ * waited, for the alert trail. */
+const PREPARED = new Map();
+let BATCH_TIME = null;
+// The one place the downloaded voice is asked for a line (a test can stand
+// in a slow one here).
+let synthVoice = (id, said, p) => window.app.voiceSynthesize(id, said, p);
+function speechKey(nv, said) {
+  return `${nv.id}|${pace()}|${said}`;
+}
+function prepareSpeech(...lines) {
+  const nv = naturalVoice();
+  if (!nv || naturalFailures >= 3 || speechLevel() === 0 || vol() === 0) return;
+  for (const text of lines) {
+    if (!text) continue;
+    const said = sayable(text);
+    const key = speechKey(nv, said);
+    if (PREPARED.has(key)) continue;
+    const p = synthVoice(nv.id, said, pace());
+    p.catch(() => {});
+    PREPARED.set(key, p);
+    while (PREPARED.size > 8) PREPARED.delete(PREPARED.keys().next().value);
+  }
+}
+
 async function speak(text, override) {
   if (!override && speechLevel() === 0) return;
   if (vol() === 0) return;
@@ -2651,7 +2744,17 @@ async function speak(text, override) {
   const nv = override ? override.natural || null : naturalVoice();
   if (nv && (override || naturalFailures < 3)) {
     try {
-      await playClip(await window.app.voiceSynthesize(nv.id, said, pace()), nv.tone);
+      const key = speechKey(nv, said);
+      const ready = override ? null : PREPARED.get(key);
+      if (ready) PREPARED.delete(key);
+      const w0 = performance.now();
+      const clip = await (ready || synthVoice(nv.id, said, pace()));
+      if (BATCH_TIME) {
+        BATCH_TIME.voiceWait += Math.round(performance.now() - w0);
+        if (BATCH_TIME.voiceAt == null) BATCH_TIME.voiceAt = Math.round(performance.now() - BATCH_TIME.t0);
+        BATCH_TIME.prepared = BATCH_TIME.prepared || Boolean(ready);
+      }
+      await playClip(clip, nv.tone);
       if (!override) naturalFailures = 0;
       return;
     } catch (err) {
@@ -2794,6 +2897,7 @@ async function itemSounds(tier, sound) {
 async function performItem(a, rule) {
   const tier = a.tier || rule.tier || 'named';
   const L = itemLines(a, rule);
+  prepareSpeech(L.first, L.again);
   await itemSounds(tier, a.sound || rule.sound || null);
   await speak(L.first);
   if (!L.again) return;
@@ -2857,10 +2961,12 @@ async function perform(a) {
     return speak("Snow! It's snowing.");
   }
   if (id === 'dawn') {
+    prepareSpeech('Dawn shop! The Dawn shop is open.');
     await sounds(() => SFX.sunrise());
     return speak('Dawn shop! The Dawn shop is open.');
   }
   if (id === 'amber') {
+    prepareSpeech('Amber alert! The Amber shop is open.');
     await sounds(() => SFX.amber());
     return speak('Amber alert! The Amber shop is open.');
   }
@@ -2915,9 +3021,10 @@ async function enqueue(list) {
       const batch = queue.splice(0);
       duck(true);   // before each, in case anything let the game's sound back in
       const t0 = Date.now();
+      BATCH_TIME = { t0: performance.now(), voiceAt: null, voiceWait: 0, prepared: false };
       try {
         await performBatch(batch);
-        reportPlayed({ played: alertNames(batch), ms: Date.now() - t0 });
+        reportPlayed({ played: alertNames(batch), ms: Date.now() - t0, voiceAt: BATCH_TIME.voiceAt, voiceWait: BATCH_TIME.voiceWait, prepared: BATCH_TIME.prepared });
       } catch (err) {
         console.error('Alert sound failed:', err);
         reportPlayed({ failed: alertNames(batch), error: String((err && err.message) || err), ms: Date.now() - t0 });
@@ -2972,11 +3079,14 @@ async function performItems(items, shop) {
   }).sort((x, y) => TIER_RANK[y.tier] - TIER_RANK[x.tier]);
   const names = [...new Set(list.map((x) => x.name))];
   const top = list[0];
+  const opened = shop ? (shop.ruleId === 'amber' ? 'Amber alert! The Amber shop is open. ' : 'Dawn shop! The Dawn shop is open. ') : '';
+  const line = shop ? `${opened}In stock: ${nameList(names)}.` : `${nameList(names)} ${names.length === 1 ? 'is' : 'are'} in the shop.`;
+  const big = [...new Set(list.filter((x) => x.tier === 'epic' || x.tier === 'legendary').map((x) => x.name))];
+  // Both sentences are made while the sounds play.
+  prepareSpeech(line, big.length ? `Once more: ${nameList(big)}.` : null);
   if (shop) await sounds(() => (shop.ruleId === 'amber' ? SFX.amber() : SFX.sunrise()));
   await itemSounds(top.tier, top.sound);
-  const opened = shop ? (shop.ruleId === 'amber' ? 'Amber alert! The Amber shop is open. ' : 'Dawn shop! The Dawn shop is open. ') : '';
-  await speak(shop ? `${opened}In stock: ${nameList(names)}.` : `${nameList(names)} ${names.length === 1 ? 'is' : 'are'} in the shop.`);
-  const big = [...new Set(list.filter((x) => x.tier === 'epic' || x.tier === 'legendary').map((x) => x.name))];
+  await speak(line);
   if (!big.length) return;
   if (top.tier === 'legendary') await sounds(() => SFX.fanfare(false));
   else await wait(BREATH_MS);
@@ -3839,6 +3949,7 @@ const PULL_ICON = {
   squirrel: '🐿️', turtle: '🐢', goat: '🐐', caribou: '🦌', ostrich: '🐦', peacock: '🦚', butterfly: '🦋', thunderwolf: '🐺',
   firehorse: '🐎', phoenix: '🔥', capybara: '🦫', platypus: '🦆', rooster: '🐓', hedgehog: '🦔', fox: '🦊', frog: '🐸',
   horse: '🐴', penguin: '🐧', owl: '🦉', duck: '🦆', sheep: '🐑', mouse: '🐭', cat: '🐱', dog: '🐶',
+  bat: '🦇', ghost: '🐾',
   goldpet: '🌟', rainbowpet: '🌈', dawnbreakerspore: '🌅', dawnbreaker: '🌅', ubeseed: '🍠', strengthshard: '💪', xpshard: '✨', embercrown: '👑',
 };
 function pullIcon(name, fallback = '🐾') {
@@ -4029,7 +4140,10 @@ let GARDEN_STATS = null;
 function shortNumber(n) {
   const v = Number(n) || 0;
   for (const [size, suffix] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']]) {
-    if (v >= size) return (v / size).toFixed(v / size >= 100 ? 0 : 1).replace(/\.0$/, '') + suffix;
+    // Trillions under 10 get two decimals (v0.53.15): at a full-room price
+    // gardens run 1-2T, and "1.1T" would hide the difference between 1.07T
+    // and 1.14T.
+    if (v >= size) return (v / size).toFixed(v / size >= 100 ? 0 : suffix === 'T' && v / size < 10 ? 2 : 1).replace(/\.0+$/, '').replace(/(\.\d)0$/, '$1') + suffix;
   }
   return String(Math.round(v));
 }
@@ -4147,7 +4261,44 @@ function renderDevDetails() {
   box.innerHTML = rows.join('');
 }
 
+/* Which pet to level next (pet-plan.js, v0.54.5): for each ability line the
+ * account's best now; which pet, levelled to its max, would add the most to
+ * those (weighted: Rainbow and Gold first, then selling and size...), with
+ * time counted. Picks build on each other; a quick win is given too. */
+function renderLevelNext() {
+  const box = $('levelNext');
+  if (!box) return;
+  const L = GARDEN_STATUS && GARDEN_STATUS.levelNext;
+  if (!L) {
+    box.innerHTML = '<div class="empty">Shows up once your pets are read from the game.</div>';
+    return;
+  }
+  if (!L.picks.length) {
+    box.innerHTML = `<div class="empty">${L.toLevel ? 'None of your pets would beat what you already have by levelling.' : 'Every pet you own is at its max strength.'}</div>`;
+    setFoldSummary('pets/level-next', '');
+    return;
+  }
+  const time = (h) => (h >= 36 ? `about ${Math.round(h / 24)} days` : `about ${Math.max(1, Math.round(h))} h`);
+  const where = { out: 'out now', hutch: 'in the hutch', inventory: 'in your bag', storage: 'in storage' };
+  const why = (x) => {
+    const beats = !x.now ? 'you have none yet' : x.now.same ? 'already your best, and growing' : `beats ${esc(x.now.pet)}'s ${esc(x.now.ability)}`;
+    return `<li><b>${esc(x.ability)}</b>: ${esc(x.text)} <span class="faint">(${beats})</span></li>`;
+  };
+  // "FireHorse" as "Fire Horse".
+  const nice = (s) => String(s || '').replace(/([a-z])([A-Z])/g, '$1 $2');
+  const card = (p, i) => `<div class="ln-pick">
+      <div class="ln-top"><span class="ln-ic" aria-hidden="true">${pullIcon(p.species)}</span><span class="ln-name"><b>${i + 1}. ${esc(nice(p.species))}</b>${p.name && p.name !== p.species ? ` “${esc(p.name)}”` : ''} <span class="faint">${where[p.where] || esc(p.where || '')}</span></span>
+      <span class="ln-str">STR ${p.strength} → <b>${p.maxStrength}</b><small>${time(p.hoursToMax)}</small></span></div>
+      <ul>${p.reasons.slice(0, 3).map(why).join('')}</ul></div>`;
+  const q = L.quick;
+  box.innerHTML = L.picks.map(card).join('')
+    + (q ? `<div class="note no-clamp" style="margin-top:6px">⚡ Quick win: <b>${esc(nice(q.species))}</b> is ${time(q.hoursToMax)} from its max (STR ${q.strength} → ${q.maxStrength}): ${q.reasons.slice(0, 2).map((x) => esc(x.ability)).join(', ')}.</div>` : '')
+    + `<div class="note no-clamp" style="margin-top:6px" title="Weighted: Rainbow and Gold crops first, then selling (Sell Boost, Crop Refund, Double Harvest) and crop size, then weather mutations, captures and pet boosts, then coins, XP and hunger. Abilities that only work in some weather count a quarter.">Of ${L.toLevel} pets that can still grow: the ones whose abilities would add the most to your best, for the time it takes. Picks build on each other.</div>`;
+  setFoldSummary('pets/level-next', L.picks.map((p) => `${pullIcon(p.species)} ${nice(p.species)}`).join(' · '));
+}
+
 function renderPets() {
+  renderLevelNext();
   renderDevDetails();
   const st = GARDEN_STATUS;
   const live = st && st.foundSelf && Date.now() - st.at < 45000;
@@ -4231,7 +4382,7 @@ function renderPets() {
   const t = teams.find((x) => x.id === TEAM_PICK);
   const outNow = isOutT(t);
   const opts = sorted.map((x) => `<option value="${esc(x.id)}"${x.id === TEAM_PICK ? ' selected' : ''}>${esc(x.name)}${isOutT(x) ? ' ✓ out now' : ''} — ${esc(petsOf(x, false).join(', ') || 'no pets')}</option>`).join('');
-  $('teamCompare').innerHTML = `<div class="row" style="margin-top:0"><label for="teamSelect">Team</label><select id="teamSelect" aria-label="Choose a saved team">${opts}</select></div>
+  $('teamCompare').innerHTML = `<div class="row" style="margin-top:0"><label for="teamSelect">Team</label><select id="teamSelect" aria-label="Choose a saved team" style="flex:1;min-width:0;max-width:none;margin-left:10px">${opts}</select></div>
     <div class="team-card-pick">
       <div class="rule-name">${esc(t.name)}${outNow ? ' <span class="live">· out now</span>' : ''}</div>
       <div class="rule-desc">${esc(petsOf(t, true).join(', ') || 'no pets')}${t.missing ? ` · ${t.missing} pet${t.missing === 1 ? '' : 's'} not found` : ''}</div>
@@ -4312,39 +4463,40 @@ function renderCropCard(st, b) {
     }</div>`;
     return;
   }
-  // "Ready" means the Money tab's rule everywhere; the game's own "grown"
-  // is called ripe here so the two numbers can't be mixed up.
-  const ready = (b.matureKnown ? ` · <strong>${b.mature.toLocaleString()}</strong> ripe` : '')
-    + (b.missing ? ` · <strong>${(b.ready || 0).toLocaleString()}</strong> ready to sell` : '');
+  // v0.54.4: numbers first, words in the tooltips. "Ready" is the Money
+  // tab's rule (what it counts as money); the game's own "grown" is ripe.
   const unpriced = Object.entries(b.unpricedSpecies || {}).sort((x, y) => y[1] - x[1]);
+  const nowV = b.ripeValue != null ? b.ripeValue : b.value;
+  const growing = Math.max(0, (b.value || 0) - (nowV || 0));
+  const stat = (n, label, title) => `<div class="gc-stat"${title ? ` title="${esc(title)}"` : ''}><b>${n}</b><span>${label}</span></div>`;
   const lines = [];
-  lines.push(`<div class="big-line"><strong>${b.total.toLocaleString()}</strong> crops growing${ready}</div>`);
+  lines.push(`<div class="gc-stats">${stat(b.total.toLocaleString(), 'crops')}${b.matureKnown ? stat(b.mature.toLocaleString(), 'ripe', 'Grown: can be picked now') : ''}${b.missing ? stat((b.ready || 0).toLocaleString(), b.readyValue ? `ready · ${shortNumber(Math.round(b.readyValue))}` : 'ready', 'Ready by your \u201cready\u201d rule (Money options): what the Money tab counts as money') : ''}</div>`);
   if (b.value) {
-    lines.push(`<div class="worth">💰 Worth about <strong>${shortNumber(Math.round(b.value))}</strong> if you harvested and sold everything now.</div>`);
-    // What you'd actually get: the room's friend bonus and your pets' sell
-    // boosts (on average) both multiply the sale.
-    const { roomPct, sellPct, dh, refund, petPart } = saleBonuses(st);
-    const bits = [];
-    if (roomPct) bits.push(`your room's +${roomPct}%`);
-    if (sellPct) bits.push(`your pets' sell boost (≈ +${sellPct.toFixed(1)}%)`);
-    if (dh) bits.push(`Double Harvest (≈ +${dh.toFixed(1)}%)`);
-    if (refund) bits.push(`Crop Refund (≈ +${((1 / (1 - refund / 100) - 1) * 100).toFixed(1)}%)`);
-    if (bits.length) {
-      const total = b.value * (1 + roomPct / 100) * petPart;
-      const list = bits.length > 1 ? bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1] : bits[0];
-      lines.push(`<div class="note">With ${list}: about <b>${shortNumber(Math.round(total))}</b> on average.</div>`);
+    const best = bestSell(st);
+    const full = nowV * 1.5 * best.petPart;
+    lines.push(`<div class="gc-worth">
+      <div title="Every ripe crop at its base value, if you harvested and sold it now"><span>💰 Sell now</span><b>${shortNumber(Math.round(nowV))}</b>${growing >= 1 ? `<small>+${shortNumber(Math.round(growing))} still growing</small>` : ''}</div>
+      <div title="A full room (+50%)${best.names.length ? ` with your best sell pets out: ${esc(best.names.join(', '))}` : ''}. The Rooms tab finds busy rooms."><span>🎉 Full room${best.names.length ? ' + sell pets' : ''}</span><b class="gold">${shortNumber(Math.round(full))}</b>${best.names.length ? `<small>${esc(best.names.join(', '))}</small>` : ''}</div>
+    </div>`);
+    // Your room right now, only when it or the pets out add something.
+    const r = saleBonuses(st);
+    if (r.roomPct || r.petPart > 1.0001) {
+      const total = nowV * (1 + r.roomPct / 100) * r.petPart;
+      lines.push(`<div class="note" title="What selling now would bring on average, with this room's bonus and the sell abilities of the pets out">In this room now${r.roomPct ? ` (+${r.roomPct}%)` : ''}${r.petPart > 1.0001 ? `, pets out +${((r.petPart - 1) * 100).toFixed(1)}%` : ''}: about <b>${shortNumber(Math.round(total))}</b></div>`);
     }
-    // The most it could fetch: a full room of 6 (+50%), with the same pets.
-    if (roomPct < 50) {
-      const full = b.value * 1.5 * petPart;
-      lines.push(`<div class="note">🎉 In a full room (+50%)${petPart > 1.0001 ? ' with your pets' : ''}: about <b style="color:var(--gold)">${shortNumber(Math.round(full))}</b>. The Rooms tab finds busy rooms.</div>`);
+    // The reminder, short: which of your best sell pets aren't out.
+    const t = st && st.idealSell;
+    if (t && t.petPart > 1.0001 && !t.allOut && (t.notOut || []).length) {
+      const outPart = t.outNow && t.outNow.petPart > 0 ? t.outNow.petPart : 1;
+      const more = nowV * 1.5 * Math.max(0, t.petPart - outPart);
+      lines.push(`<div class="note">🐾 Put ${esc(andList(t.notOut))} out before you sell${more >= 1 ? `: <b>+${shortNumber(Math.round(more))}</b>` : ''}</div>`);
     }
   }
   if (unpriced.length) {
-    lines.push(`<div class="note">Not counted in that (no price for these yet): ${unpriced.map(([name, n]) => `<b>${esc(prettyBucket(name))}</b> ×${n}`).join(', ')}.</div>`);
+    lines.push(`<div class="note">No price yet for ${unpriced.map(([name, n]) => `<b>${esc(prettyBucket(name))}</b> ×${n}`).join(', ')}.</div>`);
   }
 
-  lines.push('<div class="subhead" style="margin-top:14px">Gold and Rainbow</div>');
+  lines.push('<div class="subhead" style="margin-top:12px">Gold and Rainbow</div>');
   lines.push(barRow('🟡 Gold', 'gold', b.gold, b.total));
   lines.push(barRow('🌈 Rainbow', 'rainbow', b.rainbow, b.total));
   lines.push(barRow('Either', 'total', b.special != null ? b.special : b.gold + b.rainbow, b.total));
@@ -4608,7 +4760,7 @@ function gmTileHtml(st, i) {
   const gain = t.gain ? `<span class="gain">+${shortNumber(t.gain)}</span>` : '';
   const why = (t.why || []).length ? `<ul>${t.why.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : '';
   if (t.step === 'cleanse') {
-    step = `<div class="gs-top"><span>🧼 Cleanse ${t.binder ? 'its fruit' : 'it'}</span>${gain}</div><ul><li>${esc(t.why[0])}</li><li>Its hydro comes back with the weather; then it can go Amberlit and bind to Amberbound here.</li>${t.why.slice(1).map((w) => `<li>${esc(w)}</li>`).join('')}${t.binder ? `<li>It's a ${t.binder === 'moon' ? 'Moonbinder' : 'Dawnbinder'} too, so leave it where it is.</li>` : ''}</ul>`;
+    step = `<div class="gs-top"><span>🧼 Cleanse ${t.binder ? 'its fruit' : 'it'}</span>${gain}</div><ul><li>${esc(t.why[0])}</li><li><b>How:</b> hold a Crop Cleanser and use it on this plant. It clears the weather and moon mutations (Gold and Rainbow stay). The weather ones come back with the weather (Thundercharged: Thunderstruck, then your Thunder Wolf), and at an Amber Moon the crops can go Amberlit, then Amberbound beside the Moonbinder. \"Up to\" is that outcome.</li>${t.why.slice(1).map((w) => `<li>${esc(w)}</li>`).join('')}${t.binder ? `<li>It's a ${t.binder === 'moon' ? 'Moonbinder' : 'Dawnbinder'} too, so leave it where it is.</li>` : ''}</ul>`;
   } else if (t.step === 'pot') {
     const open = (plan.openBesideMoon || []).slice(0, 2).map((j) => spotWhere(j));
     step = `<div class="gs-top"><span>🪴 Pot it beside a Moonbinder</span>${gain}</div><ul>${t.why.map((w) => `<li>${esc(w)}</li>`).join('')}${open.length ? `<li>Open: ${esc(open.join('; '))}</li>` : ''}</ul>`;
@@ -4708,7 +4860,14 @@ function renderSpots(st) {
   } else if (view === 'todo') {
     const todo = [sm.cleanse && `<strong>${sm.cleanse}</strong> to cleanse`, sm.pot && `<strong>${sm.pot}</strong> to pot`].filter(Boolean);
     big = todo.length ? todo.join(' · ') : '✅ Nothing to cleanse or move';
-    sub = [sm.gain > 0 && `Worth up to +${shortNumber(sm.gain)}.`, sm.potLater && `${sm.potLater} more would gain +${shortNumber(sm.potLaterGain)} beside a Moonbinder, with room.`].filter(Boolean).join(' ');
+    // What the two steps mean, in a line each (v0.54.5: "1 to cleanse" alone
+    // didn't say what, where or why).
+    sub = [
+      sm.gain > 0 && `Worth up to +${shortNumber(sm.gain)}.`,
+      sm.cleanse && '🧼 Cleanse: a plant with Dawn crops beside a Moonbinder. Dawn and Amber can\'t share a crop, so a Crop Cleanser (clears its weather and moon mutations, keeps Gold / Rainbow) lets it go Amberbound instead (×10, not Dawnbound\'s ×7).',
+      sm.pot && '🪴 Pot: an Amberlit crop away from a Moonbinder. Pot it and plant it in a dashed spot next to one, so it binds at the next Amber Moon.',
+      sm.potLater && `${sm.potLater} more would gain +${shortNumber(sm.potLaterGain)} beside a Moonbinder, with room.`,
+    ].filter(Boolean).join(' ');
     const n = { cleanse: sm.cleanse, pot: sm.pot, wait: sm.wait, growing: sm.growing, done: sm.done, binder: sm.binders };
     key = Object.entries(GM_STEP).filter(([s]) => n[s]).map(([s, d]) => `<span><i${d.glow ? ' class="glow"' : ''} style="background:${d.color}${d.glow ? `;--g:${d.color}` : ''}${s === 'binder' ? ';box-shadow:inset 0 0 0 2px #f3e8ff' : ''}"></i>${d.label} ${n[s]}</span>`).join('')
       + (sm.pot ? '<span><i style="outline:1.5px dashed #b3a4ff;outline-offset:-1px"></i>Where to pot it</span>' : '');
@@ -4722,7 +4881,18 @@ function renderSpots(st) {
   $('gmSummary').hidden = !sub;
   $('gmKey').innerHTML = key;
   $('gmKey').hidden = !key;
-  $('gmTile').innerHTML = noBinder ? '' : GM_SEL != null ? gmTileHtml(st, GM_SEL) : view !== 'spots' && sm ? '<div class="note" style="margin-top:6px">Tap a tile to see its crops and what to do with it.</div>' : '';
+  // With something to do and nothing picked, the biggest one is shown (and
+  // outlined) straight away, so "1 to cleanse" says which plant (v0.54.5).
+  let sel = GM_SEL;
+  if (sel == null && view === 'todo' && plan && Array.isArray(plan.tiles)) {
+    const top = plan.tiles.filter((t) => t.step === 'cleanse' || t.step === 'pot').sort((x, y) => (y.gain || 0) - (x.gain || 0))[0];
+    if (top) {
+      sel = top.i;
+      const cell = $('spotMap').querySelector(`[data-i="${top.i}"]`);
+      if (cell) cell.classList.add('sel');
+    }
+  }
+  $('gmTile').innerHTML = noBinder ? '' : sel != null ? gmTileHtml(st, sel) : view !== 'spots' && sm ? '<div class="note" style="margin-top:6px">Tap a tile to see its crops and what to do with it.</div>' : '';
   $('spotWhere').innerHTML = view === 'spots' && open.length && open.length <= 6 ? open.map((i) => `✨ ${esc(spotWhere(i))}`).join('<br>') : '';
   setFoldSummary('garden/garden-map', sm && (sm.cleanse || sm.pot) ? [sm.cleanse && `🧼 ${sm.cleanse}`, sm.pot && `🪴 ${sm.pot}`].filter(Boolean).join(' · ') : sm ? '✅ all set' : '');
 }
@@ -5046,6 +5216,7 @@ function renderLock() {
   if (!$('lockOn')) return;
   setSwitch($('lockOn'), on);
   setSwitch($('petFoodOn'), Boolean(LOCK.petFood));
+  renderHarvestMode();
   const inGarden = (GARDEN_STATUS && GARDEN_STATUS.gardenSpecies) || [];
   const all = [...new Set([...(LOCK.species || []), ...inGarden])].sort((a, b) => seedLabel(a).localeCompare(seedLabel(b)));
   const prot = new Set(LOCK.species || []);
@@ -5054,7 +5225,32 @@ function renderLock() {
     : '<span class="note" style="margin:0">Your crops show up here once the game is connected.</span>';
   $('lockHint').textContent = 'Tap a crop to protect it: it\'s never harvested by accident, lock or no lock. Tap again to allow it.' +
     (blockedCount ? ` Stopped ${blockedCount} harvest${blockedCount === 1 ? '' : 's'} this session.` : '');
-  setFoldSummary('garden/harvest-lock', `${on ? '🔒 on' : 'off'}${(LOCK.species || []).length ? ` · ${LOCK.species.length} protected` : ''}${LOCK.petFood ? ' · pet food guarded' : ''}`);
+  setFoldSummary('garden/harvest-lock', `${on ? '🔒 on' : 'off'}${LOCK.mode && LOCK.mode.on ? ' · 🧺 harvest mode' : ''}${(LOCK.species || []).length ? ` · ${LOCK.species.length} protected` : ''}${LOCK.petFood ? ' · pet food guarded' : ''}`);
+}
+
+/* Harvest mode (v0.54.4): the rule, as chips (groups must all match; in a
+ * group any one will do; none picked = any), and what matches right now
+ * (main.js counts it from the garden on every status). */
+const HV_HYDRO = [['wet', 'Wet'], ['chilled', 'Chilled'], ['frozen', 'Frozen'], ['thunderstruck', 'Thunderstruck'], ['thundercharged', 'Thundercharged']];
+const HV_LUNAR = [['dawnlit', 'Dawnlit'], ['dawnbound', 'Dawnbound'], ['amberlit', 'Amberlit'], ['amberbound', 'Amberbound']];
+function renderHarvestMode() {
+  const box = $('harvestRule');
+  if (!box) return;
+  const m = LOCK.mode || { on: false, color: 'any', hydro: [], lunar: [], size: false };
+  setSwitch($('harvestModeOn'), Boolean(m.on));
+  const chip = (attr, val, label, on) => `<button class="chip ${on ? 'on' : ''}" data-${attr}="${val}" aria-pressed="${on}">${label}</button>`;
+  const hy = new Set(m.hydro || []);
+  const lu = new Set(m.lunar || []);
+  const hm = GARDEN_STATUS && GARDEN_STATUS.harvestMatch;
+  const match = hm && hm.ripe != null
+    ? (hm.crops ? `✅ <b>${hm.crops.toLocaleString()}</b> crop${hm.crops === 1 ? '' : 's'} on ${hm.plants} plant${hm.plants === 1 ? '' : 's'} match right now${hm.value ? `, worth <b>${shortNumber(hm.value)}</b>` : ''}.` : 'Nothing ripe matches right now.')
+    : '';
+  box.className = `hv-rule${m.on ? '' : ' off'}`;
+  box.innerHTML = `<div class="hv-row"><span>Colour</span><div class="chips">${chip('hvcolor', 'any', 'Any', m.color === 'any')}${chip('hvcolor', 'goldOrRainbow', 'Gold or Rainbow', m.color === 'goldOrRainbow')}${chip('hvcolor', 'rainbow', 'Rainbow', m.color === 'rainbow')}</div></div>
+    <div class="hv-row"><span>Weather</span><div class="chips">${HV_HYDRO.map(([k, l]) => chip('hvhydro', k, l, hy.has(k))).join('')}</div></div>
+    <div class="hv-row"><span>Moon</span><div class="chips">${HV_LUNAR.map(([k, l]) => chip('hvlunar', k, l, lu.has(k))).join('')}</div></div>
+    <div class="hv-row"><span>Size</span><div class="chips">${chip('hvsize', '1', 'Full size only', Boolean(m.size))}</div></div>
+    <div class="hv-match">${match || 'Pick what a crop needs; no pick in a row means any.'}</div>`;
 }
 
 // A crop id as its name ("ThunderCelestialShroomPlant" -> "Stormcap").
@@ -5075,6 +5271,21 @@ function wireLock() {
   });
   $('lockOn').addEventListener('click', () => {
     setLock({ on: !LOCK.on });
+  });
+  $('harvestModeOn').addEventListener('click', () => {
+    const on = !(LOCK.mode && LOCK.mode.on);
+    setLock({ mode: { on } });
+    toast(on ? '🧺 Harvest mode on: only crops that match can be harvested.' : '🧺 Harvest mode off.');
+  });
+  $('harvestRule').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-hvcolor], [data-hvhydro], [data-hvlunar], [data-hvsize]');
+    if (!b) return;
+    const m = Object.assign({ color: 'any', hydro: [], lunar: [], size: false }, LOCK.mode);
+    const flip = (list, k) => (list.includes(k) ? list.filter((x) => x !== k) : list.concat([k]));
+    if (b.dataset.hvcolor) setLock({ mode: { color: b.dataset.hvcolor } });
+    else if (b.dataset.hvhydro) setLock({ mode: { hydro: flip(m.hydro || [], b.dataset.hvhydro) } });
+    else if (b.dataset.hvlunar) setLock({ mode: { lunar: flip(m.lunar || [], b.dataset.hvlunar) } });
+    else setLock({ mode: { size: !m.size } });
   });
   $('petFoodOn').addEventListener('click', () => {
     setLock({ petFood: !LOCK.petFood });
@@ -5806,17 +6017,83 @@ function saleBonuses(st) {
   return { roomPct, sellPct, dh, refund, petPart, now: (1 + roomPct / 100) * petPart, full: 1.5 * petPart };
 }
 
-// Under "Estimated value when full": the same with your bonuses (the room
-// you're in now, your pets' average), and in a full room.
+// The app's crop values against your real sales (budget saleCheckSummary,
+// v0.53.15): coins a sale brought vs the value of what left your inventory,
+// times the room and the sell boost of the pets out at the time.
+function saleCheckLine() {
+  const c = BUDGET && BUDGET.saleCheck;
+  if (!c) return '<div class="note no-clamp" style="margin-top:2px">🔎 The app checks its crop values against your sales: the next time you sell, it compares the coins with what it expected.</div>';
+  const r = c.ratio;
+  const sales = `your last ${c.n === 1 ? 'sale' : `${c.n} sales`}`;
+  const why = 'Coins from the sale against the app\'s value of the crops that left your inventory, times your room and the sell boost of the pets out then. Sell boosts are chances, so single sales vary.';
+  if (Math.abs(r - 1) <= 0.15) return `<div class="note no-clamp" style="margin-top:2px" title="${esc(why)}">✅ ${cap1(sales)} paid <b>${r.toFixed(2)}×</b> what the app expected.</div>`;
+  return `<div class="note no-clamp" style="margin-top:2px">⚠️ ${cap1(sales)} paid <b>${r.toFixed(2)}×</b> what the app expected, so its crop values look ${r > 1 ? 'low' : 'high'}. Saving a sample right after a sale (Extras, Troubleshooting) lets that be fixed.</div>`;
+}
+
+// What the Money tab counts crops at (v0.53.15): 1 = base value; above 1 =
+// a full room with your best sell pets. `saleWords()` says so in a phrase.
+function saleMultNow() {
+  const m = BUDGET && Number(BUDGET.saleMult);
+  return Number.isFinite(m) && m > 1 ? m : 1;
+}
+function saleWords() {
+  const names = bestSell(GARDEN_STATUS).names;
+  return `at full-room prices${names.length ? ` with ${names.join(', ')}` : ''} (×${saleMultNow().toFixed(2)})`;
+}
+
+// Your best sell team (main.js idealSellTeam, v0.53.13): the three pets
+// you own whose sell abilities multiply a sale the most, and their names.
+function bestSell(st) {
+  const t = st && st.idealSell;
+  const petPart = t && t.petPart > 1 ? t.petPart : 1;
+  const names = t && Array.isArray(t.pets) ? t.pets.map((p) => p.species || p.name) : [];
+  return { petPart, names, pct: (petPart - 1) * 100 };
+}
+
+// "Pig and Capybara", "Pig, Pig and Capybara".
+function andList(names) {
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0] || '';
+}
+
+// Your best sell pets, each one's share (the Capybara's Double Harvest and
+// Crop Refund included), and whether they're out (v0.54.2): a reminder to put
+// them out when you sell, and what that's worth on your ripe crops in a full
+// room. `onlyIfMissing` shows it only when one of them isn't out.
+function sellPetsLine(st, onlyIfMissing) {
+  const t = st && st.idealSell;
+  if (!t || !(t.petPart > 1.0001) || !Array.isArray(t.pets) || !t.pets.length) return '';
+  if (onlyIfMissing && t.allOut) return '';
+  const share = (p) => [p.sell > 0 ? `+${p.sell.toFixed(1)}% sell` : '', p.dh > 0 ? `Double Harvest ${p.dh.toFixed(1)}%` : '', p.refund > 0 ? `Crop Refund ${p.refund.toFixed(1)}%` : ''].filter(Boolean).join(', ');
+  const each = t.pets.map((p) => `${esc(p.species)} (${share(p)})`).join(' · ');
+  const b = gardenBucket(st);
+  const ripe = b ? (b.ripeValue != null ? b.ripeValue : b.value) || 0 : 0;
+  const outPart = t.outNow && t.outNow.petPart > 0 ? t.outNow.petPart : 1;
+  const more = ripe * 1.5 * Math.max(0, t.petPart - outPart);
+  const status = t.allOut
+    ? '✅ all out now'
+    : `⚠️ put ${esc(andList(t.notOut || []))} out before you sell${more >= 1 ? ` (about <b>${shortNumber(more)}</b> more on your ripe crops, in a full room)` : ''}`;
+  return `<div class="note no-clamp" style="margin:2px 0 4px">🐾 Best sell pets <b>+${((t.petPart - 1) * 100).toFixed(1)}%</b>: ${each} · ${status}</div>`;
+}
+
+// Under "Estimated value when full": with your bonuses (the room you're in
+// now, and your best sell pets, since hardly anyone looks at this with their
+// sell pets already out), and in a full room with them.
 function bonusLine(E) {
   if (!E || E.fullValue == null) return '';
+  // Already counted at a full room with your best sell pets: say so, with
+  // the base value, instead of adding the bonuses again.
+  if (saleMultNow() > 1) return `<div class="bonus-line">×${saleMultNow().toFixed(2)} (full room + sell pets) · base <b>~${shortNumber(E.fullValue / saleMultNow())}</b></div>`;
   const b = saleBonuses(GARDEN_STATUS);
-  if (!(b.now > 1.0001) && !(b.full > 1.0001)) return '';
+  const best = bestSell(GARDEN_STATUS);
+  const nowMult = (1 + b.roomPct / 100) * best.petPart;
+  const fullMult = 1.5 * best.petPart;
+  if (!(nowMult > 1.0001) && !(fullMult > 1.0001)) return '';
+  const who = best.names.length ? `${best.names.join(', ')} +${best.pct.toFixed(1)}%` : '';
   const parts = [];
   if (b.roomPct) parts.push(`room +${b.roomPct}%`);
-  if (b.petPart > 1.0001) parts.push(`pets ≈ +${((b.petPart - 1) * 100).toFixed(1)}%`);
-  const now = b.now > 1.0001 ? `<div class="bonus-line">+ bonuses <b>~${shortNumber(E.fullValue * b.now)}</b> <span class="where">${esc(parts.join(' · '))}</span></div>` : '';
-  const full = b.roomPct < 50 ? `<div class="bonus-line">in a full room <b>~${shortNumber(E.fullValue * b.full)}</b> <span class="where">+50%${b.petPart > 1.0001 ? ' with your pets' : ''}</span></div>` : '';
+  if (who) parts.push(who);
+  const now = nowMult > 1.0001 ? `<div class="bonus-line">+ bonuses <b>~${shortNumber(E.fullValue * nowMult)}</b> <span class="where">${esc(parts.join(' · '))}</span></div>` : '';
+  const full = b.roomPct < 50 ? `<div class="bonus-line">in a full room${who ? ' with your best sell pets' : ''} <b>~${shortNumber(E.fullValue * fullMult)}</b> <span class="where">${esc(['+50%', who].filter(Boolean).join(' · '))}</span></div>` : '';
   return now + full;
 }
 
@@ -5835,6 +6112,7 @@ function lifecycleBar() {
   const w = (v) => ((v / total) * 100).toFixed(1);
   const rule = (BUDGET.options && BUDGET.options.readyRule) || {};
   const chip = (k, label) => `<button class="chip ${rule[k] !== false ? 'on' : ''}" data-ready="${k}">${label}</button>`;
+  const saleOn = !(BUDGET.options && BUDGET.options.saleValue === false);
   const pr = fs.prediction || {};
   const est = pr.valueSource === 'cycles' ? `~${shortNumber(pr.predictedGrowing)}` : `≥ ${shortNumber(g.potential)}`;
   // With the estimate in use it says the future; this bar is just "now".
@@ -5860,7 +6138,12 @@ function lifecycleBar() {
   return estBlock + `<div class="m-bar" style="margin-top:12px" aria-hidden="true"><i style="width:${w(fs.wallet)}%;background:${M_COL.wallet}"></i><i style="width:${w(g.ready)}%;background:#9fdca8"></i><i style="width:${w(g.growing)}%;background:${M_COL.garden};opacity:.45"></i></div>
     <div class="m-legend"><span><i style="background:${M_COL.wallet}"></i>Wallet <b>${shortNumber(fs.wallet)}</b></span><span><i style="background:#9fdca8"></i>Ready to sell <b>${shortNumber(g.ready)}</b> <span class="where">${g.readyCount}/${g.total}</span></span><span><i style="background:${M_COL.garden};opacity:.45"></i>Growing <b>${shortNumber(g.growing)}</b>${when ? ` <span class="where">${esc(when)}</span>` : ''}</span></div>
     ${fs.mode === 'estimate' && fs.estimate && !['cycles'].includes(fs.estimate.rateSource) && fs.estimate.perCropSource !== 'cycles' ? '' : `<div class="m-legend"><span>${esc(learned)}</span></div>`}
-    <details class="more" ${READY_OPEN ? 'open' : ''}><summary data-ready-toggle>⚙ What counts as ready</summary><div class="chips" id="readyRule" style="margin-top:6px">${chip('size', 'Full size')}${chip('color', 'Gold/Rainbow')}${chip('hydro', 'Weather')}${chip('lunar', 'Moon')}</div></details>`;
+    <details class="more" ${READY_OPEN ? 'open' : ''}><summary data-ready-toggle>⚙ How crops are counted</summary>
+      <div class="note" style="margin:6px 0 2px">Ready to sell means ripe, and:</div>
+      <div class="chips" id="readyRule">${chip('size', 'Full size')}${chip('color', 'Gold/Rainbow')}${chip('hydro', 'Weather')}${chip('lunar', 'Moon')}</div>
+      <div class="note" style="margin:8px 0 2px">Crops are worth:</div>
+      <div class="chips" id="saleValue"><button class="chip ${saleOn ? 'on' : ''}" data-salevalue="1">What you'd get: full room + best sell pets</button><button class="chip ${saleOn ? '' : 'on'}" data-salevalue="0">Base value</button></div>
+      <div class="note no-clamp" style="margin-top:4px">${saleOn ? `Counting ${esc(saleWords())}. Turn this off if you usually sell in a smaller room or without sell pets.` : 'Counting base value: no room or pet bonus.'}</div></details>`;
 }
 const M_COL = {
   garden: '#7fc98a', wallet: '#d9b25a',
@@ -6172,7 +6455,12 @@ function everyText(perDay) {
 // what's holding it down, from the same numbers the card shows.
 function fsWhy(fs) {
   const have = fs.available != null ? fs.available : fs.wallet;
-  const parts = fs.readyCrops > 0 ? ` (${shortNumber(fs.wallet)} coins + ${shortNumber(fs.readyCrops)} in ready crops)` : '';
+  // The crops not counted yet (not ready by your rule), so this lines up
+  // with the Garden tab's worth and net worth (v0.53.14).
+  const g = gardenBucket(GARDEN_STATUS);
+  const M = saleMultNow();
+  const notReady = g && g.readyValue != null && g.value > g.readyValue ? (g.value - g.readyValue) * M : 0;
+  const parts = fs.readyCrops > 0 ? ` (${shortNumber(fs.wallet)} coins + ${shortNumber(fs.readyCrops)} in crops ready by your rule${M > 1 ? `, ${saleWords()}` : ''}${notReady >= 1 ? `; ${shortNumber(notReady)} more is in crops that aren't ready yet` : ''})` : '';
   const short = (fs.events || []).filter((e) => e.status === 'short').sort((a, b) => a.pri - b.pri)[0];
   const skip = (fs.events || []).find((e) => e.status === 'tradeoff');
   let s = `You have <b>${shortNumber(have)}</b>${esc(parts)}. `;
@@ -6363,8 +6651,9 @@ function renderBudget() {
     $('moneyGrowth').innerHTML = `<div class="m-head">
         <div><div class="m-big">${now ? shortNumber(now.total) : '—'}<small>net worth</small></div>${deltaChip(g.change, g.pct, GROWTH_DAYS === 30 ? 'this month' : 'this week')}</div>
         <div class="chips m-range" id="growthRange"><button class="chip ${GROWTH_DAYS === 7 ? 'on' : ''}" data-gdays="7">Week</button><button class="chip ${GROWTH_DAYS === 30 ? 'on' : ''}" data-gdays="30">Month</button></div>
-      </div>${chart}
-      <div class="m-legend"><span><i style="background:${M_COL.garden}"></i>Garden <b>${now ? shortNumber(now.garden || 0) : '—'}</b></span><span><i style="background:${M_COL.wallet}"></i>Wallet <b>${now ? shortNumber(now.wallet) : '—'}</b></span></div>${lifecycleBar()}`;
+      </div>${saleMultNow() > 1 ? `<div class="note" style="margin:2px 0 4px">💰 ${esc(cap1(saleWords()))}</div>` : ''}${sellPetsLine(GARDEN_STATUS, false)}${chart}
+      <div class="m-legend"><span><i style="background:${M_COL.garden}"></i>Garden <b>${now ? shortNumber(now.garden || 0) : '—'}</b></span><span><i style="background:${M_COL.wallet}"></i>Wallet <b>${now ? shortNumber(now.wallet) : '—'}</b></span></div>
+      <div class="note no-clamp" style="margin-top:2px">Net worth: coins + every crop. The forecast above counts only the crops ready by your rule.</div>${saleCheckLine()}${lifecycleBar()}`;
     setFoldSummary('money/growth', now ? `${shortNumber(now.total)}${g.pct != null ? ` ${g.pct >= 0 ? '▲' : '▼'}${Math.abs(Math.round(g.pct * 100))}%` : ''}` : '');
   }
 
@@ -6389,7 +6678,7 @@ function renderBudget() {
     const chip = e.change != null ? deltaChip(e.change * (e.lastWeekPerDay || 0), e.change, 'vs last week') : `<span class="m-chip">${e.perDay != null ? 'first week' : 'filling in'}</span>`;
     $('moneyEngine').innerHTML = e.perDay != null
       ? `<div class="m-head"><div><div class="m-big">${shortNumber(e.perDay)}<small>a day</small></div>${chip}</div></div>${bars}`
-      : '<div class="empty">What you really earn a day, from your coins and your garden together. It needs to have watched about a day of your play first (it notes both every half hour while the game is open here).</div>';
+      : '<div class="empty">What you actually earn a day: coins from selling crops and pets, plus coins your pets find. It needs to have watched about a day of your play first (it reads the game\'s own totals every half hour while the game is open here).</div>';
     setFoldSummary('money/money-engine', e.perDay != null ? `${shortNumber(e.perDay)}/day` : '');
   }
 
@@ -6507,6 +6796,19 @@ function wireBudget() {
         renderBudget();
         // The game page re-counts under the new rule; fetch again shortly.
         setTimeout(() => refreshBudget(true), 2500);
+      } catch (err) {
+        toast("Couldn't save that.");
+      }
+      return;
+    }
+    // What crops are counted at (v0.53.15): what you'd get, or base value.
+    const sv = e.target.closest('[data-salevalue]');
+    if (sv) {
+      try {
+        BUDGET = await window.app.budgetSet({ saleValue: sv.dataset.salevalue === '1' });
+        budgetFetchedAt = Date.now();
+        refreshBudget(true);
+        renderBudget();
       } catch (err) {
         toast("Couldn't save that.");
       }
@@ -7029,11 +7331,13 @@ let PANEL = { mode: 'attached', open: true, width: 480 };
 function renderPanel() {
   $('panelMode').value = PANEL.mode;
   $('panelWidth').value = PANEL.width;
+  setSeg('panelSize', PANEL.size || 'auto');
   $('panelWidthRow').hidden = PANEL.mode !== 'attached';
   $('panelHide').hidden = PANEL.mode !== 'attached';
   $('panelPop').textContent = PANEL.mode === 'attached' ? '⧉' : '⇤';
   $('panelPop').title = PANEL.mode === 'attached' ? 'Pop the panel out into its own window' : 'Attach the panel to the side of the game';
-  setFoldSummary('scripts/panel', PANEL.mode === 'attached' ? `attached · ${PANEL.width} px` : 'own window');
+  const sizeName = { auto: 'Auto size', small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' }[PANEL.size || 'auto'] || 'Auto size';
+  setFoldSummary('scripts/panel', `${PANEL.mode === 'attached' ? `attached · ${PANEL.width} px` : 'own window'} · ${sizeName}`);
 }
 
 async function setPanel(change) {
@@ -7061,11 +7365,18 @@ function wireSprout() {
 function wirePanel() {
   $('panelMode').addEventListener('change', (e) => setPanel({ mode: e.target.value, open: true, show: true }));
   $('panelWidth').addEventListener('change', (e) => setPanel({ width: Number(e.target.value) }));
+  $('panelSize').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-val]');
+    if (b) setPanel({ size: b.dataset.val });
+  });
+  // Ctrl + / Ctrl − / Ctrl+0 are the app's View menu (main.js zoomFocused):
+  // with the panel focused they step its size and tell it here (v0.54.1).
   $('panelHide').addEventListener('click', () => setPanel({ open: false }));
   $('panelPop').addEventListener('click', () => setPanel(PANEL.mode === 'attached' ? { mode: 'window', show: true } : { mode: 'attached', open: true }));
   window.app.onPanel((p) => {
     PANEL = p || PANEL;
     renderPanel();
+    if (p && p.sizeChanged) toast(`Panel size: ${{ auto: 'Auto', small: 'Small', medium: 'Medium', large: 'Large', xlarge: 'Extra large' }[p.size] || 'Auto'}`);
   });
 }
 
@@ -7257,7 +7568,9 @@ function wireChartHover() {
     }
     tip.hidden = true;
   };
-  document.addEventListener('mousemove', (e) => {
+  // Pointer events (v0.53.16): a mouse, a pen or a finger. A tap shows the
+  // read-out where you tapped; a sideways drag scrubs along the chart.
+  const onPoint = (e) => {
     const svg = e.target && e.target.closest ? e.target.closest('svg[data-hover]') : null;
     if (svg !== lastSvg) clear();
     lastSvg = svg;
@@ -7317,7 +7630,9 @@ function wireChartHover() {
     const top = above ? e.clientY - 18 - bh : e.clientY + 14;
     tip.style.left = `${Math.max(4, left)}px`;
     tip.style.top = `${Math.max(4, top)}px`;
-  });
+  };
+  document.addEventListener('pointermove', onPoint);
+  document.addEventListener('pointerdown', onPoint);
   document.addEventListener('mouseleave', clear);
   window.addEventListener('blur', clear);
   document.addEventListener('scroll', clear, true);
@@ -7363,6 +7678,8 @@ function clampLongText() {
       el.classList.add('clamp');
       if (inList) el.classList.add('c1');
       el.title = 'Tap to read all of it';
+      // Reachable from the keyboard too (v0.54.1): Tab to it, Enter opens it.
+      el.tabIndex = 0;
     }
   }
 }
@@ -7371,6 +7688,13 @@ function watchClamp() {
   document.addEventListener('click', (e) => {
     const c = e.target.closest('.clamp');
     if (c && !e.target.closest('button, a, input, select, summary')) c.classList.toggle('open');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const c = e.target && e.target.classList && e.target.classList.contains('clamp') ? e.target : null;
+    if (!c) return;
+    e.preventDefault();
+    c.classList.toggle('open');
   });
   new MutationObserver(() => {
     if (clampTimer) return;
@@ -7545,6 +7869,10 @@ async function start() {
   GARDEN_STATS = garden.stats;
   renderGarden();
   window.app.onGardenStatus((st) => {
+    // Parts that haven't changed come from the last status (v0.54.1).
+    if (st && Array.isArray(st.sameAsBefore) && GARDEN_STATUS) {
+      for (const k of st.sameAsBefore) if (!(k in st) && k in GARDEN_STATUS) st[k] = GARDEN_STATUS[k];
+    }
     GARDEN_STATUS = st;
     renderGarden();
   });

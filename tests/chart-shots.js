@@ -227,93 +227,6 @@ app.whenReady().then(async () => {
       }
       out.alerts = al;
     }
-    if (MODE === 'binder') {
-      // The binder map over the game: a garden with a Moonbinder, lit crops
-      // beside it and away from it, a Dawn crop on a binder spot, bound
-      // ones, open binder spots; put into the observer's live state.
-      const gw = find((u) => u.startsWith('https://magicgarden.gg'));
-      const grun = (js) => gw.executeJavaScript(js, true);
-      const setTiles = `(() => {
-        const obs = window.__mgLoaderObserver; const found = []; const seen = new Set();
-        const walk = (o, d) => { if (!o || typeof o !== 'object' || seen.has(o) || d > 9) return; seen.add(o); if (o.tileObjects && typeof o.tileObjects === 'object' && !Array.isArray(o.tileObjects)) found.push(o); for (const k of Object.keys(o)) walk(o[k], d + 1); };
-        walk(obs.state, 0);
-        const crop = (m, ripe = true) => ({ species: 'Dawnbreaker', mutations: m, endTime: ripe ? Date.now() - 1000 : Date.now() + 1e7, size: 100 });
-        const plant = (sp, m, ripe) => ({ objectType: 'plant', species: sp, slots: [crop(m, ripe)] });
-        const T = {};
-        for (let i = 0; i < 200; i += 1) if (i % 7 !== 3) T[i] = plant('Ube', i % 5 === 0 ? ['Rainbow', 'Frozen'] : ['Gold', 'Wet', i % 2 ? 'Dawnlit' : 'Amberbound']);
-        T[44] = plant('MoonCelestial', []);
-        T[43] = plant('Dawnbreaker', ['Rainbow', 'Frozen', 'Amberlit']);
-        T[45] = plant('Dawnbreaker', ['Rainbow', 'Frozen', 'Dawnlit']);
-        T[63] = plant('Dawnbreaker', ['Rainbow', 'Frozen', 'Amberbound']);
-        T[24] = plant('Ube', ['Frozen']);
-        delete T[25]; delete T[65];
-        T[150] = plant('Dawnbreaker', ['Gold', 'Frozen', 'Amberlit']);
-        T[151] = plant('Milkcap', ['Rainbow', 'Amberlit']);
-        T[88] = plant('Milkcap', ['Rainbow', 'Amberlit']);
-        T[152] = plant('Milkcap', ['Rainbow', 'Dawnlit']);
-        for (const f of found) f.tileObjects = T;
-        return found.length;
-      })()`;
-      const bd = {};
-      bd.gardens = await grun(setTiles);
-      const show = async (p) => {
-        await grun(setTiles);
-        await grun(`window.__mgLoaderObserver.setBinderMap(${JSON.stringify(p)})`);
-        await wait(500);
-        return grun("(() => { const b = document.getElementById('mg-binder-map'); return b && b.style.display !== 'none' ? { text: b.innerText.replace(/\\s+/g, ' ').trim(), pulses: b.querySelectorAll('i.pulse').length, rect: (() => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; })() } : null; })()");
-      };
-      bd.amber = await show({ on: true, event: { kind: 'amber', endsAt: Date.now() + 7 * 60000 } });
-      if (bd.amber) {
-        const img = await gw.capturePage();
-        const [x, y, w, hh] = bd.amber.rect;
-        fs.mkdirSync(SHOTS, { recursive: true });
-        fs.writeFileSync(path.join(SHOTS, 'binder-amber.png'), img.crop({ x: Math.max(0, x - 6), y: Math.max(0, y - 6), width: w + 12, height: hh + 12 }).toPNG());
-        fs.writeFileSync(path.join(SHOTS, 'binder-game.png'), img.toPNG());
-      }
-      bd.dawnNoBinder = await show({ on: true, event: { kind: 'dawn', endsAt: Date.now() + 7 * 60000 } });
-      // A Dawnbinder among Amber crops (as in the owner's garden, v0.53.5):
-      // with no Dawnlit crops waiting, nothing around it pulses; with more
-      // waiting than open spots, the Amber crops in its spots do.
-      const dawnTiles = (waiting) => `(() => {
-        const obs = window.__mgLoaderObserver; const found = []; const seen = new Set();
-        const walk = (o, d) => { if (!o || typeof o !== 'object' || seen.has(o) || d > 9) return; seen.add(o); if (o.tileObjects && typeof o.tileObjects === 'object' && !Array.isArray(o.tileObjects)) found.push(o); for (const k of Object.keys(o)) walk(o[k], d + 1); };
-        walk(obs.state, 0);
-        const crop = (m) => ({ species: 'Dawnbreaker', mutations: m, endTime: Date.now() - 1000, size: 100 });
-        const plant = (sp, m) => ({ objectType: 'plant', species: sp, slots: [crop(m)] });
-        const T = {};
-        for (let i = 0; i < 200; i += 1) T[i] = plant('Ube', ['Rainbow', 'Frozen', i % 3 ? 'Amberbound' : 'Amberlit']);
-        T[44] = plant('DawnCelestial', []);
-        T[43] = plant('Dawnbreaker', ['Rainbow', 'Frozen', 'Dawnlit']);
-        delete T[65];
-        ${waiting ? "for (const i of [150, 151, 170, 171]) T[i] = plant('Milkcap', ['Rainbow', 'Dawnlit']);" : ''}
-        for (const f of found) f.tileObjects = T;
-        return found.length;
-      })()`;
-      const showWith = async (tilesJs, p, shot) => {
-        await grun(tilesJs);
-        await grun(`window.__mgLoaderObserver.setBinderMap(${JSON.stringify(p)})`);
-        await wait(500);
-        const r = await grun("(() => { const b = document.getElementById('mg-binder-map'); if (!b || b.style.display === 'none') return null; const cells = [...b.querySelectorAll('i')]; return { text: b.innerText.replace(/\\s+/g, ' ').trim(), pulses: b.querySelectorAll('i.pulse').length, orangePulses: cells.filter((c) => c.classList.contains('pulse') && /251, 146, 60|255, 177, 59/.test(c.style.getPropertyValue('--g') + c.style.background)).length, purpleGlowPulses: cells.filter((c) => c.classList.contains('pulse') && /c084fc/i.test(c.style.getPropertyValue('--g'))).length, violet: cells.filter((c) => /216, 180, 254/.test(c.style.background)).length, rect: (() => { const q = b.getBoundingClientRect(); return [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)]; })() }; })()");
-        if (r && shot) {
-          const img = await gw.capturePage();
-          const [x, y, w, hh] = r.rect;
-          fs.writeFileSync(path.join(SHOTS, shot), img.crop({ x: Math.max(0, x - 6), y: Math.max(0, y - 6), width: w + 12, height: hh + 12 }).toPNG());
-        }
-        return r;
-      };
-      bd.dawnCalm = await showWith(dawnTiles(false), { on: true, event: { kind: 'dawn', endsAt: Date.now() + 7 * 60000 } }, 'binder-dawn-calm.png');
-      bd.dawnSwap = await showWith(dawnTiles(true), { on: true, event: { kind: 'dawn', endsAt: Date.now() + 7 * 60000 } }, 'binder-dawn-swap.png');
-      bd.switchedOff = await show({ on: false, event: { kind: 'amber', endsAt: Date.now() + 7 * 60000 } });
-      bd.ended = await show({ on: true, event: { kind: 'amber', endsAt: Date.now() - 1000 } });
-      // The panel's switch, through main to the game page.
-      bd.settingOff = await run('window.app.binderMapSetting(false)');
-      await wait(300);
-      bd.observerOff = await grun('window.__mgLoaderObserver.binderOn');
-      bd.settingOn = await run('window.app.binderMapSetting(true)');
-      await wait(300);
-      bd.observerOn = await grun('window.__mgLoaderObserver.binderOn');
-      out.binder = bd;
-    }
     if (MODE === 'owner') {
       // The owner's garden (tests/fixtures/garden-layout.json, v0.53.6): the
       // Garden map's to-do in the panel, and the binder map in the game
@@ -356,7 +269,7 @@ app.whenReady().then(async () => {
         await grun(tilesJs);
         await grun(`window.__mgLoaderObserver.setBinderMap(${JSON.stringify({ on: true, event: { kind, endsAt: Date.now() + 8 * 60000 } })})`);
         await wait(600);
-        const r = await grun("(() => { const b = document.getElementById('mg-binder-map'); if (!b || b.style.display === 'none') return null; const q = b.getBoundingClientRect(); return { text: b.innerText.replace(/\\s+/g, ' ').trim(), pulses: b.querySelectorAll('i.pulse').length, rect: [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)] }; })()");
+        const r = await grun("(() => { const b = document.getElementById('mg-map'); if (!b || b.style.display === 'none') return null; const q = b.getBoundingClientRect(); return { text: b.innerText.replace(/\\s+/g, ' ').trim(), pulses: b.querySelectorAll('i.pulse').length, rect: [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)] }; })()");
         if (r) {
           const img = await gw.capturePage();
           const [x, y, w, hh] = r.rect;
@@ -369,82 +282,70 @@ app.whenReady().then(async () => {
       ow.amber = await showEv('amber', 'owner-binder-amber.png');
       out.owner = ow;
     }
-    if (MODE === 'thunder') {
-      // The Thunderstruck finder (v0.53.8) on the owner's garden, with a
-      // Thunder Wolf put among the active pets.
-      const fx = require('./fixtures/garden-layout.json');
-      const gw = find((u) => u.startsWith('https://magicgarden.gg'));
-      const grun = (js) => gw.executeJavaScript(js, true);
-      const setup = (opts) => `(() => {
-        const obs = window.__mgLoaderObserver; const gardens = []; const datas = []; const seen = new Set();
-        const walk = (o, d) => { if (!o || typeof o !== 'object' || seen.has(o) || d > 9) return; seen.add(o); if (o.tileObjects && typeof o.tileObjects === 'object' && !Array.isArray(o.tileObjects)) gardens.push(o); if (Array.isArray(o.petSlots) && o.garden) datas.push(o); for (const k of Object.keys(o)) walk(o[k], d + 1); };
-        walk(obs.state, 0);
-        const fx = ${JSON.stringify(fx)};
-        const o = ${JSON.stringify(opts)};
-        const at = new Map(fx.plants.map((p) => [p.i, p]));
-        const T = {};
-        for (const i of fx.occupied) {
-          const p = at.get(i);
-          T[i] = p ? { objectType: 'plant', species: p.sp, slots: p.s.map(([m, size, ripe]) => ({ species: p.sp, mutations: (m ? m.split(',') : []).map((k) => (o.allCharged && k === 'thunderstruck' ? 'thundercharged' : k)), size, endTime: ripe ? Date.now() - 1000 : Date.now() + 1e7 })) } : { objectType: 'decor', decorId: 'WoodBench' };
-        }
-        for (const g of gardens) g.tileObjects = T;
-        const wolf = { id: 'wolf', petSpecies: 'ThunderWolf', abilities: ['Thundercharger', 'ThunderstruckGranter'], mutations: [], xp: 1 };
-        for (const d of datas) d.petSlots = o.wolf ? [wolf] : [{ id: 'pig', petSpecies: 'Pig', abilities: ['SellBoostII'], mutations: [], xp: 1 }];
-        return [gardens.length, datas.length];
-      })()`;
-      const read = () => grun("(() => { const b = document.getElementById('mg-thunder-map'); if (!b || b.style.display === 'none') return null; const q = b.getBoundingClientRect(); return { text: b.innerText.replace(/\\s+/g, ' ').trim(), glowing: [...b.querySelectorAll('i')].filter((c) => c.style.boxShadow).length, rect: [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)] }; })()");
-      const th = {};
-      th.found = await grun(setup({ wolf: true }));
-      await grun('window.__mgLoaderObserver.setThunderMap(true)');
-      await wait(500);
-      th.wolfOut = await read();
-      if (th.wolfOut) {
-        const img = await gw.capturePage();
-        const [x, y, w, hh] = th.wolfOut.rect;
-        fs.mkdirSync(SHOTS, { recursive: true });
-        fs.writeFileSync(path.join(SHOTS, 'thunder-finder.png'), img.crop({ x: Math.max(0, x - 6), y: Math.max(0, y - 6), width: w + 12, height: hh + 12 }).toPNG());
-      }
-      await grun(setup({ wolf: false }));
-      await grun('window.__mgLoaderObserver.setThunderMap(true)');
-      await wait(300);
-      th.noWolf = await read();
-      await grun(setup({ wolf: true }));
-      await grun(`window.__mgLoaderObserver.setBinderMap(${JSON.stringify({ on: true, event: { kind: 'amber', endsAt: Date.now() + 600000 } })})`);
-      await grun('window.__mgLoaderObserver.setThunderMap(true)');
-      await wait(300);
-      th.duringAmber = await read();
-      th.binderUp = await grun("(() => { const b = document.getElementById('mg-binder-map'); return Boolean(b && b.style.display !== 'none'); })()");
-      await grun(`window.__mgLoaderObserver.setBinderMap(${JSON.stringify({ on: true, event: null })})`);
-      await wait(300);
-      th.afterAmber = await read();
-      await grun('window.__mgLoaderObserver.setThunderMap(false)');
-      await wait(300);
-      th.switchedOff = await read();
-      await grun(setup({ wolf: true, allCharged: true }));
-      await grun('window.__mgLoaderObserver.setThunderMap(true)');
-      await wait(300);
-      th.allCharged = await read();
-      th.settingOff = await run('window.app.thunderMapSetting(false)');
-      await wait(300);
-      th.observerOff = await grun('window.__mgLoaderObserver.thunderOn');
-      th.settingOn = await run('window.app.thunderMapSetting(true)');
-      await wait(300);
-      th.observerOn = await grun('window.__mgLoaderObserver.thunderOn');
-      out.thunder = th;
+    if (MODE === 'sellpets') {
+      // \"In a full room\" with your best sell pets (v0.53.13).
+      const sp = {};
+      sp.real = await run('(() => { const t = GARDEN_STATUS && GARDEN_STATUS.idealSell; return t ? { petPart: t.petPart, pets: t.pets.map((p) => p.species) } : null; })()');
+      const ideal = { petPart: 1.313, sellPct: 6.4, dh: 4, refund: 15.8, allOut: false, notOut: ['Capybara'], outNow: { petPart: 1.064 },
+        pets: [{ species: 'Pig', sell: 3.2, dh: 0, refund: 0, out: true }, { species: 'Pig', sell: 3.2, dh: 0, refund: 0, out: true }, { species: 'Capybara', sell: 0, dh: 4, refund: 15.8, out: false }] };
+      // The Garden card's lines, drawn right away from a status with that team.
+      sp.garden = await run(`(() => { GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { at: Date.now(), idealSell: ${JSON.stringify(ideal)}, room: Object.assign({}, GARDEN_STATUS.room, { players: 2 }) }); showTab('garden'); renderGarden(); return [...document.querySelectorAll('#tab-garden .note')].map((n) => n.innerText).filter((t) => /room/i.test(t)); })()`);
+      sp.estimate = await run(`(() => { GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { at: Date.now(), idealSell: ${JSON.stringify(ideal)}, room: Object.assign({}, GARDEN_STATUS.room, { players: 2 }) }); showTab('money'); renderBudget(); return [...document.querySelectorAll('.bonus-line')].map((n) => n.innerText.replace(/\\s+/g, ' ').trim()); })()`);
+      // The reminder (v0.54.2): the Capybara in the hutch, then all out.
+      sp.gardenMissing = await run(`(() => { GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { at: Date.now(), idealSell: ${JSON.stringify(ideal)} }); showTab('garden'); renderGarden(); return [...document.querySelectorAll('#tab-garden .note')].map((n) => n.innerText).filter((t) => /sell pets/i.test(t)); })()`);
+      sp.moneyMissing = await run(`(() => { BUDGET = Object.assign({}, BUDGET, { saleMult: 1.5 * 1.313 }); showTab('money'); renderBudget(); return [...document.querySelectorAll('#moneyGrowth .note')].map((n) => n.innerText).filter((t) => /sell pets/i.test(t)); })()`);
+      const allOut = Object.assign({}, ideal, { allOut: true, notOut: [], outNow: { petPart: 1.313 }, pets: ideal.pets.map((p) => Object.assign({}, p, { out: true })) });
+      sp.gardenAllOut = await run(`(() => { GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { at: Date.now(), idealSell: ${JSON.stringify(allOut)} }); showTab('garden'); renderGarden(); return [...document.querySelectorAll('#tab-garden .note')].map((n) => n.innerText).filter((t) => /Best sell pets/i.test(t)); })()`);
+      sp.moneyAllOut = await run(`(() => { showTab('money'); renderBudget(); return [...document.querySelectorAll('#moneyGrowth .note')].map((n) => n.innerText).filter((t) => /Best sell pets/i.test(t)); })()`);
+      out.sellpets = sp;
     }
-    if (MODE === 'mount') {
-      // The riding map and moving the corner maps (v0.53.9), on the owner's
-      // garden: riding an Ostrich (Dawn Capture), then a Phoenix (Amber
-      // Capture); dragging by the header with real mouse input.
+    if (MODE === 'numbers') {
+      // Every money number on the Garden and Money tabs from one set of
+      // inputs: the owner's garden at the time of their sample (v0.53.14).
+      const budgetMod = require('../budget');
+      const T = Date.now();
+      const g = { name: 'garden', total: 270, ready: 225, value: 639.3e9, ripeValue: 639.3e9, readyValue: 574.3e9, growingValue: 65e9, growingPotential: 123.9e9,
+        gold: 124, rainbow: 111, special: 235, mature: 270, matureKnown: true, sized: 270, sizeSum: 270 * 98, atMax: 260,
+        missing: { grow: 0, size: 10, color: 21, hydro: 0, lunar: 18 }, have: { ripe: 270, size: 260, hydro: 270, lunar: 252, color: 235 },
+        mutations: {}, unpriced: 0, unpricedSpecies: {}, goldPerHour: 1.21, stepHours: { ripe: 0, size: null, hydro: 0, lunar: 2.5, color: 17 } };
+      const s = { alerts: { custom: [], disabled: [] }, shopStats: budgetMod.emptyStats(), moneyHistory: [], worthHistory: [], purchases: { log: [] }, budget: {} };
+      budgetMod.seedWants(s);
+      for (let i = 0; i <= 7 * 48; i += 1) {
+        const t = T - 7 * 86400000 + i * 1800000;
+        s.moneyHistory.push({ t, c: 11.4e9, s: 100e9 + i * 1e8, f: 0 });
+        s.worthHistory.push({ t, v: 639.3e9, r: 225, rv: 574.3e9, n: 270 });
+      }
+      // Counted at what you'd get (v0.53.15): a full room x the owner's best
+      // sell team (x1.313), and two sales already checked.
+      const M = Number(process.env.MG_SALEMULT || 1.5 * 1.313);
+      s.saleChecks = [{ t: T - 3600000, coins: 99e9, base: 60e9, crops: 20, roomPct: 50, sellPct: 10, expected: 99e9, ratio: 1 }, { t: T - 1800000, coins: 64e9, base: 40e9, crops: 12, roomPct: 50, sellPct: 10, expected: 66e9, ratio: 64 / 66 }];
+      const ctx = { wallet: 11.4e9, gardenWorth: 639.3e9, garden: g, pace: 0, gardenLoaded: true, saleMult: M, readyRule: { size: true, color: true, hydro: true, lunar: true } };
+      const view = budgetMod.view({ settings: s, ctx });
+      const nm = {};
+      nm.garden = await run(`(() => { renderGarden = function () {}; BUDGET = Object.assign({}, BUDGET, ${JSON.stringify(view)}, { unlocked: true }); GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { at: Date.now(), wallet: { coins: 11.4e9 }, crops: [${JSON.stringify(g)}], room: { players: 1 }, idealSell: { petPart: 1.313, pets: [{ species: 'Pig' }, { species: 'Pig' }, { species: 'Capybara' }] } }); showTab('garden'); return true; })()`);
+      nm.gardenCard = await run(`(() => { const b = gardenBucket(GARDEN_STATUS); renderCropCard(GARDEN_STATUS, b); return [...document.querySelectorAll('#tab-garden .worth, #tab-garden .note')].map((n) => n.innerText).filter((t) => /worth|ready|room|average/i.test(t)).slice(0, 5); })()`);
+      nm.money = await run(`(() => { BUDGET = Object.assign({}, BUDGET, ${JSON.stringify(view)}, { unlocked: true }); showTab('money'); renderBudget(); const q = (s) => [...document.querySelectorAll(s)].map((n) => n.innerText.replace(/\\s+/g, ' ').trim()); return { why: q('#moneyForesight .fs-why'), big: q('#moneyForesight .m-big').slice(0, 1), estimate: q('#moneyGrowth .bonus-line, #moneyGrowth .est-full, #moneyGrowth [class*="est"]').slice(0, 6), growth: q('#moneyGrowth .m-big, #moneyGrowth .m-legend, #moneyGrowth .note').slice(0, 6) }; })()`);
+      await run("(() => { READY_OPEN = true; renderBudget(); document.getElementById('moneyGrowth').scrollIntoView({ block: 'start' }); return true; })()");
+      await wait(400);
+      await shotOf('#moneyGrowth', 'numbers-growth', 6);
+      nm.view = { saleMult: view.saleMult, saleCheck: view.saleCheck, netWorth: view.netWorth, safe: view.foresight.safeToSpend, available: view.foresight.available, fullValue: view.foresight.estimate && view.foresight.estimate.fullValue, perCrop: view.foresight.estimate && view.foresight.estimate.perCrop, canMature: view.foresight.estimate && view.foresight.estimate.canMature };
+      out.numbers = nm;
+    }
+    if (MODE === 'screens') {
+      // The app at a 13\" laptop's size (150% and 125% scaling) and a 1440p
+      // monitor's (v0.53.16), with the worst case over the game: an Amber
+      // Moon (binder map), riding the Ostrich (capture map) and holding a
+      // pot (open spots), on the owner's garden.
+      const { BaseWindow } = require('electron');
       const fx = require('./fixtures/garden-layout.json');
       const gw = find((u) => u.startsWith('https://magicgarden.gg'));
       const grun = (js) => gw.executeJavaScript(js, true);
-      const setup = (opts) => `(() => {
+      const win = BaseWindow.getAllWindows().find((w) => w.contentView && w.contentView.children.length >= 2) || BaseWindow.getAllWindows()[0];
+      const crowd = `(() => {
         const obs = window.__mgLoaderObserver; const gardens = []; const slots = []; const seen = new Set();
         const walk = (o, d) => { if (!o || typeof o !== 'object' || seen.has(o) || d > 9) return; seen.add(o); if (o.tileObjects && typeof o.tileObjects === 'object' && !Array.isArray(o.tileObjects)) gardens.push(o); if (o.data && typeof o.data === 'object' && o.data.garden && Array.isArray(o.data.petSlots)) slots.push(o); for (const k of Object.keys(o)) walk(o[k], d + 1); };
         walk(obs.state, 0);
         const fx = ${JSON.stringify(fx)};
-        const o = ${JSON.stringify(opts)};
         const at = new Map(fx.plants.map((p) => [p.i, p]));
         const T = {};
         for (const i of fx.occupied) {
@@ -452,76 +353,465 @@ app.whenReady().then(async () => {
           T[i] = p ? { objectType: 'plant', species: p.sp, slots: p.s.map(([m, size, ripe]) => ({ species: p.sp, mutations: m ? m.split(',') : [], size, endTime: ripe ? Date.now() - 1000 : Date.now() + 1e7 })) } : { objectType: 'decor', decorId: 'WoodBench' };
         }
         for (const g of gardens) g.tileObjects = T;
-        const pets = [];
-        if (o.mount === 'ostrich') pets.push({ id: 'mount', petSpecies: 'Ostrich', abilities: ['DawnCapture', 'ProduceScaleBoostII'], mutations: [], xp: 1 });
-        if (o.mount === 'phoenix') pets.push({ id: 'mount', petSpecies: 'Phoenix', abilities: ['AmberCapture', 'AmberlitGranter'], mutations: [], xp: 1 });
-        if (o.wolf) pets.push({ id: 'wolf', petSpecies: 'ThunderWolf', abilities: ['Thundercharger'], mutations: [], xp: 1 });
-        for (const s of slots) { s.data.petSlots = pets; s.riddenPetId = o.mount ? 'mount' : null; }
-        return [gardens.length, slots.length];
+        for (const s of slots) {
+          s.data.inventory = s.data.inventory || {};
+          s.data.inventory.items = [{ toolId: 'PlanterPot', itemType: 'Tool', quantity: 5 }];
+          s.notAuthoritative_selectedItemIndex = 0;
+          s.data.petSlots = [{ id: 'mount', petSpecies: 'Ostrich', abilities: ['DawnCapture'], mutations: [], xp: 1 }];
+          s.riddenPetId = 'mount';
+        }
+        obs.setSpotMap(true);
+        obs.setMountMap(true);
+        obs.setBinderMap({ on: true, event: { kind: 'amber', endsAt: Date.now() + 600000 } });
+        return true;
       })()`;
-      const read = (id) => grun(`(() => { const b = document.getElementById('${id}'); if (!b || b.style.display === 'none') return null; const q = b.getBoundingClientRect(); return { text: b.innerText.replace(/\\s+/g, ' ').trim(), pulses: b.querySelectorAll('i.pulse').length, fixed: b.style.position === 'fixed', rect: [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)] }; })()`);
-      const shot = async (r, name) => {
-        if (!r) return;
-        const img = await gw.capturePage();
-        const [x, y, w, hh] = r.rect;
-        fs.mkdirSync(SHOTS, { recursive: true });
-        fs.writeFileSync(path.join(SHOTS, name), img.crop({ x: Math.max(0, x - 6), y: Math.max(0, y - 6), width: w + 12, height: hh + 12 }).toPNG());
-      };
-      const mt = {};
-      mt.found = await grun(setup({ mount: 'ostrich', wolf: true }));
-      await grun('window.__mgLoaderObserver.setMountMap(true)');
-      await wait(500);
-      mt.ostrich = await read('mg-mount-map');
-      mt.thunderWhileRiding = await read('mg-thunder-map');
-      await shot(mt.ostrich, 'mount-ostrich.png');
-      await grun(setup({ mount: 'phoenix' }));
-      await grun('window.__mgLoaderObserver.setMountMap(true)');
-      await wait(500);
-      mt.phoenix = await read('mg-mount-map');
-      await shot(mt.phoenix, 'mount-phoenix.png');
-      await grun(setup({ mount: null, wolf: true }));
-      await grun('window.__mgLoaderObserver.setMountMap(true)');
-      await wait(400);
-      mt.notRiding = await read('mg-mount-map');
-      mt.thunderBack = Boolean(await read('mg-thunder-map'));
-      await grun(setup({ mount: 'ostrich' }));
-      await grun('window.__mgLoaderObserver.setMountMap(false)');
-      await wait(300);
-      mt.switchedOff = await read('mg-mount-map');
-      await grun('window.__mgLoaderObserver.setMountMap(true)');
-      await wait(400);
-      // Drag it by its header, for real.
-      const before = await read('mg-mount-map');
-      const hx = before.rect[0] + 40;
-      const hy = before.rect[1] + 10;
-      gw.sendInputEvent({ type: 'mouseMove', x: hx, y: hy });
-      gw.sendInputEvent({ type: 'mouseDown', x: hx, y: hy, button: 'left', clickCount: 1 });
-      for (let k = 1; k <= 6; k += 1) {
-        gw.sendInputEvent({ type: 'mouseMove', x: hx - k * 50, y: hy - k * 40, button: 'left', modifiers: ['leftButtonDown'] });
-        await wait(40);
+      const sc = {};
+      fs.mkdirSync(SHOTS, { recursive: true });
+      for (const [name, w, hh] of [['laptop150', 1280, 680], ['laptop125', 1536, 800], ['monitor1440', 2560, 1380]]) {
+        win.setContentSize(w, hh);
+        await wait(1500);
+        await grun(crowd);
+        await wait(900);
+        const panelInfo = await run(`(() => ({ cssWidth: window.innerWidth, cssHeight: window.innerHeight, dpr: window.devicePixelRatio, sideways: document.scrollingElement.scrollWidth > document.scrollingElement.clientWidth + 1 || document.querySelector('main').scrollWidth > document.querySelector('main').clientWidth + 1, navFits: (() => { const n = document.querySelector('nav'); return n.scrollWidth <= n.clientWidth + 1; })(), tabs: [...document.querySelectorAll('nav button')].map((b) => Math.round(b.getBoundingClientRect().width)).join(',') }))()`);
+        const gameInfo = await grun(`(() => { const c = document.getElementById('mg-corner'); const r = c ? c.getBoundingClientRect() : null; const maps = ['mg-map', 'mg-map', 'mg-map'].map((id) => { const b = document.getElementById(id); if (!b || b.style.display === 'none') return id + ':hidden'; const q = b.getBoundingClientRect(); return id + ':' + [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)].join('/'); }); return { w: innerWidth, h: innerHeight, scale: c ? c.style.transform : null, corner: r ? [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)] : null, inside: r ? r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight + 1 && r.right <= innerWidth + 1 : null, maps }; })()`);
+        const pimg = await panel().capturePage();
+        const gimg = await gw.capturePage();
+        fs.writeFileSync(path.join(SHOTS, `screen-${name}-panel.png`), pimg.toPNG());
+        fs.writeFileSync(path.join(SHOTS, `screen-${name}-game.png`), gimg.toPNG());
+        sc[name] = { window: [w, hh], panel: panelInfo, game: gameInfo };
       }
-      gw.sendInputEvent({ type: 'mouseUp', x: hx - 300, y: hy - 240, button: 'left', clickCount: 1 });
-      await wait(700);
-      mt.dragged = await read('mg-mount-map');
-      mt.before = before.rect;
-      mt.saved = ((await run('window.app.getSettings()')).ui.mapPos || {})['mg-mount-map'] || null;
-      // Forget it in the page, and let the app put it back from settings.
-      await grun("(() => { const o = window.__mgLoaderObserver; o.setMapPositions({}); return true; })()");
-      await wait(200);
-      mt.forgot = (await read('mg-mount-map')).fixed;
-      await run('window.app.mountMapSetting(true)');
+      // Tap a map's title: it folds to one line, and back.
+      const head = await grun("(() => { const b = document.getElementById('mg-map'); const hd = b.querySelector('.mg-map-head'); const r = hd.getBoundingClientRect(); return { x: r.left + 30, y: r.top + r.height / 2, h: Math.round(b.getBoundingClientRect().height) }; })()");
+      gw.sendInputEvent({ type: 'mouseDown', x: Math.round(head.x), y: Math.round(head.y), button: 'left', clickCount: 1 });
+      gw.sendInputEvent({ type: 'mouseUp', x: Math.round(head.x), y: Math.round(head.y), button: 'left', clickCount: 1 });
+      await wait(500);
+      sc.fold = { before: head.h, after: await grun("Math.round(document.getElementById('mg-map').getBoundingClientRect().height)"), folded: await grun("document.getElementById('mg-map').classList.contains('mg-folded')"), saved: ((await run('window.app.getSettings()')).ui.mapFold || {})['mg-map'] || false };
+      const head2 = await grun("(() => { const hd = document.querySelector('#mg-map .mg-map-head'); const r = hd.getBoundingClientRect(); return { x: r.left + 30, y: r.top + r.height / 2 }; })()");
+      gw.sendInputEvent({ type: 'mouseDown', x: Math.round(head2.x), y: Math.round(head2.y), button: 'left', clickCount: 1 });
+      gw.sendInputEvent({ type: 'mouseUp', x: Math.round(head2.x), y: Math.round(head2.y), button: 'left', clickCount: 1 });
+      await wait(500);
+      sc.fold.unfolded = !(await grun("document.getElementById('mg-map').classList.contains('mg-folded')"));
+      // The panel's size setting.
+      sc.sizes = {};
+      for (const sz of ['small', 'xlarge', 'auto']) {
+        await run(`window.app.panel({ size: '${sz}' })`);
+        await wait(700);
+        sc.sizes[sz] = await run('({ css: window.innerWidth, dpr: window.devicePixelRatio })');
+      }
+      out.screens = sc;
+    }
+    if (MODE === 'perf') {
+      // Traffic over 40 s of the stand-in game (v0.54.1): status messages to
+      // the panel and their size, and how often settings reach the disk.
+      // Who asks for a save, by the calling function.
+      const store = require('../store');
+      const callers = {};
+      const realSave = store.save;
+      store.save = function countedSave() {
+        const line = (new Error().stack || '').split('\n')[2] || '';
+        const m = line.match(/at (\S+)/);
+        const k = m ? m[1] : line.trim().slice(0, 60);
+        callers[k] = (callers[k] || 0) + 1;
+        return realSave.apply(this, arguments);
+      };
+      const dirp = require('electron').app.getPath('userData');
+      const file = dirp;
+      const seen = {};
+      let writes = 0;
+      let watcher = null;
+      try {
+        watcher = fs.watch(dirp, (ev, name) => { if (name && ev === 'rename' && /settings/.test(name) && !/tmp/.test(name)) { writes += 1; seen[name] = (seen[name] || 0) + 1; } });
+      } catch (err) { /* no watch */ }
+      await run("(() => { window.__perf = { n: 0, bytes: 0, max: 0 }; window.app.onGardenStatus((st) => { const s = JSON.stringify(st).length; window.__perf.n += 1; window.__perf.bytes += s; window.__perf.max = Math.max(window.__perf.max, s); }); return true; })()");
+      const t0 = Date.now();
+      await wait(40000);
+      const p = await run('window.__perf');
+      if (watcher) watcher.close();
+      out.perf = { seconds: Math.round((Date.now() - t0) / 1000), statusMessages: p.n, avgKB: p.n ? Math.round(p.bytes / p.n / 102.4) / 10 : 0, maxKB: Math.round(p.max / 102.4) / 10, settingsDir: file, settingsWrites: writes, saveCallers: callers, files: seen, dir: fs.readdirSync(dirp).filter((n) => /json/.test(n)) };
+    }
+    if (MODE === 'flows') {
+      // End-to-end QA of the flows no other harness drives (v0.54.1), through
+      // the same calls the panel makes. Run with MG_TEST_DIALOGS=1.
+      const { BaseWindow } = require('electron');
+      const fl = {};
+      const safe = async (name, fn) => {
+        try {
+          fl[name] = await fn();
+        } catch (err) {
+          fl[name] = { error: String(err && err.message || err) };
+        }
+      };
+      const tmpDir = require('os').tmpdir();
+      // 1. Backup, change, restore.
+      await safe('backup', async () => {
+        const file = path.join(tmpDir, `mg-backup-${Date.now()}.json`);
+        const before = (await run('window.app.getSettings()')).alerts.volume;
+        const saved = await run(`window.app.backupSave(${JSON.stringify(file)})`);
+        await run(`(async () => { const s = await window.app.getSettings(); s.alerts.volume = ${before === 0.33 ? 0.44 : 0.33}; await window.app.setSettings(s); return true; })()`);
+        const changed = (await run('window.app.getSettings()')).alerts.volume;
+        const restored = await run(`window.app.backupRestore(${JSON.stringify(file)})`);
+        await wait(1500);
+        const after = (await run('window.app.getSettings()')).alerts.volume;
+        return { saved: saved && saved.ok, bytes: fs.existsSync(file) ? fs.statSync(file).size : 0, before, changed, restored: restored && restored.ok, after, same: after === before };
+      });
+      // 2. The panel in its own window and back.
+      await safe('popOut', async () => {
+        const out1 = await run("window.app.panel({ mode: 'window', show: true })");
+        await wait(1500);
+        const wins = BaseWindow.getAllWindows().length;
+        const alive1 = await run('1 + 1');
+        const zoom1 = await run('window.devicePixelRatio');
+        const out2 = await run("window.app.panel({ mode: 'attached', show: true })");
+        await wait(1500);
+        const alive2 = await run("document.querySelector('nav') ? 'nav ok' : 'no nav'");
+        return { mode1: out1 && out1.mode, windows: wins, alive1, zoom1, mode2: out2 && out2.mode, alive2, cssWidth: await run('window.innerWidth') };
+      });
+      // 3. Rooms: save, rename, remove.
+      await safe('rooms', async () => {
+        const a = await run("window.app.roomsSave('QA42', 'QA room')");
+        const b = await run("window.app.roomsSave('QA42', 'QA renamed')");
+        const c = await run("window.app.roomsRemove('QA42')");
+        const find = (l) => (Array.isArray(l) ? l : (l && l.list) || []).find((r) => r.id === 'QA42');
+        return { saved: Boolean(find(a)), renamed: (find(b) || {}).name, removed: !find(c) };
+      });
+      // 4. A pet's strength by hand, then back to the app's own.
+      await safe('strength', async () => {
+        const g = await run('window.app.getGarden()');
+        const pet = ((g.status && g.status.allPets) || [])[0];
+        if (!pet) return { skipped: 'no pets' };
+        await run(`window.app.setStrength(${JSON.stringify(pet.id)}, 77)`);
+        await wait(2500);
+        const g2 = await run('window.app.getGarden()');
+        const p2 = ((g2.status && g2.status.allPets) || []).find((p) => p.id === pet.id) || {};
+        await run(`window.app.setStrength(${JSON.stringify(pet.id)}, null)`);
+        await wait(2500);
+        const g3 = await run('window.app.getGarden()');
+        const p3 = ((g3.status && g3.status.allPets) || []).find((p) => p.id === pet.id) || {};
+        return { pet: pet.species, set: p2.strength, override: p2.strengthOverride, cleared: p3.strengthOverride == null, back: p3.strength };
+      });
+      // 5. A luck counter by hand.
+      await safe('luck', async () => {
+        const r = await run("window.app.luckSet('egg:MythicalEgg:Capybara', 33)");
+        const v = await run('window.app.luckGet()');
+        const row = ((v && v.groups && v.groups.egg) || []).flatMap((g) => g.rows).find((x) => x.target === 'Capybara');
+        return { value: row && row.value, estimated: row && row.estimated, ok: Boolean(r) };
+      });
+      // 6. Clearing the alert history.
+      await safe('history', async () => {
+        await run('window.app.clearHistory()');
+        const h2 = await run('window.app.getHistory()');
+        return { left: Array.isArray(h2) ? h2.length : h2 };
+      });
+      // 7. Can I buy this?
+      await safe('whatIf', async () => {
+        const w = await run('window.app.budgetWhatIf(2e9)');
+        return w ? { verdict: w.verdict, keys: Object.keys(w).slice(0, 8) } : null;
+      });
+      // 8. A script error in the panel reaches the log (and a saved sample).
+      await safe('panelError', async () => {
+        await run("setTimeout(() => { throw new Error('QA: a deliberate panel error'); }, 0); true");
+        await wait(800);
+        const file = await run('window.app.gardenSample()');
+        const smp = JSON.parse(fs.readFileSync(typeof file === 'string' ? file : file.file || file.path, 'utf8'));
+        return { logged: (smp.errors || []).some((e) => e.where === 'panel script' && /deliberate/.test(e.msg)), count: (smp.errors || []).length };
+      });
+      // 10. The View menu's zoom follows focus: the panel's size, or the game.
+      await safe('zoomKeys', async () => {
+        const { Menu } = require('electron');
+        const item = (label) => {
+          let hit = null;
+          const walk = (m) => { for (const it of m.items) { if (it.label === label) hit = it; if (it.submenu) walk(it.submenu); } };
+          walk(Menu.getApplicationMenu());
+          return hit;
+        };
+        panel().focus();
+        await wait(300);
+        const focused = panel().isFocused();
+        item('Zoom in').click();
+        await wait(900);
+        const s1 = (await run('window.app.getSettings()')).ui.panelSize;
+        const z1 = await run('window.devicePixelRatio');
+        item('Actual size').click();
+        await wait(900);
+        const s2 = (await run('window.app.getSettings()')).ui.panelSize;
+        const gw2 = find((u) => u.startsWith('https://magicgarden.gg'));
+        gw2.focus();
+        await wait(300);
+        item('Zoom in').click();
+        await wait(300);
+        const g1 = gw2.getZoomLevel();
+        const s3 = (await run('window.app.getSettings()')).ui.panelSize;
+        item('Actual size').click();
+        await wait(300);
+        return { panelFocused: focused, panelAfterZoomIn: s1, panelZoom: z1, panelAfterReset: s2, gameZoomIn: g1, panelUntouched: s3, gameAfterReset: gw2.getZoomLevel() };
+      });
+      // 9. The panel's page crashes: it comes back by itself.
+      await safe('panelCrash', async () => {
+        panel().forcefullyCrashRenderer();
+        await wait(6000);
+        const back = await run("document.querySelector('nav') ? 'panel back' : 'no nav'");
+        const file = await run('window.app.gardenSample()');
+        const smp = JSON.parse(fs.readFileSync(typeof file === 'string' ? file : file.file || file.path, 'utf8'));
+        return { back, logged: (smp.errors || []).some((e) => e.where === 'panel' && /stopped/.test(e.msg)) };
+      });
+      out.flows = fl;
+    }
+    if (MODE === 'a11y') {
+      // Accessibility audit of every tab (v0.54.1): controls without a name,
+      // unlabelled fields and switches, and text contrast (WCAG ratio).
+      const a = {};
+      for (const tab of ['alerts', 'weather', 'garden', 'money', 'pets', 'pity', 'rooms', 'scripts']) {
+        await run(`(() => { showTab('${tab}'); document.querySelectorAll('#tab-${tab} details').forEach((d) => { d.open = true; }); return true; })()`);
+        await wait(700);
+        a[tab] = await run(`(() => {
+          const sec = document.getElementById('tab-${tab}');
+          const vis = (el) => el.offsetParent !== null;
+          const name = (el) => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim() || (el.labels && el.labels.length ? el.labels[0].textContent.trim() : '') || (el.getAttribute('aria-labelledby') ? 'labelledby' : '');
+          const nameless = [...sec.querySelectorAll('button, [role=button], [role=switch], [role=radio], summary')].filter(vis).filter((el) => !name(el)).map((el) => el.outerHTML.slice(0, 90));
+          const fields = [...sec.querySelectorAll('input:not([type=hidden]), select, textarea')].filter(vis).filter((el) => !name(el) && !el.getAttribute('placeholder')).map((el) => el.outerHTML.slice(0, 90));
+          // Contrast: each text colour against the nearest solid background.
+          const rgb = (s) => (s.match(/[\\d.]+/g) || []).map(Number);
+          const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+          const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.9)) return c; } return [37, 23, 48]; };
+          const low = {};
+          for (const el of [...sec.querySelectorAll('.note, .hint, .rule-desc, .where, small, .faint, .tick, .fold-sum')].filter(vis).slice(0, 400)) {
+            const fg = rgb(getComputedStyle(el).color);
+            const op = Number(getComputedStyle(el).opacity) || 1;
+            const bg = bgOf(el);
+            const mix = fg.slice(0, 3).map((v, i) => v * op + bg[i] * (1 - op));
+            const L1 = lum(mix); const L2 = lum(bg);
+            const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+            if (ratio < 4.5) { const k = el.className.split(' ')[0] + ' ' + getComputedStyle(el).color + ' on ' + bg.slice(0, 3).join(','); low[k] = Math.min(low[k] || 99, Math.round(ratio * 100) / 100); }
+          }
+          return { nameless: nameless.slice(0, 6), namelessCount: nameless.length, fields: fields.slice(0, 4), lowContrast: low };
+        })()`);
+      }
+      out.a11y = a;
+    }
+    if (MODE === 'voicetime') {
+      // The Dawn shop's voice with a slow downloaded voice (1.5 s a line),
+      // with its line made while the sunrise plays (v0.54.3) and without.
+      await run(`(() => {
+        naturalVoice = () => ({ id: 'fake', tone: null });
+        synthVoice = () => new Promise((r) => setTimeout(() => r(new Uint8Array(8)), 1500));
+        playClip = async () => { await wait(200); };
+        window.__prep = prepareSpeech;
+        return true;
+      })()`);
+      const once = (spec) => run(`(async () => {
+        const list = ${JSON.stringify(spec)}.map((x) => { const r = RULES.find((q) => q.id === x.id || q.label === x.label); return { ruleId: r.id, label: r.label, kind: r.kind, tier: (S.alerts.levels || {})[r.id] || r.tier, sound: r.sound || null }; });
+        const got = [];
+        const real = reportPlayed;
+        reportPlayed = (rep) => { got.push(rep); real(rep); };
+        enqueue(list);
+        await wait(60);
+        while (playing) await wait(40);
+        reportPlayed = real;
+        return got.find((r) => (r.played || []).some((x) => /dawn/i.test(x))) || got[0] || null;
+      })()`);
+      const vt = {};
+      vt.dawnAhead = await once([{ id: 'dawn' }]);
+      vt.shopAhead = await once([{ id: 'dawn' }, { label: 'Ube' }]);
+      await run('(() => { prepareSpeech = () => {}; return true; })()');
+      vt.dawnAfter = await once([{ id: 'dawn' }]);
+      vt.shopAfter = await once([{ id: 'dawn' }, { label: 'Ube' }]);
+      await run('(() => { prepareSpeech = window.__prep; return true; })()');
+      out.voicetime = vt;
+    }
+    if (MODE === 'onemap') {
+      // One map over the game (v0.54.3): the view follows what you're doing,
+      // tabs for the rest, a tap on a tab switches, a pick holds until
+      // something new comes up. On the owner's garden.
+      const fx = require('./fixtures/garden-layout.json');
+      const gw = find((u) => u.startsWith('https://magicgarden.gg'));
+      const grun = (js) => gw.executeJavaScript(js, true);
+      const setup = (o) => grun(`(() => {
+        const obs = window.__mgLoaderObserver; const gardens = []; const slots = []; const seen = new Set();
+        const walk = (x, d) => { if (!x || typeof x !== 'object' || seen.has(x) || d > 9) return; seen.add(x); if (x.tileObjects && typeof x.tileObjects === 'object' && !Array.isArray(x.tileObjects)) gardens.push(x); if (x.data && typeof x.data === 'object' && x.data.garden && Array.isArray(x.data.petSlots)) slots.push(x); for (const k of Object.keys(x)) walk(x[k], d + 1); };
+        walk(obs.state, 0);
+        const fx = ${JSON.stringify(fx)};
+        const o = ${JSON.stringify(o)};
+        const at = new Map(fx.plants.map((p) => [p.i, p]));
+        const T = {};
+        for (const i of fx.occupied) {
+          if ((o.open || []).includes(i)) continue;
+          const p = at.get(i);
+          T[i] = p ? { objectType: 'plant', species: p.sp, slots: p.s.map(([m, size, ripe]) => ({ species: p.sp, mutations: m ? m.split(',') : [], size, endTime: ripe ? Date.now() - 1000 : Date.now() + 1e7 })) } : { objectType: 'decor', decorId: 'WoodBench' };
+        }
+        for (const g of gardens) g.tileObjects = T;
+        for (const s of slots) {
+          const pets = [];
+          if (o.wolf) pets.push({ id: 'wolf', petSpecies: 'ThunderWolf', abilities: ['Thundercharger'], mutations: [], xp: 1 });
+          if (o.ostrich) pets.push({ id: 'ost', petSpecies: 'Ostrich', abilities: ['DawnCapture'], mutations: [], xp: 1 });
+          s.data.petSlots = pets;
+          s.riddenPetId = o.ride ? 'ost' : null;
+          s.data.inventory = s.data.inventory || {};
+          s.data.inventory.items = [{ toolId: 'CropCleanser', itemType: 'Tool', quantity: 9 }, { toolId: 'PlanterPot', itemType: 'Tool', quantity: 9 }];
+          // The game's own way now (v0.54.5): the held item by id.
+          s.heldItem = { itemId: o.pot ? 'PlanterPot' : null, decorRotation: 0 };
+          delete s.notAuthoritative_selectedItemIndex;
+        }
+        obs.setBinderMap({ on: true, event: o.amber ? { kind: 'amber', endsAt: Date.now() + 600000 } : null });
+        return true;
+      })()`);
+      const view = () => grun("(() => { const b = document.getElementById('mg-map'); if (!b || b.style.display === 'none') return null; const q = b.getBoundingClientRect(); return { ctx: b.dataset.ctx, title: b.querySelector('.mg-map-head span').textContent, tabs: [...b.querySelectorAll('.mg-tab')].map((t) => t.dataset.ctx), folded: b.classList.contains('mg-folded'), rect: [Math.round(q.left), Math.round(q.top), Math.round(q.width), Math.round(q.height)] }; })()");
+      const om = {};
+      await setup({ wolf: true });
+      await wait(400);
+      om.wolf = await view();
+      await setup({ wolf: true, ostrich: true });
+      await wait(400);
+      om.wolfOstrich = await view();
+      await setup({ wolf: true, ostrich: true, amber: true });
+      await wait(400);
+      om.plusAmber = await view();
+      await setup({ wolf: true, ostrich: true, amber: true, ride: true });
+      await wait(400);
+      om.plusRide = await view();
+      await setup({ wolf: true, ostrich: true, amber: true, ride: true, pot: true, open: [65, 190] });
+      await wait(500);
+      om.plusPot = await view();
+      const img = await gw.capturePage();
+      fs.mkdirSync(SHOTS, { recursive: true });
+      const r = om.plusPot.rect;
+      fs.writeFileSync(path.join(SHOTS, 'onemap-tabs.png'), img.crop({ x: Math.max(0, r[0] - 6), y: Math.max(0, r[1] - 6), width: r[2] + 12, height: r[3] + 12 }).toPNG());
+      // Tap the Thunderstruck tab, for real.
+      const tab = await grun("(() => { const t = document.querySelector('#mg-map .mg-tab[data-ctx=\"thunder\"]'); const q = t.getBoundingClientRect(); return { x: Math.round(q.left + q.width / 2), y: Math.round(q.top + q.height / 2) }; })()");
+      gw.sendInputEvent({ type: 'mouseDown', x: tab.x, y: tab.y, button: 'left', clickCount: 1 });
+      gw.sendInputEvent({ type: 'mouseUp', x: tab.x, y: tab.y, button: 'left', clickCount: 1 });
+      await wait(500);
+      om.tapped = await view();
+      await grun('window.__mgLoaderObserver.setMountMap(true)');
+      await wait(400);
+      om.pickHolds = await view();
+      // Something new: the pot put away. The pick gives way.
+      await setup({ wolf: true, ostrich: true, amber: true, ride: true, pot: false });
+      await wait(500);
+      om.afterChange = await view();
+      // Nothing going on: no map.
+      await setup({});
+      await wait(400);
+      om.nothing = await view();
+      // Folding it, by a tap on its title.
+      await setup({ wolf: true });
+      await wait(400);
+      const hd = await grun("(() => { const t = document.querySelector('#mg-map .mg-map-head span'); const q = t.getBoundingClientRect(); return { x: Math.round(q.left + 20), y: Math.round(q.top + q.height / 2) }; })()");
+      gw.sendInputEvent({ type: 'mouseDown', x: hd.x, y: hd.y, button: 'left', clickCount: 1 });
+      gw.sendInputEvent({ type: 'mouseUp', x: hd.x, y: hd.y, button: 'left', clickCount: 1 });
       await wait(600);
-      mt.restored = await read('mg-mount-map');
-      // Double-click the header: back to the corner, and forgotten.
-      const r2 = mt.restored.rect;
-      gw.sendInputEvent({ type: 'mouseDown', x: r2[0] + 40, y: r2[1] + 10, button: 'left', clickCount: 1 });
-      gw.sendInputEvent({ type: 'mouseUp', x: r2[0] + 40, y: r2[1] + 10, button: 'left', clickCount: 1 });
-      gw.sendInputEvent({ type: 'mouseDown', x: r2[0] + 40, y: r2[1] + 10, button: 'left', clickCount: 2 });
-      gw.sendInputEvent({ type: 'mouseUp', x: r2[0] + 40, y: r2[1] + 10, button: 'left', clickCount: 2 });
-      await wait(700);
-      mt.docked = await read('mg-mount-map');
-      mt.savedAfter = ((await run('window.app.getSettings()')).ui.mapPos || {})['mg-mount-map'] || null;
-      out.mount = mt;
+      om.folded = (await view()).folded;
+      om.foldSaved = ((await run('window.app.getSettings()')).ui.mapFold || {})['mg-map'] || false;
+      gw.sendInputEvent({ type: 'mouseDown', x: hd.x, y: hd.y, button: 'left', clickCount: 1 });
+      gw.sendInputEvent({ type: 'mouseUp', x: hd.x, y: hd.y, button: 'left', clickCount: 1 });
+      await wait(600);
+      // A place saved for one of the old maps carries over.
+      await grun("window.__mgLoaderObserver.setMapPositions({ 'mg-thunder-map': { x: 0.1, y: 0.1 } }, {})");
+      await wait(400);
+      const iw = await grun('[innerWidth, innerHeight]');
+      const moved = await view();
+      om.carriedOver = { rect: moved.rect, expect: [Math.round(iw[0] * 0.1), Math.round(iw[1] * 0.1)] };
+      // The held log, in a sample.
+      const smp = await grun('window.__mgLoaderObserver.sample()');
+      om.heldLog = (smp.heldLog || []).slice(-3);
+      out.onemap = om;
+    }
+    if (MODE === 'harvestmode') {
+      // Harvest mode (v0.54.4) end to end: the rule set from the panel, the
+      // owner's garden in the observer, real HarvestCrop commands through the
+      // game's socket; which are stopped and which go through.
+      const rule = require('../harvest-rule');
+      const fx = require('./fixtures/garden-layout.json');
+      const mine = { on: true, color: 'goldOrRainbow', hydro: ['thundercharged'], lunar: ['amberbound'], size: true };
+      const gw = find((u) => u.startsWith('https://magicgarden.gg'));
+      const grun = (js) => gw.executeJavaScript(js, true);
+      const hm = {};
+      hm.saved = (await run(`window.app.harvestSet({ mode: ${JSON.stringify(mine)} })`)).mode;
+      await wait(500);
+      hm.observer = await grun('window.__mgLoaderObserver.harvestLock.mode');
+      await grun(`(() => {
+        const obs = window.__mgLoaderObserver; const gardens = []; const seen = new Set();
+        const walk = (x, d) => { if (!x || typeof x !== 'object' || seen.has(x) || d > 9) return; seen.add(x); if (x.tileObjects && typeof x.tileObjects === 'object' && !Array.isArray(x.tileObjects)) gardens.push(x); for (const k of Object.keys(x)) walk(x[k], d + 1); };
+        walk(obs.state, 0);
+        const fx = ${JSON.stringify(fx)};
+        const at = new Map(fx.plants.map((p) => [p.i, p]));
+        const T = {};
+        for (const i of fx.occupied) {
+          const p = at.get(i);
+          T[i] = p ? { objectType: 'plant', species: p.sp, slots: p.s.map(([m, size, ripe]) => ({ species: p.sp, mutations: m ? m.split(',') : [], size, endTime: ripe ? Date.now() - 1000 : Date.now() + 1e7 })) } : { objectType: 'decor', decorId: 'WoodBench' };
+        }
+        for (const g of gardens) g.tileObjects = T;
+        return true;
+      })()`);
+      // One crop of each kind: matching, and failing each way.
+      const pick = (want) => {
+        for (const p of fx.plants) for (let j = 0; j < p.s.length; j += 1) {
+          const [m, size, ripe] = p.s[j];
+          if (!ripe) continue;
+          if (want(rule.miss(m ? m.split(',') : [], size, mine), m, size)) return { slot: p.i, idx: j, muts: m, size };
+        }
+        return null;
+      };
+      const cases = {
+        match: pick((why) => why === null),
+        noColour: pick((why) => why === 'not Gold or Rainbow'),
+        notCharged: pick((why) => why === 'not Thundercharged'),
+        notBound: pick((why) => why === 'not Amberbound'),
+        notFull: pick((why) => why === 'not full size'),
+      };
+      hm.cases = {};
+      for (const [name, c] of Object.entries(cases)) {
+        if (!c) { hm.cases[name] = 'none in the garden'; continue; }
+        const before = await grun('window.__mgLoaderObserver.recentOutgoing.filter((e) => e.blocked).length');
+        await grun(`window.__gameSend({ type: 'HarvestCrop', slot: ${c.slot}, slotsIndex: ${c.idx} })`);
+        await wait(250);
+        const after = await grun('window.__mgLoaderObserver.recentOutgoing.filter((e) => e.blocked).length');
+        const note = await grun("(() => { const el = document.getElementById('__mgHarvestNote'); return el && el.style.opacity !== '0' ? el.textContent : null; })()");
+        hm.cases[name] = { crop: c.muts + ' @' + c.size, blocked: after > before, note: after > before ? note : null };
+        await wait(1100);
+      }
+      hm.badge = await grun("(document.getElementById('__mgHarvestLock') || {}).textContent || null");
+      hm.map = await grun("(() => { const b = document.getElementById('mg-map'); return b && b.style.display !== 'none' ? { ctx: b.dataset.ctx, text: b.innerText.replace(/\\s+/g, ' ').slice(0, 140) } : null; })()");
+      // The panel: the rule, the live count, and the Your garden card.
+      await run("(() => { showTab('garden'); const h = document.querySelector('h2[data-fold=\"garden/harvest-lock\"]'); if (h && h.classList.contains('folded')) h.click(); document.getElementById('harvestRule').scrollIntoView({ block: 'start' }); return true; })()");
+      await wait(2500);
+      hm.panelCount = await run("document.querySelector('#harvestRule .hv-match').innerText");
+      hm.chipsOn = await run("[...document.querySelectorAll('#harvestRule .chip.on')].map((b) => b.textContent)");
+      fs.mkdirSync(SHOTS, { recursive: true });
+      await shotOf('#harvestRule', 'harvest-rule', 60);
+      await run("(() => { GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { crops: [{ name: 'garden', total: 270, ready: 225, value: 639.3e9, ripeValue: 639.3e9, readyValue: 574.3e9, growingValue: 65e9, mature: 270, matureKnown: true, gold: 124, rainbow: 111, special: 235, missing: { grow: 0, size: 10, color: 21, hydro: 0, lunar: 18 }, have: { ripe: 270 } }], room: { players: 2 }, idealSell: { petPart: 1.313, pets: [{ species: 'Pig' }, { species: 'Pig' }, { species: 'Capybara' }], allOut: false, notOut: ['Capybara'], outNow: { petPart: 1.064 } } }); renderGarden = window.renderGarden || renderGarden; const b = gardenBucket(GARDEN_STATUS); renderCropCard(GARDEN_STATUS, b); document.getElementById('cropStats').scrollIntoView({ block: 'start' }); return true; })()");
+      await wait(400);
+      hm.gardenCard = await run("document.getElementById('cropStats').innerText.split('\\n').filter(Boolean).slice(0, 14)");
+      await shotOf('#cropStats', 'your-garden', 6);
+      await run("window.app.harvestSet({ mode: { on: false } })");
+      out.harvestmode = hm;
+    }
+    if (MODE === 'levelnext') {
+      // Level next on the Pets tab (pet-plan.js, v0.54.5), from MG_SAMPLE's
+      // pets if given, else example pets; and the Garden map's to-do on the
+      // owner's layout, explained, with the top plant open.
+      const pp = require('../pet-plan');
+      const ex = (id, sp, ab, s, m, h, w) => ({ id, species: sp, speciesName: sp, abilities: ab, strength: s, maxStrength: m, hoursToMax: h, where: w });
+      const pets = process.env.MG_SAMPLE ? JSON.parse(fs.readFileSync(process.env.MG_SAMPLE, 'utf8')).lastStatus.allPets
+        : [ex('p1', 'Pig', ['SellBoostII', 'GoldGranter'], 99, 99, 0, 'out'), ex('p2', 'Peacock', ['SellBoostIV', 'XPBoostII'], 56, 86, 144, 'hutch'), ex('p3', 'Bat', ['ThunderCoinFinder', 'ThunderBoost'], 69, 96, 88, 'hutch'), ex('p4', 'Capybara', ['ProduceRefund', 'DoubleHarvest'], 79, 81, 8, 'hutch')];
+      const L = pp.recommend(pets);
+      const ln = {};
+      ln.fromSample = Boolean(process.env.MG_SAMPLE);
+      ln.picks = L.picks.map((p) => `${p.species} ${p.strength}->${p.maxStrength}`);
+      ln.panel = await run(`(() => { GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { levelNext: ${JSON.stringify(L)} }); showTab('pets'); renderPets(); document.getElementById('levelNext').scrollIntoView({ block: 'start' }); return document.getElementById('levelNext').innerText.split('\\n').filter(Boolean).slice(0, 16); })()`);
+      await wait(400);
+      fs.mkdirSync(SHOTS, { recursive: true });
+      await shotOf('#levelNext', 'level-next', 8);
+      // The Garden map's to-do, on the owner's layout.
+      const fx = require('./fixtures/garden-layout.json');
+      const gp = require('../garden-plan');
+      const planned = gp.plan(fx.plants, fx.occupied);
+      const kinds = {};
+      const at = new Map(fx.plants.map((p) => [p.i, p]));
+      for (const i of fx.occupied) kinds[i] = at.has(i) ? ['p', at.get(i).sp] : ['d', 'Decor'];
+      ln.todo = await run(`(() => { renderGarden = function () {}; S.ui = Object.assign({}, S.ui, { gardenMap: 'todo' }); GARDEN_STATUS = Object.assign({}, GARDEN_STATUS, { at: Date.now(), gardenTiles: ${JSON.stringify(kinds)}, plan: ${JSON.stringify(planned)} }); GM_SEL = null; showTab('garden'); const h2 = document.querySelector('h2[data-fold="garden/garden-map"]'); if (h2 && h2.classList.contains('folded')) h2.click(); spotHtml = ''; renderSpots(GARDEN_STATUS); document.getElementById('spotMap').scrollIntoView({ block: 'start' }); return { big: document.getElementById('spotCount').innerText, sub: document.getElementById('gmSummary').innerText, tile: document.getElementById('gmTile').innerText.replace(/\\n+/g, ' | ').slice(0, 700), outlined: [...document.querySelectorAll('#spotMap i.sel')].map((c) => c.dataset.i) }; })()`);
+      await wait(400);
+      await shotOf('.card:has(#spotMap)', 'todo-explained', 4);
+      out.levelnext = ln;
     }
     if (MODE === 'luck') {
       // The Luck tab in two states, built with luck.js itself: a late-game

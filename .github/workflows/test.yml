@@ -1,0 +1,28 @@
+# Runs the unit suites (npm test) on every push and pull request. They're
+# plain Node: no Electron, game or network needed. The Electron harnesses
+# (tests/README.md) need a desktop and the stand-in server, so they're run
+# by hand before a release.
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run the unit suites
+        run: node tests/run-unit.js
