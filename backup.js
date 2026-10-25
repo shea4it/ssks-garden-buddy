@@ -107,4 +107,33 @@ function autoBackup(dir, makeFn) {
   return file;
 }
 
-module.exports = { make, check, restoreScripts, autoBackup, safeScriptName, KIND };
+// The newest backup (daily or before-restore) whose settings pass test(), or
+// null: { name, settings, savedAt }. v0.72.1 looks for the last one made
+// before 0.72.0, to bring back luck counts that update reset.
+function newestWhere(dir, test) {
+  let names = [];
+  try {
+    names = fs.readdirSync(dir).filter((f) => /^(auto-\d{4}-\d{2}-\d{2}|before-restore-\d+)\.json$/.test(f));
+  } catch (err) {
+    return null;
+  }
+  const when = (f) => {
+    try {
+      return fs.statSync(path.join(dir, f)).mtimeMs;
+    } catch (err) {
+      return 0;
+    }
+  };
+  names.sort((a, b) => when(b) - when(a));
+  for (const name of names) {
+    try {
+      const b = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+      if (b && b.kind === KIND && b.settings && typeof b.settings === 'object' && test(b.settings)) return { name, settings: b.settings, savedAt: b.savedAt || null };
+    } catch (err) {
+      /* try the next one */
+    }
+  }
+  return null;
+}
+
+module.exports = { make, check, restoreScripts, autoBackup, newestWhere, safeScriptName, KIND };

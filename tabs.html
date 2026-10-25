@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Only its own inline script and styles (v0.55.0). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Accounts</title>
+<style>
+  /* Clean and calm (v0.67.0): graphite, like the panel. */
+  @font-face { font-family: 'Inter'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/inter-latin-opsz-normal.woff2') format('woff2-variations'); }
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #101012; color: #f5f5f7; font: 550 12.5px/1 'Inter', -apple-system, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; }
+  .bar { display: flex; align-items: stretch; height: 100%; padding: 0 6px; gap: 4px; }
+  .tab { display: flex; align-items: center; gap: 7px; padding: 0 12px; margin: 4px 0; border-radius: 9px; background: transparent; color: rgba(235,235,245,.62); cursor: pointer; border: 0; max-width: 260px; transition: background .15s ease, color .15s ease; }
+  .tab:hover { background: rgba(118,118,128,.16); color: #f5f5f7; }
+  .tab.on { background: rgba(118,118,128,.28); color: #fff; }
+  .tab:focus-visible { outline: 3px solid rgba(48,209,88,.55); outline-offset: -2px; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #636366; flex: none; }
+  .dot.live { background: #30d158; box-shadow: 0 0 0 3px rgba(48,209,88,.2); }
+  .x { margin-left: 2px; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; color: rgba(235,235,245,.6); font-weight: 600; }
+  .x:hover { background: rgba(118,118,128,.3); color: #fff; }
+  .hint { margin-left: auto; align-self: center; color: rgba(235,235,245,.45); font-weight: 450; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 10px; }
+</style>
+</head>
+<body>
+<div class="bar" id="bar" role="tablist" aria-label="Accounts"></div>
+<script>
+  const bar = document.getElementById('bar');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function render(st) {
+    if (!st) return;
+    const tabs = st.accounts.map((a) => {
+      const label = a.name ? esc(a.name) : a.n === 2 ? 'log in here' : 'account 1';
+      const room = a.room ? ` · ${a.room}/6` : '';
+      return `<div class="tab ${st.active === a.n ? 'on' : ''}" role="tab" tabindex="0" aria-selected="${st.active === a.n}" data-n="${a.n}" title="${a.live ? 'Connected' : 'Not connected yet'}${a.n === 1 ? ' · the panel follows this account' : ''}">
+        <span class="dot ${a.live ? 'live' : ''}"></span><span class="name">${a.n === 1 ? '🌱' : '🌿'} ${label}${room}</span>${a.n === 2 ? '<span class="x" data-close="1" title="Close the second account" role="button" aria-label="Close the second account">×</span>' : ''}</div>`;
+    }).join('');
+    bar.innerHTML = tabs + '<span class="hint">Ctrl+Tab switches · the panel follows 🌱 account 1</span>';
+  }
+  bar.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]')) { window.tabs.close(); return; }
+    const t = e.target.closest('[data-n]');
+    if (t) window.tabs.show(Number(t.dataset.n));
+  });
+  bar.addEventListener('keydown', (e) => {
+    const t = e.target.closest('[data-n]');
+    if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); window.tabs.show(Number(t.dataset.n)); }
+  });
+  window.tabs.onState(render);
+  window.tabs.get().then(render);
+</script>
+</body>
+</html>

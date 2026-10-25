@@ -4,70 +4,266 @@
 <meta charset="utf-8">
 <!-- Only its own inline script and styles; no network, no eval (v0.54.1). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-<title>Magic Garden (logged off)</title>
+<title>Magic Garden (stepped away)</title>
 <style>
-  :root { --base: #2A1B36; --card: #36224a; --edge: #4b3459; --text: #f6f1f8; --muted: #cbb8d8; --moss: #7fc98a; --moss-dim: #47624c; }
+  /* The app's font (v0.67.0). */
+  @font-face { font-family: 'Inter'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/inter-latin-opsz-normal.woff2') format('woff2-variations'); }
+  /* v0.60.3: a big countdown while the weather's on, then an inviting
+   * "Safe to join" when it's over. The app never rejoins by itself: Join
+   * the game is your press. */
+  :root { --a: #7ab0e8; --bg1: #1b2a44; --bg2: #2c4166; --text: #f4f7fb; --muted: #c4d0e2; }
+  body[data-kind="snow"] { --a: #bfe6ff; --bg1: #1e2b3f; --bg2: #3a5577; }
+  body[data-kind="thunder"] { --a: #ffd84d; --bg1: #17112a; --bg2: #3a2457; }
+  body[data-kind="dawn"] { --a: #ff9fc0; --bg1: #2f1830; --bg2: #6a3352; }
+  body[data-kind="amber"] { --a: #ffb84d; --bg1: #2a1a10; --bg2: #5c3a17; }
+  body[data-kind="break"] { --a: #b9a4ff; --bg1: #241733; --bg2: #3d2856; }
   html, body { height: 100%; margin: 0; }
   body {
-    background: radial-gradient(ellipse at top, #3a2550 0%, var(--base) 60%);
+    background: radial-gradient(ellipse at 50% 15%, var(--bg2) 0%, var(--bg1) 70%);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    display: grid; place-items: center;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    display: grid; place-items: center; overflow: hidden;
+    transition: background 1.2s ease, color 1.2s ease;
   }
-  .card {
-    background: var(--card); border: 1px solid var(--edge); border-radius: 18px;
-    padding: 36px 44px; text-align: center; max-width: 440px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  .wrap { text-align: center; padding: 24px; max-width: 560px; position: relative; z-index: 2; }
+  .lead { font-size: 20px; color: var(--muted); letter-spacing: .02em; margin: 0 0 10px; }
+  .ring { position: relative; width: min(64vw, 300px); height: min(64vw, 300px); margin: 0 auto; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .track { stroke: rgba(255,255,255,.10); }
+  .ring svg { overflow: visible; }
+  .ring .fill { stroke: var(--a); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  /* The glow: a soft, wider copy of the ring behind it (a filter clipped to
+   * a square box). */
+  .ring .glow { stroke: var(--a); stroke-linecap: round; opacity: .2; transition: stroke-dashoffset 1s linear; }
+  .ring .inside { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 4px; }
+  .emoji { font-size: 44px; line-height: 1; }
+  .count { font-size: clamp(56px, 13vw, 96px); font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1; }
+  .when { color: var(--muted); font-size: 14px; }
+  .note { color: var(--muted); margin: 18px 0 0; line-height: 1.5; font-size: 15px; }
+  .dots span { display: inline-block; width: 10px; height: 10px; margin: 0 4px; border-radius: 50%; background: var(--a); animation: dot 1.4s ease-in-out infinite; }
+  .dots span:nth-child(2) { animation-delay: .2s; }
+  .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes dot { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-6px); } }
+  /* "Reconnect when Rain ends" (v0.60.5): a few seconds after the weather
+   * starts it floats gently into view; your press, for this weather only. */
+  .recon { margin-top: 20px; min-height: 46px; }
+  .recon[hidden] { display: none; }
+  .recon.pop { animation: popin .7s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes popin { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+  .recon-btn { cursor: pointer; font: inherit; font-size: 16px; font-weight: 700; color: var(--text); padding: 11px 22px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--a) 55%, transparent); background: color-mix(in srgb, var(--a) 16%, rgba(255,255,255,.04)); box-shadow: 0 4px 18px rgba(0,0,0,.25); transition: background .2s ease, transform .15s ease; }
+  .recon-btn:hover { background: color-mix(in srgb, var(--a) 28%, rgba(255,255,255,.06)); transform: translateY(-1px); }
+  .recon-btn:focus-visible { outline: 3px solid var(--a); outline-offset: 3px; }
+  .recon-on { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; font-size: 15px; font-weight: 650; background: color-mix(in srgb, var(--a) 22%, rgba(255,255,255,.05)); border: 1px solid color-mix(in srgb, var(--a) 60%, transparent); }
+  .recon-on[hidden] { display: none; }
+  .recon-on small { color: var(--muted); font-weight: 500; }
+  .recon-cancel { cursor: pointer; font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; text-decoration: underline; text-underline-offset: 3px; padding: 0 2px; }
+  .recon-cancel:hover { color: var(--text); }
+  a.ghost { display: inline-block; margin-top: 22px; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; opacity: .8; }
+  a.ghost:hover { opacity: 1; color: var(--text); }
+
+  /* Safe to join: the screen warms up. */
+  body.safe { background: radial-gradient(ellipse at 50% 18%, #fff3c4 0%, #ffd56b 24%, #8fdc9a 60%, #2b6a47 100%); color: #12301e; }
+  .safe-view { display: none; }
+  body.safe .wait-view { display: none; }
+  body.safe .safe-view { display: block; animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+  .sun { font-size: 84px; line-height: 1; filter: drop-shadow(0 6px 18px rgba(255,190,60,.55)); animation: glow 3s ease-in-out infinite; }
+  @keyframes glow { 50% { transform: scale(1.06) rotate(6deg); } }
+  .safe-title { font-size: clamp(40px, 9vw, 64px); font-weight: 900; margin: 10px 0 6px; letter-spacing: -.02em; text-shadow: 0 2px 0 rgba(255,255,255,.45); }
+  .safe-sub { font-size: 19px; margin: 0 0 26px; color: #1e4a2e; }
+  a.join {
+    display: inline-flex; align-items: center; gap: 10px; padding: 18px 38px; border-radius: 999px;
+    background: linear-gradient(180deg, #3cbf70, #23935a); color: #fff; text-decoration: none;
+    font-weight: 850; font-size: 22px; letter-spacing: .01em;
+    box-shadow: 0 10px 28px rgba(20,90,50,.45), inset 0 1px 0 rgba(255,255,255,.35);
+    animation: pulse 2.2s ease-in-out infinite;
   }
-  .emoji { font-size: 64px; line-height: 1; }
-  h1 { font-size: 24px; margin: 16px 0 6px; font-weight: 650; }
-  p { color: var(--muted); margin: 8px 0; line-height: 1.5; }
-  .back { font-size: 17px; color: var(--text); margin-top: 18px; }
-  .count { font-variant-numeric: tabular-nums; color: var(--moss); font-weight: 600; }
-  a.btn {
-    display: inline-block; margin-top: 22px; padding: 11px 22px; border-radius: 10px;
-    background: var(--moss-dim); color: #eafbec; text-decoration: none; font-weight: 600;
-  }
-  a.btn:hover { background: #55765b; }
-  .small { font-size: 12.5px; margin-top: 18px; }
+  a.join:hover { background: linear-gradient(180deg, #47cf7d, #27a364); transform: translateY(-1px); }
+  a.join:focus-visible { outline: 4px solid #fff; outline-offset: 4px; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 10px 28px rgba(20,90,50,.45), 0 0 0 0 rgba(60,191,112,.55); } 50% { box-shadow: 0 10px 28px rgba(20,90,50,.45), 0 0 0 16px rgba(60,191,112,0); } }
+  .safe-small { margin-top: 18px; font-size: 13px; color: #24543a; }
+  .sparkle { position: fixed; z-index: 1; font-size: 22px; opacity: 0; pointer-events: none; animation: float 6s ease-in-out infinite; }
+  body:not(.safe) .sparkle { display: none; }
+  @keyframes float { 0% { opacity: 0; transform: translateY(20px); } 20% { opacity: .9; } 80% { opacity: .9; } 100% { opacity: 0; transform: translateY(-60px); } }
+  /* The game's weather right now (v0.61.1), on the safe / break view: the
+   * screen matches it (rain, snow, thunder get gently falling drops). */
+  body.safe.now-rain, body.safe.now-thunder { background: radial-gradient(ellipse at 50% 18%, #e3efff 0%, #a9c7ec 30%, #5b84b8 68%, #2c4a72 100%); color: #10243d; }
+  body.safe.now-thunder { background: radial-gradient(ellipse at 50% 18%, #e7e0ff 0%, #b2a6e0 30%, #5d5296 68%, #2a2152 100%); color: #1b1435; }
+  body.safe.now-snow { background: radial-gradient(ellipse at 50% 18%, #ffffff 0%, #dcefff 30%, #8fb6d8 68%, #4a6f93 100%); color: #123049; }
+  body.safe.now-dawn { background: radial-gradient(ellipse at 50% 18%, #ffe9ef 0%, #ffbfd2 30%, #c77ea0 68%, #6a3352 100%); color: #3a1428; }
+  body.safe.now-amber { background: radial-gradient(ellipse at 50% 18%, #fff0d6 0%, #ffd08a 30%, #d4914a 68%, #6b4219 100%); color: #3a2208; }
+  body.safe[class*="now-"] .safe-sub, body.safe[class*="now-"] .safe-small { color: inherit; opacity: .85; }
+  body.safe[class*="now-"] .safe-title { text-shadow: 0 2px 0 rgba(255, 255, 255, .35); }
+  body.safe[class*="now-"] .sparkle { display: none; }
+  body.safe[class*="now-"] .sun { filter: drop-shadow(0 6px 18px rgba(255, 255, 255, .45)); animation: none; }
+  .fall { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; display: none; }
+  body.safe.now-rain .fall, body.safe.now-thunder .fall, body.safe.now-snow .fall { display: block; }
+  .fall i { position: absolute; top: -12%; width: 2px; height: 18px; border-radius: 2px; background: rgba(255, 255, 255, .55); animation: drop linear infinite; }
+  body.now-snow .fall i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .9); animation-name: flake; }
+  @keyframes drop { to { transform: translate3d(-24px, 115vh, 0); } }
+  @keyframes flake { 50% { transform: translate3d(14px, 58vh, 0); } to { transform: translate3d(-8px, 115vh, 0); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } .fall { display: none !important; } }
 </style>
 </head>
-<body>
-  <div class="card">
-    <div class="emoji" id="emoji">🌧️</div>
-    <h1 id="title">Stepped out for the weather</h1>
-    <p>Weather can only change your crops while you're in the game, so your garden is safe from it while you're out here.</p>
-    <p class="back" id="back"></p>
-    <a class="btn" href="https://magicgarden.gg">Rejoin now</a>
-    <p class="small">Don't open the game anywhere else while you wait. If you do, it's best to close this app first.</p>
+<body data-kind="rain">
+  <div class="wrap">
+    <div class="wait-view" id="wait">
+      <p class="lead" id="lead">Rain ends in</p>
+      <div class="ring" id="ringBox">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="7"/><circle class="glow" id="glow" cx="60" cy="60" r="52" fill="none" stroke-width="15" stroke-dasharray="326.7" stroke-dashoffset="326.7"/><circle class="fill" id="fill" cx="60" cy="60" r="52" fill="none" stroke-width="7" stroke-dasharray="326.7" stroke-dashoffset="326.7"/></svg>
+        <div class="inside"><div class="emoji" id="emoji">🌧️</div><div class="count" id="count" aria-live="polite">–:––</div><div class="when" id="when"></div></div>
+      </div>
+      <div class="dots" id="dots" hidden aria-label="Waiting"><span></span><span></span><span></span></div>
+      <p class="note" id="note">Your garden's safe from it while you're out here.</p>
+      <div class="recon" id="recon" hidden>
+        <button class="recon-btn" id="reconBtn" type="button">🔁 Reconnect when <span class="wname">it</span> ends</button>
+        <div class="recon-on" id="reconOn" hidden><span>✓ Reconnecting when <span class="wname">it</span> ends</span><small id="reconWhen"></small><button class="recon-cancel" id="reconCancel" type="button">Cancel</button></div>
+      </div>
+      <a class="ghost" href="https://magicgarden.gg">Join now anyway</a>
+    </div>
+    <div class="safe-view" id="safe">
+      <div class="sun" id="sky" aria-hidden="true">☀️</div>
+      <div class="safe-title" id="safeTitle">Safe to join!</div>
+      <p class="safe-sub" id="safeSub">The weather's over. Your garden's clear.</p>
+      <a class="join" id="join" href="https://magicgarden.gg">Join the game <span aria-hidden="true">▶</span></a>
+      <p class="safe-small" id="safeSmall"></p>
+    </div>
   </div>
+  <div class="fall" id="fall" aria-hidden="true"></div>
+  <div class="sparkle" style="left:14%;top:62%;animation-delay:0s">✨</div>
+  <div class="sparkle" style="left:80%;top:58%;animation-delay:1.6s">✨</div>
+  <div class="sparkle" style="left:24%;top:30%;animation-delay:3.1s">🌱</div>
+  <div class="sparkle" style="left:72%;top:28%;animation-delay:4.4s">✨</div>
 <script>
   'use strict';
   const q = new URLSearchParams(location.search);
   const name = q.get('weather') || 'the weather';
+  const isBreak = name === 'a break';
   const until = Number(q.get('until')) || 0;
-  const auto = q.get('rejoin') === '1';
-  document.getElementById('emoji').textContent = q.get('emoji') || '🌧️';
-  document.getElementById('title').textContent = name === 'a break' ? 'Taking a break' : `Stepped out for ${name}`;
-  document.title = `Magic Garden (logged off for ${name})`;
+  const since = Number(q.get('since')) || Date.now();
+  const kind = isBreak ? 'break' : (q.get('kind') || 'rain');
+  let over = q.get('over') === '1';
+  const $ = (id) => document.getElementById(id);
+  document.body.dataset.kind = kind;
+  $('emoji').textContent = q.get('emoji') || '🌧️';
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?([AP])M/i, (m, a) => a.toLowerCase() + 'm');
+  const CIRC = 326.7;
 
-  const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    .replace(/\s?([AP])M/i, (m, a) => a.toLowerCase() + 'm');
+  // The game's weather right now (v0.61.1): from the query, then live from
+  // the app (window.__nowWeather), shown on the safe / break view.
+  let nowW = { kind: q.get('now') || '', label: q.get('nowLabel') || '', emoji: q.get('nowEmoji') || '', endsAt: Number(q.get('nowEnds')) || 0 };
+  const DOING = { rain: 'raining', snow: 'snowing', thunder: 'thundering', dawn: 'Dawn', amber: 'an Amber Moon' };
+  (function drops() {
+    const f = $('fall');
+    for (let i = 0; i < 28; i += 1) {
+      const d = document.createElement('i');
+      d.style.left = `${(i * 37) % 100}%`;
+      d.style.animationDuration = `${1.1 + ((i * 7) % 10) / 10}s`;
+      d.style.animationDelay = `${-((i * 13) % 20) / 10}s`;
+      f.appendChild(d);
+    }
+  })();
+  function nowText() {
+    if (!nowW.kind || nowW.kind === 'clear') return '';
+    const doing = DOING[nowW.kind] || nowW.label || 'weather';
+    return `It's ${doing} in the game right now${nowW.endsAt ? `, until ${clock(nowW.endsAt)}` : ''}.`;
+  }
+  function paintNow() {
+    for (const c of [...document.body.classList]) if (c.startsWith('now-')) document.body.classList.remove(c);
+    const wet = nowW.kind && nowW.kind !== 'clear';
+    if (wet) document.body.classList.add(`now-${nowW.kind}`);
+    $('sky').textContent = wet ? (nowW.emoji || '🌦️') : '☀️';
+    $('fall').style.opacity = wet ? '1' : '0';
+  }
+  window.__nowWeather = (w) => {
+    nowW = Object.assign({ kind: '', label: '', emoji: '', endsAt: 0 }, w || {});
+    if (document.body.classList.contains('safe')) safe();
+  };
 
+  // Reconnect when it ends (v0.60.5): your press, for this weather only.
+  let armed = q.get('reconnect') === '1';
+  const bridge = window.mgLoaderBridge;
+  for (const el of document.querySelectorAll('.wname')) el.textContent = name;
+  function showRecon() {
+    if (isBreak || over || !bridge || !bridge.parkedReconnect) return;
+    $('recon').hidden = false;
+    $('reconBtn').hidden = armed;
+    $('reconOn').hidden = !armed;
+    $('reconWhen').textContent = armed && until ? `· back about ${clock(until)}` : '';
+  }
+  $('reconBtn').addEventListener('click', () => {
+    armed = true;
+    bridge.parkedReconnect(true);
+    showRecon();
+  });
+  $('reconCancel').addEventListener('click', () => {
+    armed = false;
+    bridge.parkedReconnect(false);
+    showRecon();
+    $('reconBtn').focus();
+  });
+  if (armed) showRecon();
+  else {
+    // About 5 seconds after this screen shows (v0.61.6: it used to wait for
+    // the weather to start, too long when you stepped away early), it
+    // floats gently into view.
+    const at = Date.now() + 5000;
+    setTimeout(() => {
+      if (over || armed) return;
+      $('recon').classList.add('pop');
+      showRecon();
+    }, at - Date.now());
+  }
+
+  function safe() {
+    if (armed && !isBreak) {
+      // You asked to reconnect: the app takes you back in.
+      document.title = 'Magic Garden: reconnecting…';
+      $('lead').textContent = `${cap(name)}'s over`;
+      $('count').textContent = '…';
+      $('when').textContent = 'reconnecting';
+      $('recon').hidden = true;
+      return;
+    }
+    document.body.classList.add('safe');
+    document.title = 'Magic Garden: safe to join!';
+    $('safeTitle').textContent = isBreak ? 'Ready when you are!' : 'Safe to join!';
+    const now = nowText();
+    $('safeSub').textContent = isBreak ? (now || 'Your garden\'s waiting.') : `${cap(name)}'s over.${now ? ` ${now}` : ' Your garden\'s clear.'}`;
+    paintNow();
+    const at = until && Date.now() > until ? until : Date.now();
+    $('safeSmall').textContent = isBreak ? '' : `Clear since ${clock(at)}.`;
+    try { $('join').focus({ preventScroll: true }); } catch (e) { /* fine */ }
+  }
   function tick() {
-    const el = document.getElementById('back');
-    if (!auto) {
-      el.textContent = 'Press Rejoin whenever you\'re ready.';
-      return;
-    }
+    if (over || isBreak) return safe();
+    document.title = `Magic Garden (stepped away from ${name})`;
+    $('lead').textContent = `${cap(name)} ends in`;
     if (!until) {
-      el.textContent = `Back automatically when ${name} ends.`;
+      $('lead').textContent = `Waiting for ${name} to pass`;
+      $('count').textContent = '';
+      $('ringBox').hidden = true;
+      $('dots').hidden = false;
+      $('when').textContent = '';
       return;
     }
-    const back = until + 10000;
-    const s = Math.max(0, Math.round((back - Date.now()) / 1000));
-    const left = s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
-    el.innerHTML = `Back automatically at ${clock(back)} <span class="count">(${left})</span>`;
+    const s = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+    if (s <= 0) {
+      over = true;
+      return safe();
+    }
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    $('count').textContent = h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+    $('when').textContent = `clear at ${clock(until)}`;
+    const total = Math.max(1, until - since);
+    const done = Math.min(1, Math.max(0, (Date.now() - since) / total));
+    $('fill').style.strokeDashoffset = String(CIRC * (1 - done));
+    $('glow').style.strokeDashoffset = String(CIRC * (1 - done));
   }
   tick();
   setInterval(tick, 1000);

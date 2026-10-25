@@ -148,3 +148,7 @@ See **[BUILDING.md](BUILDING.md)**. `npm test` runs the unit tests.
 ## License
 
 MIT (see [LICENSE](LICENSE)). Made by Spread Sheet King.
+
+## Credits
+
+Pet icons: Microsoft's [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (3D), MIT License, Copyright (c) Microsoft Corporation. The licence is in `pet-icons/LICENSE`.

@@ -5,6 +5,15 @@
 # opens it. Your settings live in ~/Library/Application Support and carry over.
 
 cd "$(dirname "$0")" || exit 1
+
+# 0.59.1 put the pet pictures in an "icons" folder, which electron-builder
+# takes for the app's own icon (and stops: "doesn't contain icons"). They live
+# in pet-icons now; unzipping over the folder leaves the old one, so it goes
+# here: icons/pets, then icons only if that left it empty.
+if [ -f icons/pets/pig.png ]; then
+  rm -rf icons/pets
+  rmdir icons 2>/dev/null || true # not empty: something of yours, left alone
+fi
 EV="32.3.3"
 APPNAME="SSK's Garden Buddy"
 

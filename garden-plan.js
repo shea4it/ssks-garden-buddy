@@ -122,19 +122,8 @@ function plan(plants, occupied) {
     // Beside both kinds: a cleansed crop can go Dawn again (Dawns come twice
     // as often as Amber Moons) unless you step out during Dawns.
     if (nextToMoon && nextToDawn) t.both = true;
-    // Cleanse: Dawn mutations next to a Moonbinder. The whole plant is
-    // cleansed, so what the Amber ones would lose counts against it.
-    if (nextToMoon) {
-      const dawnSlots = ripe.filter((s) => s.lunar === 'dawnlit' || s.lunar === 'dawnbound');
-      if (dawnSlots.length) {
-        const up = dawnSlots.reduce((a, s) => a + withLunar(s, 'amberbound') - s.value, 0);
-        const down = ripe.filter((s) => s.lunar === 'amberlit' || s.lunar === 'amberbound').reduce((a, s) => a + s.value - withLunar(s, null), 0);
-        if (up - down > 0) {
-          t.cleanseGain = up - down;
-          t.cleanseWhy = `${dawnSlots.length} crop${dawnSlots.length === 1 ? ' is' : 's are'} ${dawnSlots[0].lunar === 'dawnbound' ? 'Dawnbound' : 'Dawnlit'}, which blocks Amberbound here`;
-        }
-      }
-    }
+    // (v0.56.5: no cleanse suggestions; the owner found them confusing,
+    // and players know when to use a Crop Cleanser.)
     // Pot: Amberlit crops away from a Moonbinder. Which ones get the open
     // spots is decided below, once all are known.
     if (moons && !nextToMoon && !isBinder) {
@@ -162,25 +151,11 @@ function plan(plants, occupied) {
     return t;
   });
 
-  // A to-do has to be worth a Crop Cleanser or a Planter Pot: at least
+  // A to-do has to be worth a Planter Pot: at least
   // 0.1 % of the garden's value (1M at the least). Smaller ones keep their
   // own step and just note the gain.
   const total = tiles.reduce((acc, t) => acc + t.value, 0);
   const worth = Math.max(1e6, total * 0.001);
-  for (const t of tiles) {
-    if (!t.cleanseGain) continue;
-    if (t.cleanseGain >= worth) {
-      t.step = 'cleanse';
-      t.gain = t.cleanseGain;
-      t.why = [t.cleanseWhy];
-      if (t.both) t.why.push('It\'s also beside a Dawnbinder, and Dawns come twice as often as Amber Moons: after cleansing, step out during Dawns (Weather tab) until it\'s Amberlit, or it may go Dawn again');
-      delete t.potGain;
-    } else {
-      t.small = t.cleanseGain;
-    }
-    delete t.cleanseGain;
-    delete t.cleanseWhy;
-  }
   for (const t of tiles) {
     if (t.potGain && t.potGain < worth) {
       t.small = Math.max(t.small || 0, t.potGain);
@@ -191,7 +166,7 @@ function plan(plants, occupied) {
   // Only as many pots as there are open spots beside a Moonbinder, best
   // first. The rest keep their own step and say what a spot there would
   // gain ("free up a spot").
-  const potting = tiles.filter((t) => t.potGain > 0 && t.step !== 'cleanse').sort((x, y) => y.potGain - x.potGain);
+  const potting = tiles.filter((t) => t.potGain > 0).sort((x, y) => y.potGain - x.potGain);
   potting.forEach((t, n) => {
     if (n < openBesideMoon.length) {
       t.step = 'pot';

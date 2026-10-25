@@ -8,6 +8,7 @@ const {
   Menu,
   shell,
   powerSaveBlocker,
+  powerMonitor,
   Notification,
   session,
   dialog,
@@ -35,6 +36,65 @@ function logError(where, err) {
 }
 process.on('uncaughtException', (err) => logError('app', err));
 process.on('unhandledRejection', (err) => logError('app (promise)', err));
+
+/* How long the app's own work takes (v0.73.1; the owner's game froze while
+ * he moved plants). This process is Chromium's browser process: while it's
+ * busy, no window (the game's included) gets new frames or input. So each
+ * game report's handling is timed, by part, settings writes are timed, and
+ * a 100 ms heartbeat notes any stall. All of it goes in a saved sample. */
+const PERF = { since: Date.now(), status: { n: 0, total: 0, max: 0 }, parts: {}, slow: [], stalls: [], stallCount: 0, maxStall: 0, writes: { n: 0, total: 0, max: 0, bytes: 0 } };
+function perfPart(parts, name, t0) {
+  const t = performance.now();
+  parts[name] = (parts[name] || 0) + (t - t0);
+  return t;
+}
+function perfStatus(parts, total) {
+  const st = PERF.status;
+  st.n += 1;
+  st.total += total;
+  st.max = Math.max(st.max, total);
+  for (const [k, v] of Object.entries(parts)) {
+    const p = PERF.parts[k] || (PERF.parts[k] = { total: 0, max: 0 });
+    p.total += v;
+    p.max = Math.max(p.max, v);
+  }
+  if (total >= 40) {
+    PERF.slow.push({ at: Date.now(), ms: Math.round(total), parts: Object.fromEntries(Object.entries(parts).filter(([, v]) => v >= 5).map(([k, v]) => [k, Math.round(v)])) });
+    if (PERF.slow.length > 20) PERF.slow.shift();
+  }
+}
+{
+  let beat = performance.now();
+  const heart = setInterval(() => {
+    const now = performance.now();
+    const lag = now - beat - 100;
+    beat = now;
+    if (lag < 60) return;
+    PERF.stallCount += 1;
+    PERF.maxStall = Math.max(PERF.maxStall, lag);
+    PERF.stalls.push({ at: Date.now(), ms: Math.round(lag) });
+    if (PERF.stalls.length > 30) PERF.stalls.shift();
+  }, 100);
+  if (heart.unref) heart.unref();
+}
+function perfWrite(ms, bytes) {
+  PERF.writes.n += 1;
+  PERF.writes.total += ms;
+  PERF.writes.max = Math.max(PERF.writes.max, ms);
+  PERF.writes.bytes = bytes;
+}
+function perfView() {
+  const r = (x) => Math.round(x * 10) / 10;
+  const st = PERF.status;
+  return {
+    minutes: r((Date.now() - PERF.since) / 60000),
+    status: { n: st.n, avgMs: st.n ? r(st.total / st.n) : 0, maxMs: r(st.max) },
+    parts: Object.fromEntries(Object.entries(PERF.parts).map(([k, v]) => [k, { avgMs: st.n ? r(v.total / st.n) : 0, maxMs: r(v.max) }])),
+    slow: PERF.slow.slice(),
+    stalls: { count: PERF.stallCount, maxMs: Math.round(PERF.maxStall), recent: PERF.stalls.slice() },
+    writes: { n: PERF.writes.n, avgMs: PERF.writes.n ? r(PERF.writes.total / PERF.writes.n) : 0, maxMs: r(PERF.writes.max), kb: Math.round(PERF.writes.bytes / 1024) },
+  };
+}
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -48,7 +108,9 @@ const cropData = require('./crop-data');
 const abilityData = require('./ability-data');
 const sellTeam = require('./sell-team');
 const harvestRule = require('./harvest-rule');
-const petPlan = require('./pet-plan');
+const stageEngine = require('./stage');
+const hatches = require('./hatches');
+const petRank = require('./pet-rank');
 const weather = require('./weather');
 const gameData = require('./game-data');
 const pity = require('./pity');
@@ -60,11 +122,26 @@ const fun = require('./fun');
 const luck = require('./luck');
 const budget = require('./budget');
 const gardenPlan = require('./garden-plan');
+const { plantMutRows, plantStateAt, pushReading } = require('./plant-muts');
+const questLib = require('./quests');
+const petGrowth = require('./pet-growth');
+const events = require('./events');
 const share = require('./share');
 
 const GAME_URL = 'https://magicgarden.gg';
 const GAME_HOST = 'magicgarden.gg';
 const APP_ID = 'gg.local.magicgardenloader';
+// The app's icon (v0.64.1) for its windows and notifications. The installed
+// .exe carries it too (tools/after-pack.js); this covers running from the
+// folder, Linux, and an .exe the build couldn't brand. Unpacked from the
+// app's archive (asarUnpack) so Windows can read it as a real file.
+function artFile(name) {
+  const inAsar = path.join(__dirname, 'art', name);
+  const unpacked = inAsar.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+  return fs.existsSync(unpacked) ? unpacked : inAsar;
+}
+const APP_ICON = artFile(process.platform === 'win32' ? 'app-icon.ico' : 'app-icon.png');
+const APP_ICON_PNG = artFile('app-icon.png');
 
 // The game window holds two views: the game on the left and, when attached,
 // the panel (control.html, which is also the sound engine) on the right.
@@ -290,6 +367,9 @@ function toastText(a) {
         : 'Nothing they eat is in the trough.',
     };
   }
+  if (a.kind === 'weather' && a.night) {
+    return { title: '🌙 Night has fallen', body: `The Spooky Shop is open over the Wishing Well${a.itemName ? `: ${a.itemName} in stock` : ''}. Nocturnal pets are stronger in the dark.` };
+  }
   if (a.kind === 'weather') {
     return { title: `${a.label} event`, body: 'The weather has changed.' };
   }
@@ -314,6 +394,7 @@ function recordAlerts(list, muted) {
   for (const a of list) {
     let text = toastText(a).title;
     if (a.kind === 'pet') text = `${a.label === 'Rainbow' ? '🌈' : '🟡'} ${a.itemName || 'A pet'} turned a crop ${a.label}`;
+    else if (a.kind === 'weather' && a.night) text = `🌙 Night: the Spooky Shop is open${a.itemName ? ` (${a.itemName} in stock)` : ''}`;
     else if (a.kind === 'weather') {
       const k = weather.BY_ID[weather.kindOf(a.label)];
       text = `${k ? k.emoji : '🌦️'} ${k ? k.label : a.label} started`;
@@ -329,6 +410,145 @@ function recordAlerts(list, muted) {
   sendToControl('alerts:history', settings.alertHistory);
 }
 
+/* Daily quests (v0.65.0; quests.js). The game keeps today's three on your
+ * slot; the panel's Quests tab shows them with a line of help each, from
+ * what the app already knows: the shops, your ripe crops, your eggs, your
+ * pets out, the weather. Each day is kept for 30 days, and an hour before
+ * new quests a gentle reminder goes if any are left (Quests tab switch). */
+const JOURNAL_TOTALS = { crops: 897, pets: 116 }; // wiki: 69 crops x 13, 29 pets x 4
+function questsView(payload) {
+  const dq = payload.dailyQuests;
+  const now = Date.now();
+  const st = watcher ? watcher.status() : null;
+  const bucket = (payload.crops || []).find((x) => /garden/i.test(x.name)) || {};
+  const j = payload.journal;
+  const v = questLib.view(dq, {
+    now,
+    plants: Array.isArray(payload.gardenPlants) ? payload.gardenPlants : null,
+    eggs: Array.isArray(payload.gardenEggs) ? payload.gardenEggs : null,
+    shops: watcher ? watcher.shops() : null,
+    pets: (payload.pets || []).map((p) => ({ name: p.name, species: p.species, abilities: p.abilities || [], strength: p.strength })),
+    weatherKind: weather.kindOf(payload.weather),
+    weather: st ? [st.current, ...(st.upcoming || [])].filter(Boolean) : [],
+    readyValue: Number(bucket.readyValue) || 0,
+    readyRule: harvestLock().mode,
+    journal: j ? { crops: { logged: j.crops, total: Math.max(j.crops, JOURNAL_TOTALS.crops) }, pets: { logged: j.pets, total: Math.max(j.pets, JOURNAL_TOTALS.pets) } } : null,
+    clock,
+  });
+  if (dq && dq.dayUTC) {
+    const s = store.get();
+    s.quests = Object.assign({ days: {}, remindDay: null }, s.quests);
+    if (questLib.recordDay(s.quests.days, dq)) store.save();
+    const days = s.quests.days;
+    v.history = Object.assign(questLib.historySummary(days, questLib.dayUTC(now)), {
+      recent: Object.keys(days).sort().reverse().slice(0, 14).map((k) => ({ day: k, tier: days[k].tier, quests: days[k].quests, bonus: days[k].bonus, bonusClaimed: days[k].bonusClaimed })),
+    });
+  }
+  // The Haunt Quest (v0.66.0): snap haunts with the Camera, at night and in
+  // weather, while the event runs.
+  v.haunt = questLib.hauntView(payload.spookyQuest, { now, night: nightInfo(now), weather: st ? [st.current, ...(st.upcoming || [])].filter(Boolean) : [], ends: HAUNT_ENDS, clock });
+  v.stats = payload.questStats || null;
+  v.journal = j ? { crops: j.crops, pets: j.pets, cropTotal: Math.max(j.crops, JOURNAL_TOTALS.crops), petTotal: Math.max(j.pets, JOURNAL_TOTALS.pets) } : null;
+  return v;
+}
+// An hour before new quests, once a day, if any are left or unclaimed.
+function checkQuestReminder(now = Date.now(), view = null) {
+  const q = view || (gardenStatus && gardenStatus.quests);
+  if (!q || !q.loaded || q.stale || !q.day) return;
+  const s = store.get();
+  if ((s.ui || {}).questRemind === false) return;
+  const left = q.resetAt - now;
+  if (left > 60 * 60000 || left < 45 * 60000) return;
+  s.quests = Object.assign({ days: {}, remindDay: null }, s.quests);
+  if (s.quests.remindDay === q.day) return;
+  const bonusLeft = q.bonus && q.bonus.state !== 'claimed';
+  if (!q.left && !q.toClaim) return;
+  s.quests.remindDay = q.day;
+  store.save();
+  const what = q.left
+    ? `${q.left} quest${q.left === 1 ? '' : 's'} left${bonusLeft && q.bonus.reward ? `, for the bonus (${q.bonus.reward.replace(/^\S+\s/, '')})` : ''}`
+    : `${q.toClaim} reward${q.toClaim === 1 ? '' : 's'} to claim at the Quest Booth`;
+  recordNote(`📜 An hour until new quests: ${what}`);
+  desktopNotify('📜 An hour until new quests', `${what.charAt(0).toUpperCase()}${what.slice(1)}.`, 'quests');
+  return what;
+}
+
+/* Desktop notifications and being away (v0.64.2). Coming back to the
+ * computer (the screen locked, the computer asleep, or nobody touching it
+ * for 10 minutes, when the screen usually goes black) used to bring a pile
+ * of Windows notifications about everything that happened meanwhile. Now,
+ * while you're away, they're held back: alerts still sound and still go in
+ * Recent alerts, and when you're back the panel shows one Welcome back line
+ * instead. For half a minute after you're back the catch-up stays quiet
+ * too. Anything that's already over (a weather that's ended) never pops
+ * up, and no more than three pop up in half a minute. */
+const AWAY_IDLE_S = 600;
+const SETTLE_MS = Number(process.env.MG_SETTLE_MS) || 30000;
+const BURST_MAX = 3;
+const BURST_MS = 30000;
+const presence = { away: null, settleUntil: 0, held: 0, lastTick: Date.now() };
+const toastTimes = [];
+function goAway(why, since) {
+  if (presence.away) return;
+  presence.away = { why, since: Math.min(Date.now(), since || Date.now()) };
+  presence.held = 0;
+  sendToControl('presence', { away: true, since: presence.away.since, why });
+}
+function comeBack() {
+  if (!presence.away) return;
+  const was = presence.away;
+  presence.away = null;
+  presence.settleUntil = Date.now() + SETTLE_MS;
+  // After the catch-up, so what it brought is in Recent alerts too.
+  setTimeout(() => {
+    if (presence.away) return;
+    sendToControl('presence', { away: false, since: was.since, back: Date.now(), held: presence.held, why: was.why });
+  }, SETTLE_MS);
+}
+function checkPresence() {
+  const now = Date.now();
+  const gap = now - presence.lastTick;
+  presence.lastTick = now;
+  // The computer slept: the clock jumped while nothing ran.
+  if (gap > 90000) goAway('asleep', now - gap);
+  let state = 'unknown';
+  try {
+    state = powerMonitor.getSystemIdleState(AWAY_IDLE_S);
+  } catch (err) {
+    state = 'unknown';
+  }
+  if (state === 'locked') goAway('locked', now);
+  else if (state === 'idle') goAway('idle', now - (Number(powerMonitor.getSystemIdleTime()) || AWAY_IDLE_S) * 1000);
+  else if (state === 'active') comeBack();
+}
+function watchPresence() {
+  setInterval(checkPresence, 15000);
+  powerMonitor.on('suspend', () => goAway('asleep', Date.now()));
+  powerMonitor.on('resume', () => setTimeout(checkPresence, 2000));
+  powerMonitor.on('lock-screen', () => goAway('locked', Date.now()));
+  powerMonitor.on('unlock-screen', comeBack);
+}
+function toastAllowed(meta) {
+  const now = Date.now();
+  if (presence.away || now < presence.settleUntil) {
+    presence.held += 1;
+    return false;
+  }
+  if (meta && meta.endsAt && Date.parse(meta.endsAt) <= now) return false;
+  while (toastTimes.length && now - toastTimes[0] > BURST_MS) toastTimes.shift();
+  if (toastTimes.length >= BURST_MAX) return false;
+  toastTimes.push(now);
+  return true;
+}
+// Every desktop notification goes through here.
+function showToast(opts, meta) {
+  if (!Notification.isSupported() || !toastAllowed(meta)) return false;
+  const n = new Notification(Object.assign({ icon: APP_ICON_PNG }, opts));
+  n.on('click', focusGame);
+  n.show();
+  return n;
+}
+
 // A line in Recent alerts that isn't an alert: a team swap, a log-off.
 function recordNote(text, toastTitle) {
   const settings = store.get();
@@ -336,11 +556,7 @@ function recordNote(text, toastTitle) {
   settings.alertHistory = settings.alertHistory.slice(-50);
   store.save();
   sendToControl('alerts:history', settings.alertHistory);
-  if (toastTitle && settings.alerts.popups && !isSnoozed(settings) && Notification.isSupported()) {
-    const toast = new Notification({ title: toastTitle, body: text, silent: true });
-    toast.on('click', focusGame);
-    toast.show();
-  }
+  if (toastTitle && settings.alerts.popups && !isSnoozed(settings)) showToast({ title: toastTitle, body: text, silent: true });
 }
 
 function clock(ms) {
@@ -388,12 +604,8 @@ function handleAlerts(list) {
   }
   try {
     const popups = list.filter((a) => !isSnoozed(settings) || isAlways(settings, a.ruleId));
-    if (settings.alerts.popups && popups.length && Notification.isSupported()) {
-      for (const a of popups.slice(0, 3)) {
-        const toast = new Notification({ ...toastText(a), silent: true });
-        toast.on('click', focusGame);
-        toast.show();
-      }
+    if (settings.alerts.popups && popups.length) {
+      for (const a of popups.slice(0, 3)) showToast({ ...toastText(a), silent: true }, { endsAt: a.endsAt });
     }
     if (gameWindow && !gameWindow.isFocused()) gameWindow.flashFrame(true);
   } catch (err) {
@@ -515,7 +727,6 @@ function sizeEta(status) {
 
 let lastTeamKey = null;
 let pendingTeam = null;
-const teamSends = [];
 
 function teamIsOut(team, pets) {
   const out = new Set((pets || []).map((p) => String(p.id)));
@@ -528,11 +739,9 @@ async function applyTeam(teamId, why) {
   if (!gameWindow || gameWindow.isDestroyed() || parked) return { ok: false, reason: 'The game isn\'t open.' };
   if (!team) return { ok: false, reason: 'That team isn\'t in your game any more.' };
   if (teamIsOut(team, st.pets)) return { ok: true, already: true, team: team.name };
-
-  // A safety valve: never more than 6 swaps in 10 minutes, whatever happens.
+  // (No more "too many swaps" limit, v0.72.2: every swap is your own press,
+  // one press, one swap, and the owner was being locked out of his own.)
   const now = Date.now();
-  while (teamSends.length && now - teamSends[0] > 10 * 60 * 1000) teamSends.shift();
-  if (teamSends.length >= 6) return { ok: false, reason: 'Too many swaps in a short time, so this one was skipped.' };
 
   let result;
   try {
@@ -544,9 +753,217 @@ async function applyTeam(teamId, why) {
     result = { ok: false, reason: String((err && err.message) || err) };
   }
   if (!result || !result.ok) return { ok: false, reason: (result && result.reason) || 'The game page didn\'t answer.' };
-  teamSends.push(now);
   pendingTeam = { id: team.id, name: team.name, why, at: now };
   return { ok: true, team: team.name };
+}
+
+/* Swap to your last team (v0.56.2): the game page works out which lineups
+ * count as teams (garden-observer.js: when the Pet Hutch window closes, a
+ * whole team goes out, you do something else, or you press the button;
+ * v0.72.2, no timer) and sends 'lineup'; the one before is "last". Pressing
+ * it twice swaps back again. Saved, so it survives a restart. */
+function trackTeams(st) {
+  // v0.56.5: "last" is the last settled lineup (the game page works it out
+  // and sends it as 'lineup'); here it's only put on the status.
+  if (!st) return;
+  const t = store.get().teamsLast || {};
+  st.lastTeam = Array.isArray(t.last) && t.last.length && t.lastLabel ? { name: t.lastLabel } : null;
+  pushTeamButton(false);
+}
+// The lineup report from the game page: what settled, and the one before.
+function noteLineup(p) {
+  const clean = (a) => (Array.isArray(a) && a.length ? a.map(String).slice(0, 6) : null);
+  const s = store.get();
+  s.teamsLast = { settled: clean(p && p.settled), last: clean(p && p.last), lastLabel: p && p.lastLabel ? String(p.lastLabel).slice(0, 60) : null };
+  store.save();
+  if (gardenStatus) trackTeams(gardenStatus);
+  if (gardenStatus) sendGardenStatus(gardenStatus);
+}
+// The rankings plus Pet Power by egg (v0.60.4): eggs from the live catalog
+// when the app has read it, ties settled by the eggs you've hatched.
+function rankPets(allPets, prefs, stageId) {
+  const R = petRank.rank(allPets, prefs, { stage: stageId || (gardenStatus && gardenStatus.stage && gardenStatus.stage.id) || null });
+  try {
+    R.eggHunt = petRank.eggHunt(R, petData.allEggs(), allPets);
+  } catch (err) {
+    logError('which eggs to hunt', err);
+    R.eggHunt = null;
+  }
+  return R;
+}
+
+// The overlays on the game use the panel's font (Nunito from v0.61.3, Inter
+// since v0.67.0). The game page can't load the app's files, so the font goes
+// in as data, named 'MG Inter' so it can't clash with the game's own fonts.
+let OVERLAY_FONT_CSS = null;
+function overlayFontCss() {
+  if (OVERLAY_FONT_CSS != null) return OVERLAY_FONT_CSS;
+  try {
+    const b = fs.readFileSync(path.join(__dirname, 'fonts', 'inter-latin-opsz-normal.woff2')).toString('base64');
+    OVERLAY_FONT_CSS = `@font-face{font-family:'MG Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url(data:font/woff2;base64,${b}) format('woff2');}`;
+  } catch (err) {
+    OVERLAY_FONT_CSS = '';
+  }
+  return OVERLAY_FONT_CSS;
+}
+
+/* When the trough runs out (v0.59.0: a countdown that moves). Each pet out
+ * with a measured hunger rate eats when its hunger falls to its eating point
+ * (learned from the last meal seen; until then, as soon as a full meal fits)
+ * and a meal refills its last meal's amount (until seen, its whole max).
+ * Meals are played out in time order, each taking one crop that pet eats,
+ * until the trough is empty: that moment is emptyAt, and the panel and the
+ * game count down to it. A pet with nothing it eats in the trough is listed
+ * with its own time left. */
+function troughForecast(pets, trough) {
+  const out = (Array.isArray(pets) ? pets : []).filter((p) => p && p.known && p.maxHunger > 0);
+  const items = trough && Array.isArray(trough.species) ? trough.species : [];
+  const key = (s) => String(s).toLowerCase().replace(/[^a-z]/g, '');
+  const eats = (p, sp) => (p.diet || []).some((d) => key(sp).startsWith(key(d)));
+  const left = {};
+  for (const sp of items) left[sp] = (left[sp] || 0) + 1;
+  let learning = false;
+  const starving = [];
+  const eaters = [];
+  for (const p of out) {
+    if (!items.some((sp) => eats(p, sp))) {
+      starving.push({ name: p.name || p.species, species: p.species, secondsLeft: p.secondsLeft });
+      continue;
+    }
+    if (!(p.perSecond > 0)) {
+      learning = true;
+      continue;
+    }
+    const meal = p.lastMeal > 0 ? p.lastMeal : p.maxHunger;
+    const eatAt = p.eatAt != null && p.eatAt >= 0 ? p.eatAt : Math.max(0, p.maxHunger - meal);
+    if (!(p.lastMeal > 0) || p.eatAt == null) learning = true;
+    const hunger = Number(p.hunger) || 0;
+    eaters.push({ p, rate: p.perSecond, meal, eatAt, next: Math.max(0, (hunger - eatAt) / p.perSecond) });
+  }
+  const edible = items.filter((sp) => out.some((p) => eats(p, sp))).length;
+  let emptyIn = null;
+  let eaten = 0;
+  let perHour = 0;
+  for (const e of eaters) perHour += (e.rate / e.meal) * 3600;
+  for (let n = 0; n < 2000 && eaters.length; n += 1) {
+    const e = eaters.reduce((a, b) => (b.next < a.next ? b : a));
+    const sp = Object.keys(left).find((s) => left[s] > 0 && eats(e.p, s));
+    if (!sp) {
+      eaters.splice(eaters.indexOf(e), 1);
+      continue;
+    }
+    left[sp] -= 1;
+    eaten += 1;
+    emptyIn = e.next;
+    e.next += e.meal / e.rate;
+  }
+  if (eaten < edible) emptyIn = null;
+  return { items: items.length, edible, perHour: perHour > 0 ? Math.round(perHour * 10) / 10 : null, emptyIn: emptyIn == null ? null : Math.round(emptyIn), emptyAt: emptyIn == null ? null : Date.now() + Math.round(emptyIn) * 1000, learning, starving, pets: out.length };
+}
+function fmtLeft(s) {
+  if (s == null) return '';
+  const m = Math.max(0, Math.round(s / 60));
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+}
+let troughChipKey = '';
+function pushTroughChip(t) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const on = Boolean((store.get().ui || {}).troughHud);
+  const urgent = Boolean(t && ((t.emptyIn != null && t.emptyIn < 30 * 60) || (t.starving || []).some((x) => x.secondsLeft != null && x.secondsLeft < 15 * 60)));
+  const text = !t ? '' : t.emptyIn != null ? `🍽️ ${fmtLeft(t.emptyIn)}` : t.items === 0 ? '🍽️ empty' : '';
+  // The chip counts down to emptyAt itself; resend when the moment shifts
+  // by more than half a minute (each status refines it).
+  const at = t && t.emptyAt ? Math.round(t.emptyAt / 30000) : null;
+  const key = JSON.stringify([on, at, t && t.items === 0, urgent, t && t.learning]);
+  if (key === troughChipKey) return;
+  troughChipKey = key;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setTroughChip && window.__mgLoaderObserver.setTroughChip(${JSON.stringify({ on, text, urgent, emptyAt: t ? t.emptyAt : null, learning: Boolean(t && t.learning) })})`).catch(() => {});
+}
+// The swap button on the game (v0.56.4): on or off, and what it brings back.
+let teamBtnKey = null;
+function pushTeamButton(force) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  // On unless you turn it off (back on by default in v0.63.11).
+  const on = !(store.get().ui && store.get().ui.teamBtn === false);
+  const last = gardenStatus && gardenStatus.lastTeam ? { name: gardenStatus.lastTeam.name } : null;
+  const key = JSON.stringify([on, last]);
+  if (!force && key === teamBtnKey) return;
+  teamBtnKey = key;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setTeamButton && window.__mgLoaderObserver.setTeamButton(${JSON.stringify({ on, last })})`).catch(() => {});
+}
+/* Keys (v0.57.0). The action bar on the game: nine slots on 1-9, each an
+ * action (garden-observer.js ACTIONS); and the app's own shortcuts, each
+ * rebindable in the panel (Extras → Action bar & keys). */
+const DEFAULT_BAR = [
+  { key: { code: 'Digit1' }, action: 'pot', arg: null },
+  { key: { code: 'Digit2' }, action: 'lastTeam', arg: null },
+  { key: { code: 'Digit3' }, action: 'harvestMode', arg: null },
+  { key: { code: 'Digit4' }, action: 'harvestLock', arg: null },
+  { key: { code: 'Digit5' }, action: 'team', arg: { index: 0 } },
+  { key: { code: 'Digit6' }, action: 'team', arg: { index: 1 } },
+  { key: { code: 'Digit7' }, action: 'team', arg: { index: 2 } },
+  { key: { code: 'Digit8' }, action: 'team', arg: { index: 3 } },
+  { key: { code: 'Digit9' }, action: 'team', arg: { index: 4 } },
+];
+// The game's bag slots 1-9 on keys of their own (the bar has 1-9).
+const DEFAULT_BAG_KEYS = Array.from({ length: 9 }, (_, i) => ({ code: `Digit${i + 1}`, shift: true }));
+function bagKeysCfg() {
+  const k = (store.get().ui || {}).bagKeys;
+  return Array.isArray(k) && k.length === 9 ? k : DEFAULT_BAG_KEYS.map((x) => Object.assign({}, x));
+}
+const APP_KEYS = {
+  panel: 'CmdOrCtrl+Shift+D', lastTeam: 'CmdOrCtrl+Shift+T', harvestLock: 'CmdOrCtrl+Shift+L', harvestMode: 'CmdOrCtrl+Shift+M',
+  moneyBox: 'CmdOrCtrl+Shift+B', alerts: 'CmdOrCtrl+Shift+A', snooze: 'CmdOrCtrl+Shift+Z', luck: 'CmdOrCtrl+Shift+P',
+  addHatch: 'CmdOrCtrl+Shift+H', scripts: 'CmdOrCtrl+Shift+S', runScripts: 'CmdOrCtrl+Shift+R',
+};
+function appKey(id) {
+  const k = ((store.get().ui || {}).appKeys) || {};
+  if (k[id] === '') return undefined;
+  return typeof k[id] === 'string' ? k[id] : APP_KEYS[id];
+}
+function actionBarCfg() {
+  const ui = store.get().ui || {};
+  const b = ui.actionBar && typeof ui.actionBar === 'object' ? ui.actionBar : {};
+  return { on: b.on !== false, shape: b.shape === 'line' ? 'line' : 'square', slots: Array.isArray(b.slots) && b.slots.length === 9 ? b.slots : DEFAULT_BAR.map((s) => Object.assign({}, s)) };
+}
+function pushActionBar(extra) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const ui = store.get().ui || {};
+  const v = Object.assign(actionBarCfg(), { potCommand: ui.potCommand || null, bagKeys: bagKeysCfg() }, extra || {});
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setActionBar && window.__mgLoaderObserver.setActionBar(${JSON.stringify(v)})`).catch(() => {});
+  // And where the garden sits in the world, as learned so far (v0.57.6).
+  const calib = ui.mapCalibBySlot && typeof ui.mapCalibBySlot === 'object' && Object.keys(ui.mapCalibBySlot).length ? ui.mapCalibBySlot : Array.isArray(ui.mapCalib) ? ui.mapCalib : [];
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setMapCalib && window.__mgLoaderObserver.setMapCalib(${JSON.stringify(calib)})`).catch(() => {});
+}
+// Quick plant (v0.56.15): the button on the game, on or off, and the seed picked.
+function pushPlantButton(resetPlace) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const ui = store.get().ui || {};
+  const v = { on: ui.plantBtn === true, pick: typeof ui.plantPick === 'string' ? ui.plantPick : null, resetPlace: resetPlace === true };
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setPlantButton && window.__mgLoaderObserver.setPlantButton(${JSON.stringify(v)})`).catch(() => {});
+}
+function pushLineups() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const t = store.get().teamsLast || {};
+  const v = { settled: Array.isArray(t.settled) ? t.settled : null, last: Array.isArray(t.last) ? t.last : null, lastLabel: t.lastLabel || null };
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setLineups && window.__mgLoaderObserver.setLineups(${JSON.stringify(v)})`).catch(() => {});
+}
+async function swapToLastTeam() {
+  if (!gameWindow || gameWindow.isDestroyed() || parked) return { ok: false, reason: 'The game isn\'t open.' };
+  let r;
+  try {
+    r = await gameView.webContents.executeJavaScript('window.__mgLoaderObserver && window.__mgLoaderObserver.restoreLineup ? window.__mgLoaderObserver.restoreLineup() : null', true);
+  } catch (err) {
+    r = { ok: false, reason: String((err && err.message) || err) };
+  }
+  if (!r) return { ok: false, reason: 'The game page didn\'t answer.' };
+  if (r.ok && !r.already) recordNote(`🐾 Back to ${r.team}`);
+  return r;
 }
 
 function checkPendingTeam(st) {
@@ -581,9 +998,16 @@ function checkWeatherTeam(st) {
   if (!cfg || !cfg.enabled || parked || !st.foundSelf || !st.canSend) return;
   const kind = weather.kindOf(st.weather);
   if (kind === null) return; // weather we don't recognise: leave the pets alone
-  const key = `${st.connection}:${kind}`;
+  // The weather alone (v0.63.11): the connection was in the key from the days
+  // of swapping by itself (to swap again after a reconnect); for suggestions
+  // it re-suggested, and notified, on every reconnect mid-weather.
+  const key = kind;
   if (key === lastTeamKey) return;
   lastTeamKey = key;
+  // A suggestion made for weather that's over goes away (v0.74.1): away for
+  // the whole spell, you came back to "Put out your rain team?" under clear
+  // skies. (So does "go back" once new weather starts.)
+  if (teamSuggestion && teamSuggestion.weather && teamSuggestion.weather !== kind) clearTeamSuggestion();
   const teamId = cfg[kind];
   const back = weatherReturn();
   if (kind === 'clear') {
@@ -596,10 +1020,7 @@ function checkWeatherTeam(st) {
       setWeatherReturn(null);
       const weatherTeam = (st.teams || []).find((t) => t.id === back.to);
       if (weatherTeam && teamIsOut(weatherTeam, st.pets)) {
-        const why = '(back from the weather)';
-        applyTeam(back.from, why).then((r) => {
-          if (!r.ok) recordNote(`⚠️ Couldn't switch back ${why}: ${r.reason}`);
-        });
+        suggestTeam(back.from, '(the weather is over)', '☀️', 'clear');
       }
       return;
     } else {
@@ -618,9 +1039,196 @@ function checkWeatherTeam(st) {
   }
   if (!teamId) return;
   const why = kind === 'clear' ? '(the weather cleared)' : `for ${weather.label(kind)}`;
-  applyTeam(teamId, why).then((r) => {
-    if (!r.ok) recordNote(`⚠️ Couldn't switch teams ${why}: ${r.reason}`);
+  suggestTeam(teamId, why, (weather.BY_ID[kind] && weather.BY_ID[kind].emoji) || '🌦️', kind);
+}
+
+/* Team suggestions (v0.60.0, fair play): the app never changes your pets by
+ * itself. When the weather changes, when it's over, or when a team
+ * trigger's goal is met, it suggests the team you chose: on the game (with a
+ * Put out button), in the panel, and as a desktop notification. You press
+ * the button. A suggestion clears once that team is out, or (a weather
+ * one) once its weather is over; its desktop notification goes with it. */
+let teamSuggestion = null;
+let teamToast = null;
+function closeTeamToast() {
+  if (!teamToast) return;
+  try {
+    teamToast.close();
+  } catch (err) {
+    /* already gone */
+  }
+  teamToast = null;
+}
+// The same team for the same reason isn't suggested again within 15
+// minutes, whatever asks (v0.63.11: one Thunderstorm suggested it 3 times).
+let lastSuggested = null;
+// forWeather: the weather a suggestion is for, so it can go when that does.
+function suggestTeam(teamId, why, emoji, forWeather) {
+  const st = gardenStatus;
+  const team = st && (st.teams || []).find((t) => t.id === teamId);
+  if (!team) return;
+  if (teamIsOut(team, st.pets)) {
+    clearTeamSuggestion();
+    return;
+  }
+  const now = Date.now();
+  if (lastSuggested && lastSuggested.teamId === teamId && lastSuggested.why === why && now - lastSuggested.at < 15 * 60000) return;
+  lastSuggested = { teamId, why, at: now };
+  teamSuggestion = { teamId, name: team.name, why: String(why || '').replace(/^\(|\)$/g, ''), emoji: emoji || '🐾', at: Date.now(), weather: forWeather || null };
+  pushTeamSuggestion();
+  closeTeamToast();
+  // "your dawn team", not "your dawn team team" (v0.61.6)
+  const teamWords = /team$/i.test(String(team.name).trim()) ? team.name : `${team.name} team`;
+  recordNote(`💡 Suggested your ${teamWords} ${why}`);
+  teamToast = desktopNotify(`${teamSuggestion.emoji} Put out your ${teamWords}?`, `Suggested ${teamSuggestion.why}. Press Put out on the game to switch.`, 'teams') || null;
+}
+function clearTeamSuggestion() {
+  closeTeamToast();
+  if (!teamSuggestion) return;
+  teamSuggestion = null;
+  pushTeamSuggestion();
+}
+function pushTeamSuggestion() {
+  const contents = gameView && gameView.webContents;
+  if (contents && !contents.isDestroyed()) contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.showTeamSuggest && window.__mgLoaderObserver.showTeamSuggest(${JSON.stringify(teamSuggestion)})`, true).catch(() => {});
+  sendToControl('team:suggest', teamSuggestion);
+}
+// The player's answer (a click on the game or in the panel).
+// (v0.63.7: no "Bring it back" after Not now: the owner found it annoying.)
+async function answerTeamSuggestion(act) {
+  const s = teamSuggestion;
+  if (!s) return { ok: false, reason: 'Nothing suggested right now.' };
+  clearTeamSuggestion();
+  if (act !== 'apply') return { ok: true, dismissed: true };
+  const r = await applyTeam(s.teamId, '(you pressed Put out)');
+  if (!r.ok) recordNote(`⚠️ Couldn't put out ${s.name}: ${r.reason}`);
+  return r;
+}
+// A suggestion goes away once its team is out (you swapped by hand, say).
+function checkTeamSuggestion(st) {
+  if (!teamSuggestion || !st) return;
+  const team = (st.teams || []).find((t) => t.id === teamSuggestion.teamId);
+  if (!team || teamIsOut(team, st.pets)) clearTeamSuggestion();
+}
+
+/* Weather you don't want (v0.60.2): a gentle ping when it starts, once per
+ * spell of it: a note, a desktop notification, and a soft chime in the
+ * panel. Its own switch (logoff.ping, on by default), apart from Ask me to
+ * step away; the weather picked is logoff.kinds. */
+let lastUnwanted = null;
+function checkUnwantedWeather(st) {
+  // Not while the game is away: missing weather reads as clear, and a
+  // reconnect mid-rain would ping again (v0.63.3).
+  if (!st || !st.foundSelf || st.weather == null) return;
+  const l = store.get().logoff || {};
+  const kind = st && weather.kindOf(st.weather);
+  if (!kind || kind === 'clear' || !(l.kinds || []).includes(kind)) {
+    lastUnwanted = null;
+    return;
+  }
+  if (lastUnwanted === kind || l.ping === false || parked) return;
+  lastUnwanted = kind;
+  // That weather's own alert is on: it announces it already (v0.63.7).
+  if (!((store.get().alerts || {}).disabled || []).includes(kind)) return;
+  // Ask me to step away is on: its "about to start" said it (v0.63.11).
+  if (l.enabled) return;
+  const label = weather.label(kind);
+  const emoji = (weather.BY_ID[kind] && weather.BY_ID[kind].emoji) || '🌦️';
+  sendToControl('weather:ping', { kind, label, emoji, quiet: hushNow() });
+  recordNote(`${emoji} ${label} started (weather you don't want)`);
+  desktopNotify(`${emoji} ${label} started`, 'Weather you don\'t want on your garden.', 'weather');
+}
+
+/* Pet-food pots for weather (v0.63.0). Some pet food can't fill a pet's bar
+ * unmutated (the owner's: Lychee, kept in pots). When a weather you'll stay
+ * in for starts (not one you'd rather not have), the game gets a card to
+ * plant those pots out, one press per pot; when it ends, a card to pot them
+ * back up, one press each. The game page counts what's in the bag / garden
+ * and only shows a card if there's something to do. */
+let potWeatherKind;
+// v0.63.4: pet food = what's in your trough (what you actually feed; the
+// potted kinds if the trough's empty). It needs weather if even its largest
+// unmutated size (base x max size) can't fill the bar of a pet you own that
+// eats it. Owner: Lychee 50K x 2 = 100K < Capybara 150K; Cacao 375K fills
+// a Phoenix's 300K; Eggplant 250K fills a Pig's 50K. Your ticks override it.
+// The trough's last contents are remembered while the app runs, so a trough
+// that's just run dry still knows your pet food. Never guessed from pots:
+// you keep all sorts of plants in pots.
+let lastTroughSpecies = [];
+function petFoodCandidates(st) {
+  const trough = [...new Set(((st && st.trough && st.trough.species) || []).filter(Boolean))];
+  if (trough.length) lastTroughSpecies = trough;
+  return lastTroughSpecies.slice();
+}
+function petFoodSuggested(st) {
+  const CROPS = cropData.CROPS || {};
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+  const byNorm = {};
+  for (const k of Object.keys(CROPS)) byNorm[norm(k)] = CROPS[k];
+  const owned = [...new Set(((st && st.allPets) || []).map((p) => p.species))];
+  return petFoodCandidates(st).filter((crop) => {
+    const c = byNorm[norm(crop)];
+    if (!c) return false;
+    const most = c[0] * (c[1] || 1);
+    return owned.some((sp) => {
+      const e = petData.PETS[sp];
+      return e && (e[1] || []).some((x) => norm(x) === norm(crop)) && most < e[0];
+    });
   });
+}
+function petFoodNeedsWeather(st) {
+  const ui = store.get().ui || {};
+  return Array.isArray(ui.potWeatherSpecies) ? ui.potWeatherSpecies : petFoodSuggested(st);
+}
+function checkPotWeather(st) {
+  // Only while the game is found and saying what the weather is: missing
+  // weather reads as clear, so a disconnect would look like it ended
+  // (v0.63.3).
+  if (!st || !st.foundSelf || st.weather == null) return;
+  const kind = weather.kindOf(st.weather) || 'clear';
+  if (potWeatherKind === undefined) {
+    potWeatherKind = kind;
+    return;
+  }
+  if (kind === potWeatherKind) return;
+  const prev = potWeatherKind;
+  potWeatherKind = kind;
+  // Off unless you turn it on (v0.63.4).
+  if (parked || (store.get().ui || {}).potWeather !== true) return;
+  const unwanted = new Set((store.get().logoff || {}).kinds || []);
+  const species = petFoodNeedsWeather(st);
+  if (!species.length) return;
+  const info = (k) => ({ kind: k, label: weather.label(k), emoji: (weather.BY_ID[k] && weather.BY_ID[k].emoji) || '🌦️' });
+  let msg = null;
+  if (kind !== 'clear' && !unwanted.has(kind)) msg = Object.assign({ mode: 'plant', species }, info(kind));
+  else if (prev && prev !== 'clear' && !unwanted.has(prev)) msg = Object.assign({ mode: 'pick', species }, info(prev));
+  if (!msg) return;
+  const contents = gameView && gameView.webContents;
+  if (contents && !contents.isDestroyed()) contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.potWeather && window.__mgLoaderObserver.potWeather(${JSON.stringify(msg)})`, true).catch(() => {});
+}
+
+/* Desktop notifications (v0.60.0): weather (step away, it's over) and team
+ * suggestions, each with its own switch (ui.desktopNotify). Clicking one
+ * brings the app to the front. */
+// Quiet hours or a snooze (v0.61.5): the newer pings make no sound then
+// (their notes and notifications still show, silently).
+function hushNow() {
+  try {
+    const s = store.get();
+    return Boolean(alerts.inQuietHours(s) || isSnoozed(s));
+  } catch (err) {
+    return false;
+  }
+}
+function desktopNotify(title, body, kind, meta) {
+  try {
+    const cfg = Object.assign({ on: true, weather: true, teams: true, quests: true }, (store.get().ui || {}).desktopNotify);
+    if (!cfg.on || (kind && cfg[kind] === false)) return;
+    return showToast({ title: String(title).slice(0, 120), body: String(body || '').slice(0, 240), silent: hushNow() }, meta);
+  } catch (err) {
+    logError('desktop notification', err);
+  }
+  return false;
 }
 
 /* ================================================================== *
@@ -701,9 +1309,7 @@ function checkTriggers(st) {
     const team = (st.teams || []).find((t) => t.id === rule.teamId);
     if (!team || teamIsOut(team, st.pets)) continue;
     swapped = true;
-    applyTeam(rule.teamId, `(${describeTrigger(rule)})`).then((r) => {
-      if (!r.ok) recordNote(`⚠️ Couldn't switch teams (${describeTrigger(rule)}): ${r.reason}`);
-    });
+    suggestTeam(rule.teamId, `(${describeTrigger(rule)})`, '🎯');
   }
   return swapped;
 }
@@ -719,7 +1325,73 @@ function checkTriggers(st) {
 
 let parkTimer = null;
 let rejoinTimer = null;
-let skipEvent = null;   // an event you chose to stay in for (pressed "Rejoin now")
+/* Spells of weather (v0.64.0). One question per spell of weather you don't
+ * want, matched to the feed's own start time. stayedIn is the spell you
+ * stayed in for: you pressed Stay in, didn't answer (that's staying in
+ * too), or rejoined by hand mid-weather. feedSpells keeps the feed's last
+ * spell of each kind after it ends: the game keeps reporting a weather for
+ * a little while after the feed has moved on, and that's the same spell,
+ * over, not a new one to ask about. */
+let stayedIn = null; // { kind, startsAt, endsAt, at, synthetic }
+const feedSpells = {};
+const SPELL_GRACE_MS = 5 * 60000;
+// synthetic: the spell was the app's stand-in while the feed was silent (it
+// has no end time), so its start time is made up.
+function stayIn(kind, startsAt, endsAt, synthetic) {
+  if (!kind) return;
+  stayedIn = { kind, startsAt: startsAt || null, endsAt: endsAt || null, at: Date.now(), synthetic: Boolean(synthetic || !endsAt) };
+}
+function isStayedIn(e) {
+  if (!stayedIn || !e || stayedIn.kind !== e.kind) return false;
+  if (e.startsAt && stayedIn.startsAt === e.startsAt) return true;
+  // Two spells from the feed are the same only by their start time. With a
+  // stand-in on either side (the feed went quiet, or came back), it's the
+  // same spell if you answered just before it started or during it.
+  if (!(e.synthetic || stayedIn.synthetic)) return false;
+  const start = Date.parse(e.startsAt);
+  const end = Date.parse(e.endsAt);
+  if (!Number.isFinite(start)) return false;
+  return stayedIn.at >= start - 3 * 60000 && (!Number.isFinite(end) || stayedIn.at <= end + SPELL_GRACE_MS);
+}
+function noteFeedSpell(cur) {
+  if (cur && cur.kind && cur.kind !== 'clear' && cur.startsAt) feedSpells[cur.kind] = { kind: cur.kind, startsAt: cur.startsAt, endsAt: cur.endsAt };
+}
+// The feed's spell of this kind that's on now (from two minutes before its
+// start to five after its end), if there is one.
+function spellNow(kind, now) {
+  const status = watcher ? watcher.status() : null;
+  const evs = [status && status.current, ...((status && status.upcoming) || []), feedSpells[kind]];
+  for (const e of evs) {
+    if (!e || e.kind !== kind || !e.startsAt) continue;
+    const s = Date.parse(e.startsAt);
+    const en = Date.parse(e.endsAt) || s + 10 * 60000;
+    if (now >= s - 2 * 60000 && now <= en + SPELL_GRACE_MS) return e;
+  }
+  return null;
+}
+let gameSpell = null; // the game's report standing in for the feed, kept steady
+
+// Step away now (v0.64.2): the weather you're stepping away from. The feed's
+// weather that's on; else the game's own (the feed can lag), with its end
+// time when the feed knows the spell; else weather starting within 10
+// minutes (stepping away a little early). Null: clear skies, a break.
+const STEP_EARLY_MS = 10 * 60000;
+function weatherToStepAwayFrom(now, feed, game) {
+  const st = feed !== undefined ? feed : watcher ? watcher.status() : null;
+  const gs = game !== undefined ? game : gardenStatus;
+  const real = (e) => e && e.kind && e.kind !== 'clear';
+  const cur = st && st.current;
+  if (real(cur) && !(Date.parse(cur.endsAt) <= now)) return cur;
+  const gk = gs && gs.connected !== false ? gs.weatherKind : null;
+  if (gk && gk !== 'clear') {
+    const spell = spellNow(gk, now);
+    if (spell && !(Date.parse(spell.endsAt) <= now)) return spell;
+    return { kind: gk, startsAt: null, endsAt: null };
+  }
+  return ((st && st.upcoming) || []).find((e) => real(e) && Date.parse(e.startsAt) - now <= STEP_EARLY_MS && !(Date.parse(e.endsAt) <= now)) || null;
+}
+// A step-away with no weather to wait out (Step away now on a clear sky).
+const isBreak = (p) => !p || !p.kind || p.kind === 'clear';
 
 function logoffKinds() {
   const l = store.get().logoff;
@@ -732,7 +1404,7 @@ function sendParked() {
 
 function park(kind, untilIso, eventKey, manual) {
   if (!gameWindow || gameWindow.isDestroyed()) return;
-  if (!manual && eventKey && eventKey === skipEvent) return;
+  if (!manual && eventKey && isStayedIn({ kind, startsAt: eventKey, endsAt: untilIso })) return;
   const until = Date.parse(untilIso) || null;
   if (parked) {
     if (until && !parked.until) parked.until = until;
@@ -743,13 +1415,13 @@ function park(kind, untilIso, eventKey, manual) {
   const label = kind && kind !== 'clear' ? weather.label(kind) : 'a break';
   parked = { kind, label, until, since: Date.now(), eventKey: eventKey || null, manual: Boolean(manual) };
   clearTimeout(parkTimer);
-  const autoBack = !manual && store.get().logoff.rejoin;
+  const autoBack = false; // v0.60.0: you press Rejoin
   showParkedPage();
   recordNote(
     manual
-      ? '🚪 Logged off (you pressed Log off now)'
-      : `🚪 Logged off for ${label}${until && autoBack ? `, back about ${clock(until + 10000)}` : ''}`,
-    manual ? null : `Logged off for ${label}`
+      ? `🚪 Stepped away${kind && kind !== 'clear' ? ` for ${label}` : ''} (you pressed Step away now)`
+      : `🚪 Stepped away for ${label}${until && autoBack ? `, back about ${clock(until + 10000)}` : ''}`,
+    manual ? null : `Stepped away for ${label}`
   );
   sendParked();
   scheduleRejoin();
@@ -759,47 +1431,114 @@ function park(kind, untilIso, eventKey, manual) {
 // time becomes known, so its countdown is right.
 function showParkedPage() {
   if (!parked || !gameWindow || gameWindow.isDestroyed()) return;
-  const autoBack = !parked.manual && store.get().logoff.rejoin;
+  const autoBack = false; // v0.60.0: you press Rejoin
   gameView.webContents.loadFile(path.join(__dirname, 'parked.html'), {
+    // v0.60.3: a big countdown, then "Safe to join" (the page turns over by
+    // itself at the end time; over=1 once the app knows it's over).
     query: {
       weather: parked.label,
       emoji: (weather.BY_ID[parked.kind] && weather.BY_ID[parked.kind].emoji) || '🌙',
       until: parked.until ? String(parked.until) : '',
+      since: String(parked.since || Date.now()),
+      kind: parked.kind || '',
+      over: parked.overSaid ? '1' : '',
+      start: parked.eventKey && Date.parse(parked.eventKey) ? String(Date.parse(parked.eventKey)) : '',
+      reconnect: parked.autoBack ? '1' : '',
+      ...nowWeatherQuery(),
       rejoin: autoBack ? '1' : '0',
     },
   });
 }
 
+// v0.60.0: no coming back by itself. When the weather's over, it says so
+// (a note, a desktop notification, the page's Rejoin) and you press Rejoin.
 function scheduleRejoin() {
   clearTimeout(rejoinTimer);
-  if (!parked || parked.manual || !parked.until || !store.get().logoff.rejoin) return;
-  const wait = Math.max(1000, parked.until + 10000 - Date.now());
-  rejoinTimer = setTimeout(() => rejoin(false), wait);
+  if (isBreak(parked) || !parked.until) return;
+  const wait = Math.max(1000, parked.until + 5000 - Date.now());
+  rejoinTimer = setTimeout(weatherOver, wait);
+}
+function weatherOver() {
+  if (!parked || parked.overSaid) return;
+  parked.overSaid = true;
+  // You pressed "Reconnect when it ends" for this weather (v0.60.5).
+  if (parked.autoBack) {
+    const label = parked.label;
+    // One note and one notification (v0.63.7: it used to say it three ways).
+    recordNote(`👋 Back in the game: ${label} is over (you asked to reconnect)`);
+    desktopNotify('👋 Back in the game', `${label}'s over: reconnected, as you asked.`, 'weather');
+    rejoin(false, true);
+    return;
+  }
+  recordNote(`☀️ ${parked.label} is over: safe to join`);
+  desktopNotify('☀️ Safe to join!', `${parked.label}'s over. Press Join the game whenever you're ready.`, 'weather');
+  showParkedPage();
+  sendToControl('weather:safe', { label: parked.label, emoji: (weather.BY_ID[parked.kind] && weather.BY_ID[parked.kind].emoji) || '🌦️', quiet: hushNow() });
+  sendParked();
 }
 
-function rejoin(byHand) {
+function rejoin(byHand, quiet) {
   clearTimeout(rejoinTimer);
   if (!parked) return;
   const was = parked;
-  if (byHand && was.eventKey) skipEvent = was.eventKey;
+  if (byHand && was.eventKey) stayIn(was.kind, was.eventKey, was.until ? new Date(was.until).toISOString() : null);
   parked = null;
   lastTeamKey = null;
-  recordNote(byHand || was.manual ? '👋 Back in the game' : `👋 Back in the game, ${was.label} is over`);
+  if (!quiet) recordNote(byHand || was.manual ? '👋 Back in the game' : `👋 Back in the game, ${was.label} is over`);
   sendParked();
   if (gameWindow && !gameWindow.isDestroyed()) gameView.webContents.loadURL(GAME_URL);
 }
 
 // Called with every shop-feed status. Parks now if chosen weather is on, or
 // sets a timer to park shortly before the next one starts.
+// The game's weather right now, for the stepped-away page (v0.61.1): it
+// follows the game's weather while you're out (rainy if it's raining).
+function nowWeatherInfo(cur) {
+  const c = cur || (watcher && watcher.status().current) || null;
+  const kind = c && c.kind && c.kind !== 'clear' ? c.kind : '';
+  return { kind, label: kind ? weather.label(kind) : '', emoji: kind ? (weather.BY_ID[kind] && weather.BY_ID[kind].emoji) || '' : '', endsAt: kind ? Date.parse(c.endsAt) || 0 : 0 };
+}
+function nowWeatherQuery() {
+  const w = nowWeatherInfo();
+  return { now: w.kind, nowLabel: w.label, nowEmoji: w.emoji, nowEnds: w.endsAt ? String(w.endsAt) : '' };
+}
+let lastNowPushed = '';
+function pushNowWeather(cur) {
+  if (!parked || !gameView || gameView.webContents.isDestroyed()) return;
+  const w = nowWeatherInfo(cur);
+  const key = JSON.stringify(w);
+  if (key === lastNowPushed) return;
+  lastNowPushed = key;
+  gameView.webContents.executeJavaScript(`window.__nowWeather && window.__nowWeather(${key})`).catch(() => {});
+}
+
+// When to ask about weather you don't want (v0.63.9): usually the lead plus
+// 20 seconds to answer before it starts; but when a Dawn or Amber Moon runs
+// right up to it (still on within a minute of it starting), only 10 seconds
+// before: you almost never want to leave a moon event early.
+const MOON_KINDS = new Set(['dawn', 'amber']);
+function moonRunsUpTo(next, events) {
+  const start = Date.parse(next && next.startsAt);
+  if (!Number.isFinite(start)) return false;
+  return (events || []).some((e) => e && e !== next && MOON_KINDS.has(e.kind)
+    && Date.parse(e.startsAt) < start && Date.parse(e.endsAt) >= start - 60000);
+}
+function stepAskAt(next, events, lead) {
+  const start = Date.parse(next.startsAt);
+  return moonRunsUpTo(next, events) ? start - 10000 : start - lead - STEP_ASK_MS;
+}
+
 function planLogoff(status) {
   clearTimeout(parkTimer);
   const kinds = logoffKinds();
   if (!status) return;
   const now = Date.now();
   const cur = status.current;
+  noteFeedSpell(cur);
+  pushNowWeather(cur);
 
   if (parked) {
-    if (parked.manual) return;
+    if (isBreak(parked)) return;
     // Parked by the live game before the feed knew the end time: take it now.
     if (!parked.until && cur && cur.kind === parked.kind) {
       parked.until = Date.parse(cur.endsAt) || null;
@@ -809,17 +1548,16 @@ function planLogoff(status) {
       scheduleRejoin();
       return;
     }
-    // Still no end time, the feed shows the weather has moved on, and it's
-    // been a couple of minutes: come back.
-    if (!parked.until && (!cur || cur.kind !== parked.kind) && now - parked.since > 120000 && store.get().logoff.rejoin) {
-      rejoin(false);
-    }
+    // The weather's over (v0.60.0): say so; you press Rejoin.
+    const over = parked.until ? now >= parked.until : (!cur || cur.kind !== parked.kind) && now - parked.since > 120000;
+    if (over) weatherOver();
     return;
   }
   if (!kinds.size) return;
 
+  // Chosen weather is on: ask (v0.60.0: the app never steps out by itself).
   if (cur && cur.kind && kinds.has(cur.kind) && Date.parse(cur.endsAt) > now) {
-    park(cur.kind, cur.endsAt, cur.startsAt);
+    if (!stepAsk && !isStayedIn(cur)) askStepOut(cur, now);
     return;
   }
 
@@ -828,12 +1566,12 @@ function planLogoff(status) {
   if (next) {
     // Already asking about this one: its own timer carries on.
     if (stepAsk && stepAsk.eventKey === next.startsAt) return;
-    if (skipEvent && skipEvent === next.startsAt) return;
-    const at = Date.parse(next.startsAt) - lead;
-    if (at - now < 6 * 60 * 60 * 1000) {
-      // 20 seconds before stepping out, ask (Confirm / Ignore); no answer
-      // steps out as before.
-      parkTimer = setTimeout(() => askStepOut(next, at), Math.max(0, at - STEP_ASK_MS - now));
+    if (isStayedIn(next)) return;
+    const askAt = stepAskAt(next, [cur, ...(status.upcoming || [])], lead);
+    if (askAt - now < 6 * 60 * 60 * 1000) {
+      // Shortly before it starts, ask (Step away / Ignore). No answer: nothing
+      // happens (v0.60.0); the card stays until the weather starts.
+      parkTimer = setTimeout(() => askStepOut(next, askAt), Math.max(0, askAt - now));
     }
   }
 }
@@ -849,22 +1587,76 @@ if (process.env.MG_TEST_DIR) {
     askStepOut: (next, at) => askStepOut(next, at),
     stepAsk: () => (stepAsk ? { label: stepAsk.label, until: stepAsk.until, eventKey: stepAsk.eventKey } : null),
     parked: () => parked,
-    skipEvent: () => skipEvent,
+    skipEvent: () => (stayedIn ? stayedIn.startsAt : null),
+    stayedIn: () => stayedIn,
+    checkLogoffFromGame: (w) => checkLogoffFromGame(Object.assign({}, gardenStatus, { weather: w })),
+    noteFeedSpell: (e) => noteFeedSpell(e),
+    stepOutAnswer: (act) => stepOutAnswer(act),
     rejoin: () => rejoin(true),
+    weatherOver: () => weatherOver(),
+    recheckWeatherTeam: (connection) => checkWeatherTeam(Object.assign({}, gardenStatus, { connection })),
+    suggestedAt: () => (lastSuggested ? lastSuggested.at : null),
+    plantMutRows: (plants) => plantMutRows(plants),
+    plantStateAt: (h, end) => plantStateAt(h, end),
+    recordMutations: (st, t) => recordMutations(st, t),
+    autoBack: () => Boolean(parked && parked.autoBack),
+    weatherToStepAwayFrom: (now, feed, game) => weatherToStepAwayFrom(now, feed, game),
+    goAway: (why, since) => goAway(why, since),
+    checkQuestReminder: (now, view) => checkQuestReminder(now, view),
+    noteNight: (data, now) => noteNight(data, now),
+    nightInfo: (now) => nightInfo(now),
+    themeNow: (now) => themeNow(now),
+    pushMapPin: () => pushMapPin(true),
+    pushHatch: () => pushHatch(true),
+    // The quest reminder test runs at any hour: in the last hour before the
+    // reset the real reminder may already have gone today.
+    perfView: () => perfView(),
+    resetQuestRemind: () => {
+      const q = store.get().quests;
+      if (q) q.remindDay = null;
+    },
+    lastHatchBlocked: () => lastHatchBlocked,
+    luckRaw: () => luckState(),
+    recoverTypedLuck: () => recoverTypedLuck(),
+    backupsDir: () => backupsDir(),
+    alertHistory: () => store.get().alertHistory,
+    noteEventSign: (id, now) => noteEventSign(id, now),
+    resetEvents: () => {
+      store.get().events = {};
+    },
+    resetNight: () => {
+      nightOpenSince = null;
+      const s = store.get();
+      s.night = { lastStart: null, lastEnd: null };
+    },
+    petLookup: (sp) => petData.lookup(sp),
+    catalogInfo: () => catalogInfo,
+    questsView: (payload) => questsView(payload),
+    comeBack: () => comeBack(),
+    presence: () => ({ away: presence.away, held: presence.held, settling: Date.now() < presence.settleUntil }),
+    toastAllowed: (meta) => toastAllowed(meta),
+    resetToasts: () => {
+      presence.settleUntil = 0;
+      toastTimes.length = 0;
+    },
+    stepAwayNowFor: (ev) => park(ev.kind, ev.endsAt || null, ev.startsAt || null, true),
   });
 }
 let stepAsk = null;
 function askStepOut(next, at) {
-  if (parked || stepAsk || (skipEvent && skipEvent === next.startsAt)) return;
+  if (parked || stepAsk || isStayedIn(next)) return;
   const now = Date.now();
   const start = Date.parse(next.startsAt) || now + STEP_ASK_MS;
-  const until = Math.min(Math.max(at || now, now + STEP_ASK_MS), Math.max(now + 1000, start));
+  // The card stays up until the weather starts (or, if it's on already,
+  // until it ends); then it just goes away.
+  const end = Date.parse(next.endsAt) || start + 10 * 60 * 1000;
+  const until = start > now ? Math.max(start, now + STEP_ASK_MS) : Math.max(end, now + STEP_ASK_MS);
   const label = weather.label(next.kind);
   const emoji = (weather.BY_ID[next.kind] && weather.BY_ID[next.kind].emoji) || '🌦️';
   stepAsk = { kind: next.kind, endsAt: next.endsAt, eventKey: next.startsAt, until, label, emoji };
   stepAsk.timer = setTimeout(() => stepOutAnswer('timeout'), Math.max(0, until - now));
   showStepAsk();
-  sendToControl('stepout:ask', { label, emoji, until });
+  desktopNotify(`${emoji} ${label} ${start > now ? 'is about to start' : 'is on'}`, 'You set this weather to step away from. Press Step away on the game, or Stay in.', 'weather', { endsAt: next.endsAt });
 }
 function showStepAsk() {
   const contents = gameView && gameView.webContents;
@@ -878,10 +1670,15 @@ function stepOutAnswer(act) {
   clearTimeout(ask.timer);
   stepAsk = null;
   showStepAsk();
-  sendToControl('stepout:ask', null);
   if (act === 'ignore') {
-    skipEvent = ask.eventKey;
-    recordNote(`🌦️ Staying in for ${ask.label} (you pressed Ignore). Stepping out is still on for the next one.`);
+    stayIn(ask.kind, ask.eventKey, ask.endsAt);
+    recordNote(`🌦️ Staying in for ${ask.label} (you pressed Stay in). It'll ask again for the next one.`);
+    return true;
+  }
+  // No answer: nothing happens (v0.60.0), and that's staying in for this
+  // spell (v0.64.0: it used to ask again once the weather started).
+  if (act === 'timeout') {
+    stayIn(ask.kind, ask.eventKey, ask.endsAt);
     return true;
   }
   park(ask.kind, ask.endsAt, ask.eventKey);
@@ -893,10 +1690,23 @@ function stepOutAnswer(act) {
 function checkLogoffFromGame(st) {
   if (parked) return;
   const kind = weather.kindOf(st.weather);
+  if (gameSpell && gameSpell.kind !== kind) gameSpell = null;
   if (!kind || kind === 'clear' || !logoffKinds().has(kind)) return;
-  const cur = watcher && watcher.status().current;
-  const match = cur && cur.kind === kind ? cur : null;
-  park(kind, match ? match.endsAt : null, match ? match.startsAt : null);
+  const now = Date.now();
+  // Ask, don't step out (v0.60.0). Matched to the feed's spell (v0.64.0).
+  const spell = spellNow(kind, now);
+  if (spell) {
+    const end = Date.parse(spell.endsAt);
+    // Over by the feed: the game's still catching up. Never ask about a
+    // weather that's over.
+    if (Number.isFinite(end) && now > end) return;
+    if (!stepAsk && !isStayedIn(spell)) askStepOut(spell, now);
+    return;
+  }
+  // The feed says nothing about it (not loaded, or not answering): one
+  // steady spell for as long as the game reports this weather.
+  if (!gameSpell) gameSpell = { kind, startsAt: new Date(now).toISOString(), endsAt: null, synthetic: true };
+  if (!stepAsk && !isStayedIn(gameSpell)) askStepOut(gameSpell, now);
 }
 
 /* ================================================================== *
@@ -943,10 +1753,16 @@ function enrichPets(st) {
   const matches = weatherMatcher(st);
   st.pets = (st.pets || []).map((p) => {
     const full = all.find((x) => x.id === p.id) || p;
-    return Object.assign({}, describeOne(Object.assign({}, full, p)), { hunger: p.hunger, pct: p.pct, known: p.known, diet: p.diet, troughHasFood: p.troughHasFood, needsFood: p.needsFood, secondsLeft: p.secondsLeft, maxHunger: p.maxHunger });
+    return Object.assign({}, describeOne(Object.assign({}, full, p)), { hunger: p.hunger, pct: p.pct, known: p.known, diet: p.diet, troughHasFood: p.troughHasFood, needsFood: p.needsFood, secondsLeft: p.secondsLeft, maxHunger: p.maxHunger, perSecond: p.perSecond || null, lastMeal: p.lastMeal || null, eatAt: p.eatAt == null ? null : p.eatAt });
   });
   st.allPets = all.map(describeOne);
   st.abilities = abilityData.summarise(st.pets, { weatherMatches: matches });
+  // Time to max strength (v0.66.0), for the Pets tab.
+  try {
+    st.growth = petGrowth.view(st.allPets, st.pets, weather.kindOf(st.weather));
+  } catch (err) {
+    logError('pet growth', err);
+  }
   // Each saved team, as it would be if you swapped it in now.
   st.teamSummaries = (st.teams || []).map((t) => {
     const members = t.members.map((m) => st.allPets.find((p) => p.id === m.petId)).filter(Boolean);
@@ -961,12 +1777,37 @@ function enrichPets(st) {
   st.idealSell = sellTeam.idealSellTeam(st.allPets, matches);
   // The pets out right now, for the reminder to put the best ones out.
   st.idealSell.outNow = sellTeam.fromRows(st.abilities.rows);
-  // Which pet to level next (pet-plan.js, v0.54.5).
+  // Pet rankings (pet-rank.js, v0.58.0): each ability's top 3, every pet's
+  // value by the abilities you tick and weigh, and what to level next.
+  // The weights follow your stage (v0.70.0): worked out here first (it only
+  // reads the garden, coins, pets and sell team), and again below as before.
+  let stageId = null;
   try {
-    st.levelNext = petPlan.recommend(st.allPets);
+    stageId = stageEngine.detect(stageEngine.signalsFrom(st), (store.get().stage || {}).pick).id;
   } catch (err) {
-    logError('level next', err);
-    st.levelNext = null;
+    stageId = null;
+  }
+  try {
+    st.petRank = rankPets(st.allPets, (store.get().ui || {}).petPrefs || {}, stageId);
+  } catch (err) {
+    logError('pet rankings', err);
+    st.petRank = null;
+  }
+  // The trough: when it runs out for the pets out now (v0.58.0).
+  try {
+    st.troughTimer = troughForecast(st.pets, st.trough);
+    pushTroughChip(st.troughTimer);
+  } catch (err) {
+    logError('trough timer', err);
+    st.troughTimer = null;
+  }
+  // Your stage in the game (stage.js, v0.56.0 beta): Auto from milestones,
+  // or the one you picked.
+  try {
+    st.stage = stageEngine.detect(stageEngine.signalsFrom(st), (store.get().stage || {}).pick);
+  } catch (err) {
+    logError('stage', err);
+    st.stage = null;
   }
 }
 
@@ -1146,6 +1987,20 @@ function gardenPlanOf(plants, tiles) {
 // replant doesn't read as mutations lost.
 const MUT_EVERY = 10 * 60 * 1000;
 const MUT_KEEP = 7 * 24 * 6;
+
+/* Plant by plant (v0.64.0), so plants can be left out of the chart: each
+ * plant kind's row [n, h, l, c, w, ch, f, th, d, a, g, r] (the same counts as
+ * a reading, for that kind's crops only; trailing zeros dropped). A reading's
+ * `s` holds only the rows that changed since the reading before it (0 = that
+ * kind is gone); `sf: 1` marks a full set. No `s`: not tracked then. */
+function plantNamesOf(rows) {
+  const out = {};
+  for (const sp of Object.keys(rows || {})) {
+    const found = cropData.lookup(sp);
+    out[sp] = found && found.name ? found.name : String(sp).replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+  return out;
+}
 function recordMutations(st, t) {
   const b = (st.crops || []).find((x) => /garden/i.test(x.name));
   if (!b || !b.total || !b.have) return false;
@@ -1156,18 +2011,15 @@ function recordMutations(st, t) {
   // lines: wet, chilled, frozen, thunder (struck or charged), dawn and amber
   // (lit or bound), gold, rainbow.
   const p = {
-    t, n: b.total, h: b.have.hydro || 0, l: b.have.lunar || 0, c: b.have.color || 0,
+    // Any weather / moon / colour (v0.56.14): since v0.54.7 `have` is the
+    // harvest rule's ("Thundercharged or Frozen"), which made the chart's
+    // totals smaller than their own parts.
+    t, n: b.total, h: (b.any || b.have).hydro || 0, l: (b.any || b.have).lunar || 0, c: (b.any || b.have).color || 0,
     w: mu.wet || 0, ch: mu.chilled || 0, f: mu.frozen || 0, th: (mu.thunderstruck || 0) + (mu.thundercharged || 0),
     d: (mu.dawnlit || 0) + (mu.dawnbound || 0), a: (mu.amberlit || 0) + (mu.amberbound || 0), g: b.gold || 0, r: b.rainbow || 0,
   };
-  const last = h[h.length - 1];
-  if (last && Math.floor(last.t / MUT_EVERY) === Math.floor(t / MUT_EVERY)) {
-    Object.assign(last, p);
-    return false;
-  }
-  h.push(p);
-  if (h.length > MUT_KEEP) h.splice(0, h.length - MUT_KEEP);
-  return true;
+  // Plant by plant (v0.64.0): only what changed since the reading before.
+  return pushReading(h, p, st.plantMuts && typeof st.plantMuts === 'object' ? st.plantMuts : null, MUT_EVERY, MUT_KEEP);
 }
 
 // Each sale against what the app expected (budget.saleCheckStep): the
@@ -1233,7 +2085,62 @@ function shopStatsState() {
   return s.shopStats;
 }
 let statsSaveTimer = null;
+/* Night (v0.66.0; worked out from the game's clock since v0.67.0, see
+ * events.js). The Spooky Shop opening is noted too: it's a fallback for
+ * night, and a sign the Haunt Event is running (for its theme). */
+const NIGHT_LONG_MS = events.NIGHT_LONG_MS;
+let nightOpenSince = null;
+let lastThemeSig = '';
+function noteEventSign(id, now = Date.now()) {
+  const s = store.get();
+  s.events = Object.assign({}, s.events);
+  const prev = Number(s.events[id]) || 0;
+  s.events[id] = now;
+  // Saved at most every 10 minutes (it's a "seen lately" mark).
+  if (now - prev > 10 * 60000) store.save();
+}
+function noteNight(data, now = Date.now()) {
+  const sp = Object.entries((data && data.shops) || {}).find(([id]) => /^spooky/i.test(id));
+  if (!sp) return;
+  const open = Boolean(sp[1] && sp[1].open);
+  const s = store.get();
+  s.night = Object.assign({ lastStart: null, lastEnd: null }, s.night);
+  if (open) noteEventSign('haunt', now);
+  if (open && !nightOpenSince) {
+    // Already open when the app started: it began some time before.
+    const prev = s.night.lastStart;
+    nightOpenSince = prev && now - prev < NIGHT_LONG_MS ? prev : now;
+    if (s.night.lastStart !== nightOpenSince) {
+      s.night.lastStart = nightOpenSince;
+      store.save();
+    }
+  } else if (!open && nightOpenSince) {
+    nightOpenSince = null;
+    s.night.lastEnd = now;
+    store.save();
+  }
+}
+function nightInfo(now = Date.now()) {
+  return events.nightInfo(now, nightOpenSince);
+}
+// The panel's look while an event runs (v0.67.0): its theme, unless the
+// owner switched event themes off (Extras).
+function themeNow(now = Date.now()) {
+  const s = store.get();
+  return events.theme(now, s.events || {}, (s.ui || {}).eventThemes !== false, nightInfo(now));
+}
+// The Haunt Event's end (the devs' note: Mon 9 Nov 2026, 7:00 PM Eastern).
+const HAUNT_ENDS = events.EVENTS.find((e) => e.id === 'haunt').ends;
+function feedStatus(st) {
+  return st ? Object.assign({}, st, { night: nightInfo(), hauntEnds: Date.now() < HAUNT_ENDS ? HAUNT_ENDS : null, theme: themeNow() }) : st;
+}
+
 function onShopFeed(data) {
+  try {
+    noteNight(data);
+  } catch (err) {
+    logError('night', err);
+  }
   if (budget.record(shopStatsState(), data) > 0 && !statsSaveTimer) {
     statsSaveTimer = setTimeout(() => {
       statsSaveTimer = null;
@@ -1295,9 +2202,17 @@ function stepHours(st, upcoming) {
 }
 
 function readyRule() {
-  const b = store.get().budget || {};
-  const r = b.readyRule && typeof b.readyRule === 'object' ? b.readyRule : {};
-  return { size: r.size !== false, color: r.color !== false, hydro: r.hydro !== false, lunar: r.lunar !== false };
+  // "Ready" is the harvest rule (v0.54.7): the Money tab gets its groups as
+  // on / off for its step timings, and the rule in words.
+  const md = harvestLock().mode;
+  const list = (l) => l.map((k) => harvestRule.NAMES[k] || k).join(' or ');
+  return {
+    size: md.size, color: md.color !== 'any', hydro: md.hydro.length > 0, lunar: md.lunar.length > 0, words: harvestRule.describe(md),
+    // Each step in the rule's own words, for the crop-stage track.
+    // Three or more in a group read as the group (v0.56.0: "Wet or Chilled or
+    // Frozen or…" overflowed the track).
+    labels: { color: md.color === 'rainbow' ? 'Rainbow' : 'Gold / Rainbow', hydro: md.hydro.length && md.hydro.length < 3 ? list(md.hydro) : 'Weather', lunar: md.lunar.length && md.lunar.length < 3 ? list(md.lunar) : 'Moon' },
+  };
 }
 function pushReadyRule() {
   const contents = gameView && gameView.webContents;
@@ -1314,6 +2229,10 @@ function budgetContext() {
     now: Date.now(),
     wallet: gardenStatus && gardenStatus.wallet && Number.isFinite(Number(gardenStatus.wallet.coins)) ? Number(gardenStatus.wallet.coins) : undefined,
     gardenWorth: garden && garden.value > 0 ? garden.value : 0,
+    // Crops in your bag, harvested but not sold (v0.63.10).
+    bagWorth: gardenStatus && gardenStatus.inventoryCrops && Number(gardenStatus.inventoryCrops.v) > 0 ? Number(gardenStatus.inventoryCrops.v) : 0,
+    // Steadier estimates (v0.63.10; see budget.steady).
+    steady: true,
     garden: garden ? {
       total: garden.total, special: garden.special, gold: garden.gold, rainbow: garden.rainbow,
       ready: garden.ready || 0, readyValue: garden.readyValue || 0, growingValue: garden.growingValue || 0, growingPotential: garden.growingPotential || 0,
@@ -1326,7 +2245,7 @@ function budgetContext() {
     } : null,
     readyRule: readyRule(),
     // Crops at what you'd get (v0.53.15): a full room (x1.5) with your best
-    // sell pets out, unless that's turned off in Money options.
+    // sell pets out, unless that's turned off under "How crops are counted".
     saleMult: budget.options(store.get()).saleValue ? 1.5 * (gardenStatus && gardenStatus.idealSell && gardenStatus.idealSell.petPart > 1 ? gardenStatus.idealSell.petPart : 1) : 1,
     // false until the garden's report (with ready/growing) has arrived
     gardenLoaded: Boolean(garden && garden.missing),
@@ -1337,6 +2256,27 @@ function budgetContext() {
     inStock: watcher ? watcher.current().filter((i) => /decor/i.test(i.type) && i.price >= 1e6).sort((a, b) => b.price - a.price) : [],
   };
 }
+// What the forecast was built from, every 5 minutes (v0.63.10), kept for
+// samples: if the line jumps, the sample shows which input moved.
+const forecastLog = [];
+function noteForecast(view) {
+  const f = view && view.foresight;
+  if (!f) return;
+  const now = Date.now();
+  const last = forecastLog[forecastLog.length - 1];
+  if (last && now - last.t < 5 * 60000) return;
+  const e = f.estimate || {};
+  const endPt = Array.isArray(f.line) && f.line.length ? f.line[f.line.length - 1] : null;
+  forecastLog.push({
+    t: now, mode: f.mode, wallet: f.wallet, available: f.available,
+    ready: f.garden && f.garden.ready, bag: f.garden && f.garden.bag,
+    pace: f.pace, perCrop: e.perCrop, perCropRaw: e.perCropRaw, perCropSrc: e.perCropSource,
+    rate: e.rate, rateRaw: e.rateRaw, rateSrc: e.rateSource, canMature: e.canMature,
+    endDay: endPt ? endPt[0] : null, endCoins: endPt ? endPt[1] : null,
+  });
+  if (forecastLog.length > 200) forecastLog.splice(0, forecastLog.length - 200);
+}
+
 // The view isn't free (it walks every counted shop item for every alert),
 // and the panel, the money box and purchases all ask for it, so it is
 // reused for a few seconds unless something just changed.
@@ -1344,43 +2284,13 @@ let viewCache = { at: 0, view: null };
 function budgetView(fresh) {
   if (!fresh && viewCache.view && Date.now() - viewCache.at < 3000) return viewCache.view;
   const view = budget.view({ settings: store.get(), ctx: budgetContext() });
+  noteForecast(view);
   // Once the Money tab has earned its unlock it stays unlocked.
   if (view.unlockEarned && !(store.get().budget && store.get().budget.unlocked)) {
     const s = store.get();
     s.budget = Object.assign({}, s.budget, { unlocked: true });
     store.save();
     recordNote('💰 The Money tab has unlocked: a full day of coins in and out has been measured. It gets better with every day of play.', 'Money tab unlocked');
-  }
-  // The buy-everything line: keep your best, and the first time you cross
-  // it, celebrate (confetti over the game, a spoken cheer) and remember when.
-  const ev = view.foresight && view.foresight.everything;
-  if (ev && ev.ratio != null) {
-    const s = store.get();
-    s.budget = s.budget || {};
-    let changed = false;
-    // A real crossing is celebrated: the app has seen you below the line
-    // before, and the Money tab is showing. Someone already past it when the
-    // app first measures (a new install with a big garden) gets the date
-    // noted quietly, not confetti out of nowhere.
-    const prevBest = Number(s.budget.everythingBest) || 0;
-    const wasBelow = prevBest > 0 && prevBest < 1;
-    if (ev.ratio > prevBest + 0.005) {
-      s.budget.everythingBest = Math.round(ev.ratio * 1000) / 1000;
-      changed = true;
-    }
-    if (ev.ratio >= 1 && !s.budget.everythingCrossedAt) {
-      s.budget.everythingCrossedAt = Date.now();
-      ev.crossedAt = s.budget.everythingCrossedAt;
-      changed = true;
-      if (wasBelow && view.unlocked) {
-        recordNote('🏆 You crossed the buy-everything line: you make more a day than buying every alert item and every decoration costs.', 'Buy-everything line crossed!');
-        sendToControl('budget:crossed', { ratio: ev.ratio });
-        const js = fun.script('confetti');
-        const contents = gameView && gameView.webContents;
-        if (js && contents && !contents.isDestroyed() && isGameUrl(contents.getURL())) contents.executeJavaScript(js, true).catch(() => {});
-      }
-    }
-    if (changed) store.save();
   }
   viewCache = { at: Date.now(), view };
   return view;
@@ -1598,6 +2508,68 @@ ipcMain.handle('ui:binderMap', (event, on) => {
   pushMountMap();
   return binderMapOn();
 });
+/* Keep the map on the game (v0.67.2): the view picked in the Garden tab
+ * (ui.gardenMap) stays up over the game; the contextual maps still come up
+ * as before. The value view is made here (the observer doesn't price
+ * crops): each tile's worth as a shade, the ten best glowing gold, like the
+ * Garden tab's. */
+const MAP_VIEWS = ['spots', 'thunder', 'dawn', 'amber', 'value'];
+function alwaysMapOn() {
+  const s = store.get();
+  return Boolean(s.ui && s.ui.alwaysMap === true);
+}
+function mapPinView() {
+  const v = (store.get().ui || {}).gardenMap;
+  return MAP_VIEWS.includes(v) ? v : 'spots';
+}
+function valueMap(st) {
+  const plan = st && st.plan;
+  const tiles = (st && st.gardenTiles) || {};
+  if (!plan || !Array.isArray(plan.tiles)) return null;
+  const byTile = new Map(plan.tiles.map((t) => [t.i, t]));
+  const values = plan.tiles.map((t) => t.value).filter((v) => v > 0);
+  if (!values.length) return null;
+  const lo = Math.log10(Math.max(1, Math.min(...values)));
+  const hi = Math.log10(Math.max(1, ...values));
+  const shade = (v) => {
+    const f = hi > lo ? Math.min(1, Math.max(0, (Math.log10(Math.max(1, v)) - lo) / (hi - lo))) : 1;
+    const mix = (x, y) => Math.round(x + (y - x) * f);
+    return `rgb(${mix(58, 255)},${mix(47, 211)},${mix(26, 92)})`;
+  };
+  const gems = new Set(plan.tiles.filter((t) => t.value > 0).sort((a, b) => b.value - a.value).slice(0, 10).map((t) => t.i));
+  const looks = [];
+  for (let i = 0; i < 200; i += 1) {
+    const t = byTile.get(i);
+    const k = tiles[i] || tiles[String(i)];
+    looks.push(t && t.value > 0 ? { v: shade(t.value), gem: gems.has(i) } : { k: k ? String(k[0] || 'o') : null });
+  }
+  return {
+    looks,
+    right: `${values.length} plant${values.length === 1 ? '' : 's'}`,
+    sum: 'Brighter tiles are worth more; the ten most valuable glow gold.',
+    key: [['rgb(255,211,92)', '#ffd35c', 'most valuable'], ['rgb(156,129,59)', '', 'middling'], ['rgb(58,47,26)', '', 'least']],
+  };
+}
+let mapPinKey = '';
+let lastHatchBlocked = null;
+function pushMapPin(force = false) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const on = alwaysMapOn();
+  const view = mapPinView();
+  const value = on && view === 'value' ? valueMap(gardenStatus) : null;
+  const msg = JSON.stringify({ on, view, value });
+  if (!force && msg === mapPinKey) return;
+  mapPinKey = msg;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setMapPin && window.__mgLoaderObserver.setMapPin(${msg})`).catch(() => {});
+}
+ipcMain.handle('ui:alwaysMap', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { alwaysMap: Boolean(on) });
+  store.save();
+  pushMapPin(true);
+  return alwaysMapOn();
+});
 ipcMain.handle('ui:spotMap', (event, on) => {
   const s = store.get();
   s.ui = Object.assign({}, s.ui, { spotMap: Boolean(on) });
@@ -1648,9 +2620,83 @@ function luckState() {
   return s.luck;
 }
 
-function sendLuck() {
-  sendToControl('luck:state', luck.view(luckState()));
+/* Counts you typed, back from a backup (v0.72.1). 0.72.0 reset every counter
+ * that hadn't had its result yet, counts the owner had typed included (his
+ * Rainbow pet count, kept by hand from before the app). Once, on the first
+ * start after that: the newest backup made before 0.72.0 gives them back,
+ * plus every pull counted since (luck.recover). Saves upgraded straight from
+ * 0.71 or earlier keep them in migrate and skip this. */
+function recoverTypedLuck() {
+  const l = luckState();
+  if (l.recovered) return [];
+  let found = null;
+  try {
+    found = backup.newestWhere(backupsDir(), (s) => Boolean(s.luck && s.luck.counters && !(s.luck.version >= 2)));
+  } catch (err) {
+    found = null;
+  }
+  const back = found ? luck.recover(l, found.settings.luck) : [];
+  l.recovered = { at: Date.now(), from: found ? found.name : null, keys: back.map((b) => b.key) };
+  store.save();
+  if (back.length) {
+    const d = found.savedAt ? new Date(found.savedAt) : null;
+    const when = d && !Number.isNaN(d.getTime()) ? ` from your backup of ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ' from your backup';
+    const list = back.map((b) => `${b.name} (${b.v.toLocaleString()})`).join(', ');
+    recordNote(`🍀 Your own luck counts are back${when}: ${list}. 0.72.0 had reset counts you typed by mistake; they count on from here.`);
+  }
+  return back;
 }
+
+function sendLuck() {
+  sendToControl('luck:state', luckView());
+  pushHatch();
+}
+
+/* The hatch countdown and egg locks (v0.69.0). Within 5 hatches of a rare,
+ * Gold or Rainbow pet, a small counter shows over the game (and a Hatching
+ * card on Home). Eggs you lock can't be hatched: the game page stops the
+ * hatch and says so, with a button to the locks on the Luck tab. Only you
+ * unlock them. */
+function eggLocks() {
+  const s = store.get();
+  if (!Array.isArray(s.eggLock)) s.eggLock = [];
+  return s.eggLock;
+}
+function luckView() {
+  const v = luck.view(luckState());
+  v.eggLocks = eggLocks().slice();
+  v.watch = luck.hatchWatch(v, eggLocks());
+  return v;
+}
+let hatchKey = '';
+function pushHatch(force = false) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const w = luck.hatchWatch(luck.view(luckState()), eggLocks());
+  const msg = JSON.stringify({ rows: w.rows.slice(0, 4), locks: w.locks, shown: store.get().ui.hatchHud !== false });
+  if (!force && msg === hatchKey) return;
+  hatchKey = msg;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setHatchWatch && window.__mgLoaderObserver.setHatchWatch(${msg})`).catch(() => {});
+}
+ipcMain.handle('ui:hatchHud', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { hatchHud: Boolean(on) });
+  store.save();
+  pushHatch(true);
+  return s.ui.hatchHud;
+});
+ipcMain.handle('luck:eggLock', (event, egg, on) => {
+  const id = String(egg || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+  if (!id) return luckView();
+  const s = store.get();
+  const list = eggLocks().filter((x) => x.toLowerCase() !== id.toLowerCase());
+  if (on) list.push(id);
+  s.eggLock = list.slice(0, 30);
+  store.save();
+  pushHatch(true);
+  sendLuck();
+  return luckView();
+});
 
 // "Primed": the next pull of something is guaranteed. One heads-up per
 // counter per streak, as an alert (so it has a sound, a 🌙 and a switch).
@@ -1666,11 +2712,7 @@ function checkPrimed() {
     const muted = quietFor(settings, 'luckprimed');
     recordAlerts([alert], muted);
     if (!muted) sendToControl('alerts:play', [alert]);
-    if (settings.alerts.popups && Notification.isSupported() && (!isSnoozed(settings) || isAlways(settings, 'luckprimed'))) {
-      const toast = new Notification({ title: '🍀 Bad Luck Protection primed', body: text, silent: true });
-      toast.on('click', focusGame);
-      toast.show();
-    }
+    if (settings.alerts.popups && (!isSnoozed(settings) || isAlways(settings, 'luckprimed'))) showToast({ title: '🍀 Bad Luck Protection primed', body: text, silent: true });
   }
 }
 
@@ -1682,7 +2724,7 @@ function celebrateLuck(events, quiet) {
     if (e.type === 'egg' || e.type === 'pet') {
       hits.push({ counter: e.target === 'gold' ? 'Gold' : e.target === 'rainbow' ? 'Rainbow' : luck.pretty(e.target), kind: e.kind === 'mutation' ? e.target : 'species', species: e.kind === 'species' ? e.target : e.species, egg: e.source, forced: e.forced });
     } else if (e.kind !== 'mutation') {
-      recordNote(`🍀 ${luck.pretty(e.target)} from ${e.type === 'capsule' ? 'a ' : 'your '}${luck.pretty(e.source)}${e.type === 'plant' ? ' crop' : ''} after ${e.after} pulls`);
+      recordNote(`🍀 ${luck.pretty(e.target)} from ${e.type === 'capsule' ? 'a ' : 'your '}${luck.pretty(e.source)}${e.type === 'plant' ? ' crop' : ''}${e.after != null ? ` after ${e.after} pulls` : ': its count starts now'}`);
     }
   }
   // Species from the egg event itself, for "Gold Capybara".
@@ -1825,27 +2867,50 @@ function handleGardenMessage(type, payload) {
   if (!payload || typeof payload !== 'object') return;
 
   if (type === 'status') {
+    const t0 = performance.now();
+    const parts = {};
+    let t = t0;
     // The observer's connection id (pageId:welcomes). Kept apart, because
     // gardenStatus.session below becomes the coins-this-session box.
     const connectionId = payload.session;
     gardenStatus = Object.assign({}, payload, { at: Date.now() });
     gardenStatus.pets = petData.describePets(payload.pets, payload.trough);
+    t = perfPart(parts, 'pets', t);
     enrichPets(gardenStatus);
+    t = perfPart(parts, 'enrichPets', t);
     gardenStatus.eta = gardenEta(gardenStatus);
     gardenStatus.size = sizeEta(gardenStatus);
     gardenStatus.weatherKind = weather.kindOf(gardenStatus.weather);
+    t = perfPart(parts, 'eta', t);
     pushBinderMap(false);
     gardenStatus.plan = gardenPlanOf(payload.gardenPlants, payload.gardenTiles);
+    if (alwaysMapOn() && mapPinView() === 'value') pushMapPin();
+    t = perfPart(parts, 'plan', t);
+    // Each plant kind's crops and mutations (v0.64.0), for leaving plants out
+    // of Mutations over time; and their names.
+    gardenStatus.plantMuts = plantMutRows(payload.gardenPlants);
+    gardenStatus.plantNames = plantNamesOf(gardenStatus.plantMuts);
     // What harvest mode would let through right now (the panel shows it).
     gardenStatus.harvestMatch = harvestRule.count(payload.gardenPlants, harvestLock().mode);
+    // Daily quests (v0.65.0): today's three in words, with help.
+    gardenStatus.quests = questsView(gardenStatus);
+    t = perfPart(parts, 'plantsQuests', t);
+    // Today's Haunt Quest is a sign the Haunt Event is running (its theme).
+    if (payload.spookyQuest && payload.spookyQuest.dayUTC === questLib.dayUTC(Date.now())) noteEventSign('haunt');
+    delete gardenStatus.dailyQuests;
+    delete gardenStatus.spookyQuest;
+    delete gardenStatus.gardenEggs;
     delete gardenStatus.gardenPlants;
     if (gardenStatus.foundSelf) {
       checkGrown(gardenStatus);
       recordWorth(gardenStatus);
+      t = perfPart(parts, 'grownWorth', t);
       checkSale(gardenStatus);
       applyShopPurchases(payload.shopPurchases);
       if (sharer && shareOn()) sharer.nudge().catch(() => {});
+      t = perfPart(parts, 'saleShop', t);
       pushBudgetHud(false);
+      t = perfPart(parts, 'budgetHud', t);
     }
     // Coins this session: net change in the wallet since the app first saw
     // it (spending counts against it, like in real life).
@@ -1901,28 +2966,38 @@ function handleGardenMessage(type, payload) {
     }
     checkLogoffFromGame(gardenStatus);
     checkPendingTeam(gardenStatus);
+    trackTeams(gardenStatus);
     if (checkTriggers(gardenStatus)) {
       // A trigger just swapped: don't let the weather team undo it.
-      lastTeamKey = `${gardenStatus.connection}:${weather.kindOf(gardenStatus.weather)}`;
+      // (v0.74.1: the weather alone, as checkWeatherTeam keys it since
+      // v0.63.11; with the connection in it the weather team came straight
+      // back over the trigger's suggestion.)
+      lastTeamKey = weather.kindOf(gardenStatus.weather);
     } else {
       checkWeatherTeam(gardenStatus);
+      checkTeamSuggestion(gardenStatus);
+      checkUnwantedWeather(gardenStatus);
+      checkPotWeather(gardenStatus);
     }
+    t = perfPart(parts, 'checks', t);
     sendGardenStatus(gardenStatus);
+    t = perfPart(parts, 'toPanel', t);
+    perfStatus(parts, t - t0);
     return;
   }
 
   if (type === 'hatch') {
     const p = pityState();
-    const seen = payload.petId && p.seenIds.includes(payload.petId);
-    pity.onHatch(p, payload);
-    if (!seen && p.autoCount) {
-      const events = luck.onEgg(luckState(), payload);
+    const h = hatches.live(p, luckState(), payload);
+    if (h.counted) {
+      const events = h.events;
       // A Rainbow version of the egg's rare pet: the secret celebration
       // takes over from the usual Rainbow alert.
       const rare = events.some((e) => e.type === 'egg' && e.kind === 'species');
-      const rainbow = events.some((e) => e.type === 'pet' && e.target === 'rainbow');
+      const isRainbow = (e) => (e.type === 'pet' || e.type === 'egg') && e.kind === 'mutation' && e.target === 'rainbow';
+      const rainbow = events.some(isRainbow);
       if (rare && rainbow) {
-        celebrateLuck(events.filter((e) => !(e.type === 'pet' && e.target === 'rainbow') && !(e.type === 'egg' && e.kind === 'species')));
+        celebrateLuck(events.filter((e) => !isRainbow(e) && !(e.type === 'egg' && e.kind === 'species')));
         secretRainbow(payload.species);
       } else {
         celebrateLuck(events);
@@ -1947,18 +3022,14 @@ function handleGardenMessage(type, payload) {
 
   if (type === 'hatchBacklog') {
     const p = pityState();
-    const r = pity.onBacklog(p, payload.hatches, payload.eggsHatched, payload.oldestLogAt);
     // From now on this connection's status updates keep the game's total.
-    p.syncConnection = payload.connection;
+    const r = hatches.backlog(p, luckState(), payload);
     store.save();
     sendPity();
     const total = r.counted + r.unknown;
     if (total > 0) recordNote(`🥚 Caught up on ${total} hatch${total === 1 ? '' : 'es'} from while the app was closed`);
     if (p.autoCount) {
-      const events = [];
-      for (const h of r.fresh || []) events.push(...luck.onEgg(luckState(), h));
-      if (r.unknown) luck.onUnknownHatches(luckState(), r.unknown);
-      celebrateLuck(events, true);
+      celebrateLuck(r.events, true);
       checkPrimed();
       store.save();
       sendLuck();
@@ -1983,6 +3054,70 @@ function handleGardenMessage(type, payload) {
   }
 
   // A corner map dragged somewhere (or double-clicked back to the corner).
+  // The swap button on the game was pressed (v0.56.4).
+  if (type === 'lastTeam') {
+    swapToLastTeam().then((r) => {
+      const contents = gameView && gameView.webContents;
+      if (contents && !contents.isDestroyed()) contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.teamSaid && window.__mgLoaderObserver.teamSaid(${JSON.stringify(r)})`).catch(() => {});
+      sendToControl('teams:lastResult', r);
+    });
+    return;
+  }
+  // The action bar (v0.57.0): the potted-plant command it learned from your
+  // own planting; a saved team; harvest mode or the lock.
+  if (type === 'potCommand') {
+    const p = payload && typeof payload === 'object' && typeof payload.type === 'string' ? payload : null;
+    if (p) {
+      const s = store.get();
+      s.ui = Object.assign({}, s.ui, { potCommand: { type: p.type.slice(0, 60), idKey: String(p.idKey).slice(0, 40), slotKey: String(p.slotKey).slice(0, 40), extra: p.extra && typeof p.extra === 'object' ? p.extra : {} } });
+      store.save();
+      sendToControl('keys:state', keysState());
+    }
+    return;
+  }
+  // The garden tile you're on changed (v0.57.8): straight to the panel.
+  if (type === 'meTile') {
+    const t = payload && Number.isInteger(payload.t) ? payload.t : null;
+    const gap = payload && Number.isInteger(payload.gap) ? payload.gap : null;
+    if (gardenStatus) {
+      gardenStatus.meTile = t;
+      gardenStatus.meGap = gap;
+    }
+    sendToControl('garden:me', { t, gap });
+    return;
+  }
+  // Where your garden sits in the world (v0.57.6): learned tile pairs.
+  if (type === 'mapCalib') {
+    const clean = (list) => (Array.isArray(list) ? list : []).filter((c) => c && Number.isInteger(c.i) && Number.isFinite(c.x) && Number.isFinite(c.y)).slice(-40).map((c) => ({ i: c.i, x: c.x, y: c.y }));
+    const s = store.get();
+    const bySlot = {};
+    if (payload && payload.bySlot && typeof payload.bySlot === 'object') for (const [k, list] of Object.entries(payload.bySlot)) if (/^\d{1,2}$/.test(k)) bySlot[k] = clean(list);
+    s.ui = Object.assign({}, s.ui, { mapCalib: clean(payload && payload.calib), mapCalibBySlot: bySlot });
+    store.save();
+    return;
+  }
+  if (type === 'barTeam') {
+    if (payload && payload.teamId) applyTeam(String(payload.teamId), '(action bar)');
+    return;
+  }
+  if (type === 'barToggle') {
+    if (payload && payload.what === 'mode') setHarvestLock({ mode: { on: !harvestLock().mode.on } });
+    else if (payload && payload.what === 'lock') setHarvestLock({ on: !(store.get().harvestLock && store.get().harvestLock.on) });
+    return;
+  }
+  // The seed picked on the quick-plant button (v0.56.15).
+  if (type === 'plantPick') {
+    const sp = payload && typeof payload.species === 'string' ? payload.species.slice(0, 60) : null;
+    const s = store.get();
+    s.ui = Object.assign({}, s.ui, { plantPick: sp });
+    store.save();
+    return;
+  }
+  // The lineup you had out settled (v0.56.5).
+  if (type === 'lineup') {
+    noteLineup(payload);
+    return;
+  }
   if (type === 'mapPos') {
     const p = payload || {};
     if (typeof p.id === 'string' && /^mg-[a-z-]{1,30}$/.test(p.id)) {
@@ -2008,13 +3143,16 @@ function handleGardenMessage(type, payload) {
     }
     return;
   }
+  // Logged in on another device: a note (v0.60.0: the app no longer comes
+  // back by itself afterwards).
   if (type === 'superseded') {
-    onSuperseded(payload);
+    recordNote('📱 You logged in on another device, so the game here was logged out. Reload it when you want to play here again.');
     return;
   }
 
-  if (type === 'reclaim') {
-    onReclaimAction(String(payload && payload.act));
+  // A team suggestion answered on the game (v0.60.0).
+  if (type === 'teamSuggest') {
+    answerTeamSuggestion(payload && payload.act === 'apply' ? 'apply' : 'dismiss');
     return;
   }
 
@@ -2023,6 +3161,16 @@ function handleGardenMessage(type, payload) {
     return;
   }
 
+  // A hatch the egg lock stopped (v0.69.0), and its popup's button.
+  if (type === 'hatchBlocked') {
+    lastHatchBlocked = { at: Date.now(), egg: String((payload && payload.egg) || '') };
+    return;
+  }
+  if (type === 'eggLockGo') {
+    showControl('pity');
+    sendToControl('luck:focusLock', String((payload && payload.egg) || ''));
+    return;
+  }
   // The guard locked pet food and re-sent the sale (or couldn't).
   if (type === 'stepOut') {
     stepOutAnswer(payload && payload.act === 'ignore' ? 'ignore' : 'confirm');
@@ -2031,7 +3179,7 @@ function handleGardenMessage(type, payload) {
   if (type === 'sellGuard') {
     const pretty = (x) => String(x).replace(/([a-z])([A-Z])/g, '$1 $2');
     if (payload.ok) {
-      recordNote(`🐾 Kept your pet food: locked ${(payload.locked || []).map(pretty).join(', ') || 'it'}, then sold the rest.`);
+      recordNote(`🐾 Kept your pet food: locked ${(payload.locked || []).map(pretty).join(', ') || 'it'}, sold the rest${payload.unlocked ? ', then unlocked it again for the trough' : ''}.`);
     } else if (Array.isArray(payload.soldAnyway) && payload.soldAnyway.length) {
       recordNote(`🐾 The game sold ${payload.soldAnyway.map(pretty).join(', ')} even though the app locked it. Until this is fixed, the app will stop sales with pet food in them instead of locking it for you: right-click your pet food to lock it, then sell. Please send a sample (Extras, 🛠 Troubleshooting).`, 'Pet food was sold');
     } else {
@@ -2163,6 +3311,179 @@ function applyPanelZoom(z) {
   panelView.webContents.setZoomFactor(zoom);
 }
 
+/* A second account (v0.55.0): another game in its own login (its own
+ * cookie store, persist:magicgarden-2), in a tab above the game. Both keep
+ * running: the one you're not on is hidden and muted, never paused
+ * (backgroundThrottling off), and gets your scripts too (anti-AFK keeps it
+ * active). The panel's features (alerts, money, garden, maps) follow
+ * account 1; account 2's game page only tells the app its name, room and
+ * whether it's connected, for its tab. */
+const TAB_BAR = 30;
+const ALT_PARTITION = 'persist:magicgarden-2';
+let altView = null;
+let tabsView = null;
+let activeAccount = 1;
+let altInfo = { name: null, room: null, players: null, at: 0 };
+
+function accountsState() {
+  const me = gardenStatus && gardenStatus.self;
+  const fresh = (t) => Boolean(t && Date.now() - t < 30000);
+  return {
+    second: Boolean(altView),
+    active: altView ? activeAccount : 1,
+    accounts: [
+      { n: 1, name: (me && me.name) || null, room: gardenStatus && gardenStatus.room ? gardenStatus.room.players : null, live: fresh(gardenStatus && gardenStatus.at) },
+      ...(altView ? [{ n: 2, name: altInfo.name, room: altInfo.players, live: fresh(altInfo.at) }] : []),
+    ],
+  };
+}
+let accountsPushAt = 0;
+function pushAccounts(force) {
+  if (!force && Date.now() - accountsPushAt < 2000) return;
+  accountsPushAt = Date.now();
+  const st = accountsState();
+  sendToControl('accounts:state', st);
+  if (tabsView && !tabsView.webContents.isDestroyed()) tabsView.webContents.send('accounts:state', st);
+}
+function ensureTabsView() {
+  if (tabsView || !gameWindow) return;
+  tabsView = new WebContentsView({
+    webPreferences: { preload: path.join(__dirname, 'preload-tabs.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  tabsView.setBackgroundColor('#1f1329');
+  tabsView.webContents.on('will-navigate', (event) => event.preventDefault());
+  tabsView.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  tabsView.webContents.on('did-finish-load', () => pushAccounts(true));
+  tabsView.webContents.loadFile(path.join(__dirname, 'tabs.html'));
+  gameWindow.contentView.addChildView(tabsView);
+}
+// Keep the panel above the game views when views are added.
+function panelOnTop() {
+  if (panelView && gameWindow && gameWindow.contentView.children.includes(panelView)) {
+    gameWindow.contentView.removeChildView(panelView);
+    gameWindow.contentView.addChildView(panelView);
+  }
+}
+function createAltView() {
+  if (altView || !gameWindow || gameWindow.isDestroyed()) return;
+  const view = new WebContentsView({
+    webPreferences: {
+      backgroundThrottling: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      partition: ALT_PARTITION,
+      preload: path.join(__dirname, 'preload-game.js'),
+    },
+  });
+  altView = view;
+  altInfo = { name: null, room: null, players: null, at: 0 };
+  view.setBackgroundColor('#2A1B36');
+  gameWindow.contentView.addChildView(view);
+  ensureTabsView();
+  if (tabsView) {
+    gameWindow.contentView.removeChildView(tabsView);
+    gameWindow.contentView.addChildView(tabsView);
+  }
+  panelOnTop();
+  const contents = view.webContents;
+  contents
+    .loadURL('about:blank')
+    .catch(() => {})
+    .then(() => withTimeout(installObserver(contents), 5000))
+    .catch(() => {})
+    .finally(() => {
+      if (!contents.isDestroyed()) contents.loadURL(GAME_URL);
+    });
+  contents.on('did-finish-load', () => {
+    injectScripts(contents);
+    // The overlays' font (v0.61.3; Inter since v0.67.0), as data, under its
+    // own name; and the event theme on the glass.
+    if (isGameUrl(contents.getURL())) {
+      contents.insertCSS(overlayFontCss()).catch(() => {});
+      setTimeout(() => pushTheme(true), 1500);
+    }
+    relayoutSoon();
+  });
+  contents.on('render-process-gone', (event, details) => {
+    logError('second account', `stopped: ${details && details.reason}`);
+    if (details && details.reason !== 'clean-exit') {
+      setTimeout(() => {
+        if (!contents.isDestroyed()) contents.loadURL(GAME_URL).catch((err) => logError('second account', err));
+      }, 1500);
+    }
+  });
+  contents.on('devtools-closed', () => {
+    if (!contents.isDestroyed()) installObserver(contents);
+  });
+  // Its log-in windows (Discord and so on) share its own cookie store.
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isGameUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 520,
+          height: 720,
+          autoHideMenuBar: true,
+          backgroundColor: '#2A1B36',
+          webPreferences: { partition: ALT_PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true },
+        },
+      };
+    }
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { secondAccount: true });
+  store.save();
+  layout();
+  buildMenu();
+  pushAccounts(true);
+}
+function removeAltView() {
+  if (!altView) return;
+  const v = altView;
+  altView = null;
+  activeAccount = 1;
+  try {
+    gameWindow.contentView.removeChildView(v);
+  } catch (err) {
+    /* already gone */
+  }
+  try {
+    v.webContents.close();
+  } catch (err) {
+    /* already gone */
+  }
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { secondAccount: false });
+  store.save();
+  layout();
+  buildMenu();
+  pushAccounts(true);
+}
+function showAccount(n) {
+  const want = n === 2 && altView ? 2 : 1;
+  if (want === activeAccount) return;
+  activeAccount = want;
+  layout();
+  const v = want === 2 ? altView : gameView;
+  if (v && !v.webContents.isDestroyed()) v.webContents.focus();
+  pushAccounts(true);
+}
+// Account 2's game page: only what its tab shows.
+function handleAltMessage(type, payload) {
+  if (type !== 'status' || !payload || typeof payload !== 'object') return;
+  const me = payload.self;
+  altInfo = {
+    name: me && me.name ? String(me.name).slice(0, 40) : altInfo.name,
+    room: payload.room ? payload.room.roomId : null,
+    players: payload.room ? payload.room.players : null,
+    at: Date.now(),
+  };
+  pushAccounts(false);
+}
+
 function layout() {
   if (!gameWindow || gameWindow.isDestroyed() || !gameView) return;
   const [w, h] = gameWindow.getContentSize();
@@ -2172,7 +3493,22 @@ function layout() {
   const scale = panelScale(h);
   let pw = 0;
   if (showPanel) pw = Math.max(0, Math.min(Math.round(panelWidth() * scale), Math.round(w * 0.42), w - 480));
-  gameView.setBounds({ x: 0, y: 0, width: Math.max(0, w - pw), height: h });
+  // With a second account (v0.55.0): a tab bar on top of the game area and
+  // the account you're on below it; the other keeps running, hidden and muted.
+  const gw = Math.max(0, w - pw);
+  const top = altView ? TAB_BAR : 0;
+  gameView.setBounds({ x: 0, y: top, width: gw, height: Math.max(0, h - top) });
+  gameView.setVisible(activeAccount === 1 || !altView);
+  if (!gameView.webContents.isDestroyed()) gameView.webContents.setAudioMuted(Boolean(altView) && activeAccount !== 1);
+  if (altView) {
+    altView.setBounds({ x: 0, y: top, width: gw, height: Math.max(0, h - top) });
+    altView.setVisible(activeAccount === 2);
+    if (!altView.webContents.isDestroyed()) altView.webContents.setAudioMuted(activeAccount !== 2);
+  }
+  if (tabsView) {
+    tabsView.setBounds({ x: 0, y: 0, width: gw, height: altView ? TAB_BAR : 0 });
+    tabsView.setVisible(Boolean(altView));
+  }
   if (attached) {
     panelView.setBounds({ x: w - pw, y: 0, width: pw, height: h });
     panelView.setVisible(showPanel);
@@ -2215,6 +3551,7 @@ function createPanelWindow() {
     show: false,
     backgroundColor: '#251730',
     title: "SSK's Garden Buddy",
+    icon: APP_ICON,
   });
   panelWindow.setMenuBarVisibility(false);
   panelWindow.on('resize', layoutPanelWindow);
@@ -2357,10 +3694,13 @@ function createGameWindow() {
     minHeight: Math.min(600, area.height),
     backgroundColor: '#2A1B36',
     title: 'Magic Garden',
+    icon: APP_ICON,
   });
   if (small && !process.env.MG_NO_MAXIMIZE) gameWindow.maximize();
   createGameView();
   wireGameWindow();
+  // The second account comes back if it was open (v0.55.0).
+  if (store.get().ui && store.get().ui.secondAccount) setTimeout(() => createAltView(), 1500);
   relayoutSoon();
 }
 
@@ -2409,14 +3749,26 @@ function createGameView() {
   contents.on('unresponsive', () => logError('game page', 'stopped responding'));
   contents.on('did-finish-load', () => {
     injectScripts(contents);
+    // The overlays' font (v0.61.3; Inter since v0.67.0), as data, under its
+    // own name; and the event theme on the glass.
+    if (isGameUrl(contents.getURL())) {
+      contents.insertCSS(overlayFontCss()).catch(() => {});
+      setTimeout(() => pushTheme(true), 1500);
+    }
     relayoutSoon();
     pushHarvestLock();
     pushSpotMap();
     pushBinderMap(true);
     pushThunderMap();
     pushMountMap();
+    pushMapPin(true);
+    pushHatch(true);
     pushReadyRule();
     pushBudgetHud(true);
+    pushLineups();
+    pushTeamButton(true);
+    pushPlantButton();
+    pushActionBar();
     // Again once the game has had a moment (the observer is ready by then).
     setTimeout(() => {
       pushHarvestLock();
@@ -2424,8 +3776,14 @@ function createGameView() {
       pushBinderMap(true);
       pushThunderMap();
       pushMountMap();
+      pushMapPin(true);
+      pushHatch(true);
       pushReadyRule();
       pushBudgetHud(true);
+      pushLineups();
+      pushTeamButton(true);
+      pushPlantButton();
+      pushActionBar();
     }, 3000);
   });
 
@@ -2434,7 +3792,7 @@ function createGameView() {
   contents.on('did-navigate', (event, url) => {
     if (parked && isGameUrl(url)) {
       const was = parked;
-      if (was.eventKey) skipEvent = was.eventKey;
+      if (was.eventKey) stayIn(was.kind, was.eventKey, was.until ? new Date(was.until).toISOString() : null);
       parked = null;
       clearTimeout(rejoinTimer);
       lastTeamKey = null;
@@ -2590,12 +3948,21 @@ function buildMenu() {
       ],
     },
     {
+      label: 'Accounts',
+      submenu: [
+        { label: altView ? 'Second account is open' : 'Add a second account', enabled: !altView, click: () => { createAltView(); showAccount(2); } },
+        { label: 'Switch account', accelerator: 'Ctrl+Tab', enabled: Boolean(altView), click: () => showAccount(activeAccount === 1 ? 2 : 1) },
+        { label: 'Close the second account', enabled: Boolean(altView), click: () => removeAltView() },
+      ],
+    },
+    {
       label: 'Panel',
       submenu: [
-        { label: 'Show or hide the panel', accelerator: 'CmdOrCtrl+Shift+D', click: togglePanel },
-        { label: 'Harvest lock', type: 'checkbox', checked: Boolean(store.get().harvestLock && store.get().harvestLock.on), accelerator: 'CmdOrCtrl+Shift+L', click: () => setHarvestLock({ on: !harvestLock().on }) },
-        { label: 'Harvest mode', type: 'checkbox', checked: Boolean(harvestLock().mode.on), accelerator: 'CmdOrCtrl+Shift+M', click: () => setHarvestLock({ mode: { on: !harvestLock().mode.on } }) },
-        { label: 'Money box over the game', type: 'checkbox', checked: budgetHudOn(), accelerator: 'CmdOrCtrl+Shift+B', click: () => setBudgetHud(!budgetHudOn()) },
+        { label: 'Show or hide the panel', accelerator: appKey('panel'), click: togglePanel },
+        { label: 'Swap to last pet team', accelerator: appKey('lastTeam'), click: async () => sendToControl('teams:lastResult', await swapToLastTeam()) },
+        { label: 'Harvest lock', type: 'checkbox', checked: Boolean(store.get().harvestLock && store.get().harvestLock.on), accelerator: appKey('harvestLock'), click: () => setHarvestLock({ on: !harvestLock().on }) },
+        { label: 'Harvesting unlocked', type: 'checkbox', checked: Boolean(harvestLock().mode.on), accelerator: appKey('harvestMode'), click: () => setHarvestLock({ mode: { on: !harvestLock().mode.on } }) },
+        { label: 'Money box over the game', type: 'checkbox', checked: budgetHudOn(), accelerator: appKey('moneyBox'), click: () => setBudgetHud(!budgetHudOn()) },
         { type: 'separator' },
         { label: 'Attached to the game', type: 'radio', checked: store.get().ui.panel !== 'window', click: () => setPanel({ mode: 'attached', open: true }) },
         { label: 'In its own window', type: 'radio', checked: store.get().ui.panel === 'window', click: () => setPanel({ mode: 'window', show: true }) },
@@ -2604,10 +3971,10 @@ function buildMenu() {
     {
       label: 'Alerts',
       submenu: [
-        { label: 'Open alerts', accelerator: 'CmdOrCtrl+Shift+A', click: () => showControl('alerts') },
+        { label: 'Open alerts', accelerator: appKey('alerts'), click: () => showControl('alerts') },
         { label: 'Check the shops now', click: () => watcher && watcher.checkNow() },
         { type: 'separator' },
-        { label: 'Snooze for 30 minutes', accelerator: 'CmdOrCtrl+Shift+Z', click: () => sendToControl('alerts:snooze', 30) },
+        { label: 'Snooze for 30 minutes', accelerator: appKey('snooze'), click: () => sendToControl('alerts:snooze', 30) },
         { label: 'Snooze for 1 hour', click: () => sendToControl('alerts:snooze', 60) },
         { label: 'Resume alerts', click: () => sendToControl('alerts:snooze', 0) },
       ],
@@ -2615,8 +3982,8 @@ function buildMenu() {
     {
       label: 'Eggs',
       submenu: [
-        { label: 'Open Bad Luck Protection', accelerator: 'CmdOrCtrl+Shift+P', click: () => showControl('pity') },
-        { label: 'Add one hatch by hand', accelerator: 'CmdOrCtrl+Shift+H', click: () => {
+        { label: 'Open Bad Luck Protection', accelerator: appKey('luck'), click: () => showControl('pity') },
+        { label: 'Add one hatch by hand', accelerator: appKey('addHatch'), click: () => {
           pity.act(pityState(), { type: 'hatch' });
           store.save();
           sendPity();
@@ -2627,8 +3994,8 @@ function buildMenu() {
     {
       label: 'Scripts',
       submenu: [
-        { label: 'Open scripts', accelerator: 'CmdOrCtrl+Shift+S', click: () => showControl('scripts') },
-        { label: 'Run enabled scripts now', accelerator: 'CmdOrCtrl+Shift+R', click: () => gameWindow && injectScripts(gameView.webContents) },
+        { label: 'Open scripts', accelerator: appKey('scripts'), click: () => showControl('scripts') },
+        { label: 'Run enabled scripts now', accelerator: appKey('runScripts'), click: () => gameWindow && injectScripts(gameView.webContents) },
         { label: 'Open scripts folder', click: () => shell.openPath(scriptsDir()) },
       ],
     },
@@ -2692,8 +4059,15 @@ ipcMain.handle('settings:set', (event, next) => {
     folds: next.ui && next.ui.folds && typeof next.ui.folds === 'object'
       ? Object.fromEntries(Object.entries(next.ui.folds).slice(0, 120).map(([k, v]) => [String(k).slice(0, 60), Boolean(v)]))
       : current.ui.folds,
+    // The Garden tab's view (v0.64.0).
+    gardenView: next.ui && ['now', 'mutations', 'map', 'harvest', 'progress'].includes(next.ui.gardenView) ? next.ui.gardenView : current.ui.gardenView,
+    // The Pets tab's view (v0.67.3).
+    petsView: next.ui && ['now', 'food', 'teams', 'rank', 'made'].includes(next.ui.petsView) ? next.ui.petsView : current.ui.petsView,
+    questRemind: next.ui && typeof next.ui.questRemind === 'boolean' ? next.ui.questRemind : current.ui.questRemind,
+    // Event themes (v0.67.0): on unless switched off in Extras.
+    eventThemes: next.ui && typeof next.ui.eventThemes === 'boolean' ? next.ui.eventThemes : current.ui.eventThemes,
     // The Garden map's view: to-do, value or spots.
-    gardenMap: next.ui && ['todo', 'value', 'spots'].includes(next.ui.gardenMap) ? next.ui.gardenMap : current.ui.gardenMap,
+    gardenMap: next.ui && ['todo', 'value', 'spots', 'thunder', 'dawn', 'amber'].includes(next.ui.gardenMap) ? next.ui.gardenMap : current.ui.gardenMap,
     // The Garden tab's mutation chart: which lines are on, and the range.
     mutChart: next.ui && next.ui.mutChart && typeof next.ui.mutChart === 'object'
       ? Object.assign(
@@ -2702,6 +4076,10 @@ ipcMain.handle('settings:set', (event, next) => {
           lunar: next.ui.mutChart.lunar !== false,
           color: next.ui.mutChart.color !== false,
           hours: [12, 24, 72, 168].includes(Number(next.ui.mutChart.hours)) ? Number(next.ui.mutChart.hours) : 24,
+          // Stacked on or off (it wasn't kept before v0.64.0), and the
+          // plants left out of the chart.
+          stack: next.ui.mutChart.stack !== false,
+          exclude: Array.isArray(next.ui.mutChart.exclude) ? [...new Set(next.ui.mutChart.exclude.map((x) => String(x).slice(0, 40)))].slice(0, 60) : [],
         },
         // The separate lines (v0.53.3), off unless ticked.
         Object.fromEntries(['wet', 'chilled', 'frozen', 'thunder', 'dawn', 'amber', 'gold', 'rainbow'].map((k) => [k, next.ui.mutChart[k] === true])),
@@ -2714,18 +4092,178 @@ ipcMain.handle('settings:set', (event, next) => {
   }
   const saved = store.set(merged);
   if (watcher) planLogoff(watcher.status());
+  // The map kept on the game follows the view picked in the Garden tab.
+  pushMapPin();
   return saved;
 });
 
 ipcMain.handle('weather:kinds', () => weather.KINDS);
 ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('teams:last', () => swapToLastTeam());
+// Your stage (beta): off unless turned on in Extras → Beta features (v0.56.6).
+function keysState() {
+  const ui = store.get().ui || {};
+  return { bar: actionBarCfg(), bagKeys: bagKeysCfg(), defaults: DEFAULT_BAR, appKeys: Object.fromEntries(Object.keys(APP_KEYS).map((k) => [k, appKey(k) || ''])), appDefaults: APP_KEYS, potLearned: Boolean(ui.potCommand), potCommand: ui.potCommand || null };
+}
+// The Garden tab's map card (v0.57.4): a map built by the game page.
+ipcMain.handle('map:card', async (event, view) => {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed() || !['spots', 'thunder', 'dawn', 'amber'].includes(view)) return null;
+  try {
+    return await contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.mapCard ? window.__mgLoaderObserver.mapCard(${JSON.stringify(view)}) : null`, true);
+  } catch (err) {
+    return null;
+  }
+});
+// Pet rankings (v0.58.0): which abilities count and how much; the trough chip.
+ipcMain.handle('pets:prefs', (event, change) => {
+  const c = change && typeof change === 'object' ? change : {};
+  const s = store.get();
+  const prefs = Object.assign({}, (s.ui && s.ui.petPrefs) || {});
+  if (c.reset) for (const k of Object.keys(prefs)) delete prefs[k];
+  else if (typeof c.key === 'string') prefs[c.key] = { on: c.on !== false, w: Math.max(0, Math.min(1, Number(c.w) || 0)) };
+  s.ui = Object.assign({}, s.ui, { petPrefs: prefs });
+  store.save();
+  if (gardenStatus) {
+    gardenStatus.petRank = rankPets(gardenStatus.allPets, prefs);
+    sendGardenStatus(gardenStatus);
+  }
+  return gardenStatus ? gardenStatus.petRank : null;
+});
+ipcMain.handle('ui:troughHud', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { troughHud: on === true });
+  store.save();
+  troughChipKey = '';
+  if (gardenStatus) pushTroughChip(gardenStatus.troughTimer);
+  return s.ui.troughHud;
+});
+// The team builder (v0.59.8): put these pets out.
+ipcMain.handle('teams:putOut', async (event, ids) => {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return { ok: false, reason: 'The game isn\'t open.' };
+  const list = (Array.isArray(ids) ? ids : []).map(String).filter((x) => /^[\w-]{1,80}$/.test(x)).slice(0, 3);
+  try {
+    return await contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.putOut ? window.__mgLoaderObserver.putOut(${JSON.stringify(list)}) : { ok: false, reason: 'The game isn\\'t ready yet.' }`, true);
+  } catch (err) {
+    return { ok: false, reason: 'No answer from the game.' };
+  }
+});
+ipcMain.handle('teams:suggestion', () => teamSuggestion);
+ipcMain.handle('teams:answer', (event, act) => answerTeamSuggestion(act === 'apply' ? 'apply' : 'dismiss'));
+// The first-run welcome is done (v0.63.2): kept in ui, which the panel's
+// general save doesn't carry.
+// Pet food that needs weather (v0.63.4): on / off (off by default) and your
+// own ticks; reading it returns what's in use, the trough's kinds and what
+// the rule suggests.
+ipcMain.handle('ui:potWeather', (event, change) => {
+  const s = store.get();
+  const c = change && typeof change === 'object' ? change : {};
+  const ui = Object.assign({}, s.ui);
+  if (typeof c.on === 'boolean') ui.potWeather = c.on;
+  if (Array.isArray(c.species)) ui.potWeatherSpecies = c.species.map(String).slice(0, 40);
+  if (c.reset) delete ui.potWeatherSpecies;
+  if (typeof c.on === 'boolean' || Array.isArray(c.species) || c.reset) {
+    s.ui = ui;
+    store.save();
+  }
+  const st = gardenStatus || {};
+  return { on: ui.potWeather === true, species: petFoodNeedsWeather(st), custom: Array.isArray(ui.potWeatherSpecies), candidates: petFoodCandidates(st), suggested: petFoodSuggested(st) };
+});
+ipcMain.handle('ui:welcomed', (event, v) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { welcomed: v !== false });
+  store.save();
+  return s.ui.welcomed;
+});
+ipcMain.handle('ui:desktopNotify', (event, change) => {
+  const s = store.get();
+  const cur = Object.assign({ on: true, weather: true, teams: true, quests: true }, (s.ui || {}).desktopNotify);
+  const c = change && typeof change === 'object' ? change : {};
+  for (const k of ['on', 'weather', 'teams', 'quests']) if (typeof c[k] === 'boolean') cur[k] = c[k];
+  s.ui = Object.assign({}, s.ui, { desktopNotify: cur });
+  store.save();
+  if (c.test) desktopNotify('🌱 Garden Buddy', 'Desktop notifications are on.', null);
+  return cur;
+});
+ipcMain.handle('keys:get', () => keysState());
+ipcMain.handle('keys:setBar', (event, change) => {
+  const c = change && typeof change === 'object' ? change : {};
+  const s = store.get();
+  const cur = actionBarCfg();
+  const next = { on: typeof c.on === 'boolean' ? c.on : cur.on, shape: c.shape === 'line' || c.shape === 'square' ? c.shape : cur.shape, slots: Array.isArray(c.slots) && c.slots.length === 9 ? c.slots : cur.slots };
+  if (c.reset) next.slots = DEFAULT_BAR.map((x) => Object.assign({}, x));
+  s.ui = Object.assign({}, s.ui, { actionBar: next });
+  if (Array.isArray(c.bagKeys) && c.bagKeys.length === 9) s.ui.bagKeys = c.bagKeys.map((k) => (k && k.code ? { code: String(k.code), shift: Boolean(k.shift), ctrl: Boolean(k.ctrl), alt: Boolean(k.alt) } : null));
+  if (c.resetBag) s.ui.bagKeys = null;
+  if (c.forgetPot) s.ui.potCommand = null;
+  store.save();
+  pushActionBar(c.forgetPot ? { forgetPot: true } : null);
+  return keysState();
+});
+ipcMain.handle('keys:setApp', (event, change) => {
+  const c = change && typeof change === 'object' ? change : {};
+  const s = store.get();
+  const keys = Object.assign({}, (s.ui && s.ui.appKeys) || {});
+  if (c.reset) {
+    s.ui = Object.assign({}, s.ui, { appKeys: {} });
+  } else if (typeof c.id === 'string' && c.id in APP_KEYS) {
+    keys[c.id] = typeof c.accel === 'string' ? c.accel.slice(0, 40) : '';
+    s.ui = Object.assign({}, s.ui, { appKeys: keys });
+  }
+  store.save();
+  try {
+    buildMenu();
+  } catch (err) {
+    logError('keys', err);
+    // A key the menu won't take: back to the default for it.
+    if (c.id) {
+      delete keys[c.id];
+      s.ui = Object.assign({}, s.ui, { appKeys: keys });
+      store.save();
+      buildMenu();
+    }
+  }
+  return keysState();
+});
+ipcMain.handle('ui:plantBtnPlace', () => {
+  pushPlantButton(true);
+  return true;
+});
+ipcMain.handle('ui:plantBtn', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { plantBtn: on === true });
+  store.save();
+  pushPlantButton();
+  return s.ui.plantBtn;
+});
+ipcMain.handle('ui:stageOn', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { stageOn: on === true });
+  store.save();
+  return s.ui.stageOn;
+});
+ipcMain.handle('ui:teamBtn', (event, on) => {
+  const s = store.get();
+  s.ui = Object.assign({}, s.ui, { teamBtn: on !== false });
+  store.save();
+  pushTeamButton(true);
+  return s.ui.teamBtn;
+});
 ipcMain.handle('teams:apply', async (event, teamId) => {
   const r = await applyTeam(String(teamId), '(you pressed Apply)');
   return r;
 });
 ipcMain.handle('game:parked', () => parked);
 ipcMain.handle('game:logoffNow', () => {
-  if (!parked) park(null, null, null, true);
+  if (!parked) {
+    // v0.64.2: for the weather that's on (or about to start), so the
+    // stepped-away page counts it down and offers "Reconnect when it ends";
+    // a plain break when the sky's clear.
+    const w = weatherToStepAwayFrom(Date.now());
+    if (w) park(w.kind, w.endsAt || null, w.startsAt || null, true);
+    else park(null, null, null, true);
+  }
   return parked;
 });
 ipcMain.handle('game:rejoin', () => {
@@ -2740,7 +4278,7 @@ ipcMain.handle('alerts:rules', () => alerts.publicRules(store.get()));
 // the app has seen them list before, then a built-in list (decor, eggs)
 // for weather shops that haven't opened while the app was watching.
 // [{ name, itemId, shop, type, price, seen }], one per item name.
-const EGG_SHOPS = { CommonEgg: 'egg', UncommonEgg: 'egg', RareEgg: 'egg', LegendaryEgg: 'egg', MythicalEgg: 'egg', DawnEgg: 'dawn', AmberEgg: 'amber', SnowEgg: 'snow', WinterEgg: 'snow' };
+const EGG_SHOPS = { CommonEgg: 'egg', UncommonEgg: 'egg', RareEgg: 'egg', LegendaryEgg: 'egg', MythicalEgg: 'egg', DawnEgg: 'dawn', AmberEgg: 'amber', SnowEgg: 'snow', WinterEgg: 'snow', SpookyEgg: 'spooky' };
 function itemCatalog() {
   const byName = new Map();
   const key = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2754,6 +4292,8 @@ function itemCatalog() {
   for (const [itemId, it] of Object.entries(stats.items)) add({ itemId, name: it.name || itemId, shop: it.shop, type: it.type, price: it.price }, true);
   for (const d of budget.DECOR) add({ name: d.name, shop: d.shop, type: 'Decor', price: d.price }, false);
   for (const [id, e] of Object.entries(petData.EGGS)) add({ itemId: id, name: e.name, shop: EGG_SHOPS[id] || '', type: 'Egg' }, false);
+  // The Haunt Event's egg, from the Spooky Shop (open at night).
+  if (Date.now() < HAUNT_ENDS) add({ itemId: 'SpookyEgg', name: 'Spooky Egg', shop: 'spooky', type: 'Egg', price: 8e8 }, false);
   return [...byName.values()];
 }
 ipcMain.handle('alerts:catalog', () => itemCatalog());
@@ -2763,16 +4303,73 @@ ipcMain.handle('alerts:clearHistory', () => {
   store.save();
   return [];
 });
-ipcMain.handle('alerts:status', () => (watcher ? watcher.status() : null));
+ipcMain.handle('alerts:status', () => (watcher ? feedStatus(watcher.status()) : null));
 ipcMain.handle('alerts:checkNow', async () => {
   if (watcher) await watcher.checkNow();
-  return watcher ? watcher.status() : null;
+  return watcher ? feedStatus(watcher.status()) : null;
 });
 
+// "Reconnect when the weather ends" (v0.60.5): your press on the stepped-
+// away page, for this weather only. Only from the game view showing that
+// page, only while stepped away for weather (not a break).
+ipcMain.on('parked:reconnect', (event, on) => {
+  if (!gameView || event.sender !== gameView.webContents || isBreak(parked)) return;
+  const url = (event.senderFrame && event.senderFrame.url) || '';
+  if (!/^file:/.test(url) || !/parked\.html(\?|$)/.test(url)) return;
+  parked.autoBack = on === true;
+  recordNote(parked.autoBack ? `🔁 Reconnecting when ${parked.label} ends (you pressed it)` : `Not reconnecting when ${parked.label} ends`);
+  sendParked();
+  if (parked.autoBack && parked.overSaid) rejoin(false);
+});
 ipcMain.on('garden:msg', (event, msg) => {
   if (!event.senderFrame || !isGameUrl(event.senderFrame.url) || !msg) return;
+  // Two accounts (v0.55.0): account 2's page only tells its tab about itself.
+  if (altView && event.sender === altView.webContents) {
+    handleAltMessage(msg.type, msg.payload);
+    return;
+  }
   handleGardenMessage(msg.type, msg.payload);
+  if (msg.type === 'status' && altView) pushAccounts(false);
 });
+// Your stage (v0.56.0 beta): 'auto' or the stage you pick; the answer comes
+// straight back, worked out from the last garden report.
+ipcMain.handle('stage:set', (event, pick) => {
+  const s = store.get();
+  s.stage = { pick: ['early', 'mid', 'late'].includes(pick) ? pick : null };
+  store.save();
+  const st = gardenStatus ? stageEngine.detect(stageEngine.signalsFrom(gardenStatus), s.stage.pick) : stageEngine.detect({}, s.stage.pick);
+  if (gardenStatus) {
+    gardenStatus.stage = st;
+    // The rankings' weights follow the stage (v0.70.0).
+    try {
+      gardenStatus.petRank = rankPets(gardenStatus.allPets, (s.ui || {}).petPrefs || {}, st.id);
+      sendGardenStatus(gardenStatus);
+    } catch (err) {
+      logError('pet rankings', err);
+    }
+  }
+  return st;
+});
+ipcMain.handle('accounts:get', () => accountsState());
+ipcMain.handle('accounts:add', () => {
+  createAltView();
+  showAccount(2);
+  return accountsState();
+});
+ipcMain.handle('accounts:remove', async () => {
+  if (!altView) return accountsState();
+  const r = process.env.MG_TEST_DIALOGS ? { response: 0 } : await dialog.showMessageBox(gameWindow, {
+    type: 'question',
+    buttons: ['Close it', 'Keep it'],
+    defaultId: 1,
+    cancelId: 1,
+    message: 'Close the second account?',
+    detail: 'Its game closes. It stays logged in, so adding it again picks up where it was.',
+  });
+  if (r.response === 0) removeAltView();
+  return accountsState();
+});
+ipcMain.on('accounts:show', (event, n) => showAccount(Number(n)));
 
 ipcMain.handle('ui:panel', (event, change) => (change ? setPanel(change) : panelState()));
 // The panel's own script errors (v0.54.1), for the log.
@@ -2801,20 +4398,19 @@ ipcMain.handle('garden:strength', (event, petId, strength) => {
 });
 
 ipcMain.handle('pity:get', () => pityView());
-ipcMain.handle('luck:get', () => luck.view(luckState()));
+ipcMain.handle('luck:get', () => luckView());
 ipcMain.handle('luck:set', (event, key, value) => {
   luck.set(luckState(), key, value);
   store.save();
   sendLuck();
-  return luck.view(luckState());
+  return luckView();
 });
 ipcMain.handle('luck:options', (event, opts) => {
   const l = luckState();
-  if (opts && typeof opts.startHalf === 'boolean') l.startHalf = opts.startHalf;
   if (opts && opts.notify && typeof opts.notify === 'object') Object.assign(l.notify, opts.notify);
   store.save();
   sendLuck();
-  return luck.view(l);
+  return luckView();
 });
 ipcMain.handle('pity:act', (event, action) => {
   const p = pityState();
@@ -2837,95 +4433,6 @@ ipcMain.handle('pity:act', (event, action) => {
 });
 
 /* ------------------------------------------------------------------ *
- * Coming back after another device. When you log in somewhere else (your
- * phone), the game here is bumped off (close code 4250/4300). If you've
- * switched this on, the app waits the time you chose, then reloads the game,
- * which logs the other device out. Magic Circle's rule: no automatic
- * reconnect after being replaced unless the player explicitly asks for it,
- * because two sessions fighting can lose data. So: off by default, a
- * countdown with Come back now / Stay away, and if you're bumped again
- * within 10 minutes of the app coming back, it stops and waits for you.
- * ------------------------------------------------------------------ */
-
-const RECLAIM_QUIET_MS = 10 * 60 * 1000;
-const reclaimState = { timer: null, until: 0, lastReturnAt: 0, waiting: false };
-
-function reclaimSettings() {
-  const s = store.get();
-  s.reclaim = Object.assign({ on: false, delaySec: 60 }, s.reclaim);
-  return s.reclaim;
-}
-
-function showReclaim(info) {
-  const contents = gameView && gameView.webContents;
-  if (!contents || contents.isDestroyed()) return;
-  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.showReclaim(${JSON.stringify(info)})`, true).catch(() => {});
-  sendToControl('reclaim:state', info);
-}
-
-function comeBack(why) {
-  clearTimeout(reclaimState.timer);
-  reclaimState.timer = null;
-  reclaimState.waiting = false;
-  reclaimState.lastReturnAt = Date.now();
-  const contents = gameView && gameView.webContents;
-  if (!contents || contents.isDestroyed()) return;
-  const url = isGameUrl(contents.getURL()) ? contents.getURL() : GAME_URL;
-  recordNote(why === 'auto' ? '📱 Came back to the game (the other device was logged out)' : '📱 Came back to the game');
-  sendToControl('reclaim:state', null);
-  contents.loadURL(url);
-}
-
-function onSuperseded() {
-  const cfg = reclaimSettings();
-  if (parked) return;
-  if (!cfg.on) {
-    recordNote('📱 You logged in somewhere else, so the game here was logged out');
-    return;
-  }
-  clearTimeout(reclaimState.timer);
-  reclaimState.waiting = true;
-  // Bumped again soon after coming back: you're using the other device.
-  // Don't fight over the account; wait for you instead.
-  if (reclaimState.lastReturnAt && Date.now() - reclaimState.lastReturnAt < RECLAIM_QUIET_MS) {
-    recordNote('📱 Logged in somewhere else again, so the app will wait until you press Come back');
-    showReclaim({ manual: true, message: "You're busy on the other device, so this will wait. Press Come back when you're done over there." });
-    return;
-  }
-  const delay = Math.max(15, Math.min(3600, Number(cfg.delaySec) || 60)) * 1000;
-  const until = Date.now() + delay;
-  reclaimState.until = until;
-  reclaimState.timer = setTimeout(() => comeBack('auto'), delay);
-  recordNote(`📱 Logged in somewhere else: coming back here at ${clock(until)}`);
-  showReclaim({ until });
-}
-
-function onReclaimAction(act) {
-  if (act === 'now') return comeBack('manual');
-  if (act === 'stay') {
-    clearTimeout(reclaimState.timer);
-    reclaimState.timer = null;
-    showReclaim({ manual: true, message: "Staying away. Press Come back when you're done over there." });
-    recordNote('📱 Staying logged out here until you press Come back');
-  }
-  return true;
-}
-
-ipcMain.handle('reclaim:get', () => Object.assign({}, reclaimSettings(), { waiting: reclaimState.waiting, until: reclaimState.timer ? reclaimState.until : null }));
-ipcMain.handle('reclaim:set', (event, change) => {
-  const cfg = reclaimSettings();
-  if (change && typeof change.on === 'boolean') cfg.on = change.on;
-  if (change && change.delaySec) cfg.delaySec = Math.max(15, Math.min(3600, Math.round(Number(change.delaySec))));
-  if (!cfg.on) {
-    clearTimeout(reclaimState.timer);
-    reclaimState.timer = null;
-  }
-  store.save();
-  return cfg;
-});
-ipcMain.handle('reclaim:act', (event, act) => onReclaimAction(String(act)));
-
-/* ------------------------------------------------------------------ *
  * Harvest lock: tells the game page which harvests to stop (all of them
  * while the lock is on, and protected crops always). The page does the
  * stopping (garden-observer.js); nothing is ever sent.
@@ -2933,13 +4440,41 @@ ipcMain.handle('reclaim:act', (event, act) => onReclaimAction(String(act)));
 
 function harvestLock() {
   const s = store.get();
-  s.harvestLock = Object.assign({ on: false, species: [], petFood: false, lockField: null }, s.harvestLock);
+  s.harvestLock = Object.assign({ on: false, species: [], petFood: false, lockField: null, team: null, teamBack: true, teamBefore: null, teamSwapped: null }, s.harvestLock);
   // Harvest mode (v0.54.4): only crops matching this rule can be harvested.
+  // Since v0.54.7 the rule is also what "ready" means everywhere. Someone who
+  // never set it starts from the old Money-tab ready rule (full size, Gold or
+  // Rainbow, any weather, any moon unless they'd turned one off).
+  if (!s.harvestLock.modeSet) {
+    const cur = harvestRule.clean(s.harvestLock.mode);
+    const untouched = cur.color === 'any' && !cur.hydro.length && !cur.lunar.length && !cur.size;
+    if (untouched) {
+      const old = (s.budget && s.budget.readyRule) || {};
+      s.harvestLock.mode = Object.assign(cur, {
+        color: old.color === false ? 'any' : 'goldOrRainbow',
+        hydro: old.hydro === false ? [] : harvestRule.HYDRO.slice(),
+        lunar: old.lunar === false ? [] : harvestRule.LUNAR.slice(),
+        size: old.size !== false,
+      });
+    }
+    s.harvestLock.modeSet = true;
+  }
   s.harvestLock.mode = harvestRule.clean(s.harvestLock.mode);
   return s.harvestLock;
 }
 
 
+// The event theme on the game's overlays too (v0.67.0).
+let pushedTheme = null;
+function pushTheme(force = false) {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const t = themeNow();
+  const id = t ? t.id : '';
+  if (!force && pushedTheme === id) return;
+  pushedTheme = id;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setTheme && window.__mgLoaderObserver.setTheme(${JSON.stringify(t ? { id: t.id } : null)})`, true).catch(() => {});
+}
 function pushHarvestLock() {
   const contents = gameView && gameView.webContents;
   if (!contents || contents.isDestroyed()) return;
@@ -2949,15 +4484,74 @@ function pushHarvestLock() {
 
 function setHarvestLock(change) {
   const lock = harvestLock();
+  const wasOn = Boolean(lock.mode && lock.mode.on);
   if (change && typeof change.on === 'boolean') lock.on = change.on;
   if (change && typeof change.petFood === 'boolean') lock.petFood = change.petFood;
   if (change && Array.isArray(change.species)) lock.species = change.species.map(String).slice(0, 100);
   if (change && change.mode && typeof change.mode === 'object') lock.mode = harvestRule.clean(Object.assign({}, lock.mode, change.mode));
+  // The harvest team (v0.73.0): a saved team to put out with Harvesting
+  // unlocked, and whether the pets before come back when it's turned off.
+  if (change && 'team' in change) lock.team = change.team ? String(change.team).slice(0, 80) : null;
+  if (change && typeof change.teamBack === 'boolean') lock.teamBack = change.teamBack;
+  const isOn = Boolean(lock.mode && lock.mode.on);
+  if (!wasOn && isOn) harvestTeamOut(lock);
+  if (wasOn && !isOn) harvestTeamBack(lock);
   store.save();
   pushHarvestLock();
+  // The rule is what "ready" means: the Money tab counts again.
+  viewCache.view = null;
   sendToControl('harvest:lock', lock);
   buildMenu();
   return lock;
+}
+
+/* Harvest team (v0.73.0, the owner: "set a team for harvest mode that auto
+ * swaps out when you turn it on"). Turning Harvesting unlocked on is your
+ * press, and it puts out your harvest team (one swap); the pets you had out
+ * are remembered. Turning it off puts them back (one swap), unless you've
+ * changed pets since or switched that off. Nothing happens on its own. */
+function petIdsOut() {
+  return ((gardenStatus && gardenStatus.pets) || []).map((p) => String(p.id)).filter(Boolean).sort();
+}
+function harvestTeamOut(lock) {
+  lock.teamBefore = null;
+  lock.teamSwapped = null;
+  if (!lock.team) return;
+  const team = gardenStatus && (gardenStatus.teams || []).find((t) => t.id === lock.team);
+  if (!team) {
+    recordNote('⚠️ Your harvest team isn\'t in your game any more: pick another in the Garden tab.');
+    return;
+  }
+  if (teamIsOut(team, gardenStatus.pets)) return;
+  const before = petIdsOut();
+  lock.teamBefore = before.length ? before : null;
+  lock.teamSwapped = team.id;
+  applyTeam(team.id, '(Harvesting unlocked)').then((r) => {
+    if (r && r.ok) return;
+    const l = harvestLock();
+    if (l.teamSwapped === team.id) {
+      l.teamBefore = null;
+      l.teamSwapped = null;
+      store.save();
+    }
+    recordNote(`⚠️ Couldn't put out ${team.name}: ${(r && r.reason) || 'the game page didn\'t answer'}`);
+  }).catch(() => {});
+}
+function harvestTeamBack(lock) {
+  const before = lock.teamBefore;
+  const swapped = lock.teamSwapped;
+  lock.teamBefore = null;
+  lock.teamSwapped = null;
+  if (lock.teamBack === false || !before || !before.length || !swapped) return;
+  // Only if the harvest team is still what's out: pets you changed since stay.
+  const team = gardenStatus && (gardenStatus.teams || []).find((t) => t.id === swapped);
+  if (!team || !teamIsOut(team, gardenStatus.pets)) return;
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed() || parked) return;
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.putOut ? window.__mgLoaderObserver.putOut(${JSON.stringify(before)}) : null`, true).then((r) => {
+    if (r && r.ok && !r.already) recordNote(`🐾 Back to ${r.team} (Harvesting locked again)`);
+    else if (r && !r.ok) recordNote(`⚠️ Couldn't put your pets back: ${r.reason}`);
+  }).catch(() => {});
 }
 
 ipcMain.handle('harvest:get', () => harvestLock());
@@ -3635,7 +5229,17 @@ ipcMain.handle('garden:sample', async () => {
     const file = path.join(app.getPath('userData'), 'garden-sample.json');
     fs.writeFileSync(
       file,
-      JSON.stringify({ appVersion: app.getVersion(), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, errors: ERROR_LOG.slice(), alertLog: alertDiagnostics(), maps: (() => { const u = store.get().ui || {}; return { spotMap: u.spotMap, binderMap: u.binderMap, thunderMap: u.thunderMap, mountMap: u.mountMap, mapPos: u.mapPos }; })(), lastStatus: gardenStatus, sample }, null, 2),
+      JSON.stringify({ appVersion: app.getVersion(), perf: perfView(), forecastLog: forecastLog.slice(-120), observerLoaded: Boolean(sample), roomLookup: lastRoomCheck, alerts: watcher ? watcher.diagnostics() : null, errors: ERROR_LOG.slice(), saleChecks: (store.get().saleChecks || []).slice(-10), keys: (() => {
+        // The action bar, bag keys and the potted-plant command (v0.57.2).
+        const ui = store.get().ui || {};
+        return { bar: actionBarCfg(), bagKeys: bagKeysCfg(), potCommand: ui.potCommand || '(built in: PlantGardenPlant)', appKeys: ui.appKeys || {} };
+      })(), hatchCounters: (() => {
+        // The hatch trackers (v0.56.11), so a paper tally can be checked
+        // against them: each counter, the audit, and the recent hatches.
+        const p = pityState();
+        const l = luckState();
+        return { audit: luck.audit(l), luck: l.counters, pity: { totalHatches: p.totalHatches, lastEggsHatched: p.lastEggsHatched, gameBase: p.gameBase, trackedBase: p.trackedBase, autoCount: p.autoCount, byEgg: p.byEgg, counters: p.counters, recent: (p.recent || []).slice(-60) } };
+      })(), alertLog: alertDiagnostics(), maps: (() => { const u = store.get().ui || {}; return { spotMap: u.spotMap, binderMap: u.binderMap, thunderMap: u.thunderMap, mountMap: u.mountMap, alwaysMap: u.alwaysMap, gardenMap: u.gardenMap, mapPos: u.mapPos }; })(), lastStatus: gardenStatus, sample }, null, 2),
       'utf8'
     );
     shell.showItemInFolder(file);
@@ -3755,7 +5359,20 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     store.init(app.getPath('userData'));
+    store.onWrite(perfWrite);
     voices.init(app.getPath('userData'));
+    try {
+      watchPresence();
+    } catch (err) {
+      logError('presence', err);
+    }
+    setInterval(() => {
+      try {
+        checkQuestReminder();
+      } catch (err) {
+        logError('quest reminder', err);
+      }
+    }, 60000);
     // The v0.50 voice lineup: remove downloads of voices that were retired,
     // and move anyone using one of them to the closest new voice that's
     // downloaded (the old effect voices were Leah underneath, so they move
@@ -3789,6 +5406,11 @@ if (!gotLock) {
     }
     seedScripts();
     migrateSettings();
+    try {
+      recoverTypedLuck();
+    } catch (err) {
+      /* the counts stay as they are */
+    }
     try {
       backup.autoBackup(backupsDir(), makeBackup);
     } catch (err) {
@@ -3835,11 +5457,24 @@ if (!gotLock) {
       onAlerts: handleAlerts,
       onData: onShopFeed,
       onStatus: (status) => {
-        sendToControl('alerts:status', status);
+        const st = feedStatus(status);
+        lastThemeSig = JSON.stringify([st.theme, st.night && st.night.on]);
+        sendToControl('alerts:status', st);
         planLogoff(status);
       },
     });
     watcher.start();
+    // The theme and night change with the clock (v0.67.0): the panel hears
+    // straight away, not only at the next shop check.
+    setInterval(() => {
+      if (!watcher) return;
+      const st = feedStatus(watcher.status());
+      pushTheme();
+      const sig = JSON.stringify([st.theme, st.night && st.night.on]);
+      if (sig === lastThemeSig) return;
+      lastThemeSig = sig;
+      sendToControl('alerts:status', st);
+    }, 20000);
 
     powerSaveId = powerSaveBlocker.start('prevent-app-suspension');
 

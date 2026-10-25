@@ -11,6 +11,15 @@ echo.
 where node >nul 2>nul
 if errorlevel 1 goto :nonode
 
+rem 0.59.1 put the pet pictures in an "icons" folder, which electron-builder
+rem takes for the app's own icon (and stops: "doesn't contain icons"). They
+rem live in pet-icons now; unzipping over the folder leaves the old one, so
+rem it goes here: icons\pets, then icons only if that left it empty.
+if exist "icons\pets\pig.png" (
+  rmdir /s /q "icons\pets"
+  rmdir "icons" 2>nul
+)
+
 rem An installer left running from an earlier build keeps its file open.
 taskkill /f /im "SSKs-Garden-Buddy-Windows.exe" >nul 2>nul
 

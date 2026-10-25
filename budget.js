@@ -289,6 +289,22 @@ function flows(history, days, now = Date.now()) {
   };
 }
 
+// Your expected burn rate (v0.67.3): every coin that went out a day (seeds,
+// eggs, decor, restocks, wherever you spent it), averaged over the last two
+// weeks. Only once the money history reaches back two weeks: a few days
+// swing too much with one big purchase. `days` says how far it reaches.
+const BURN_DAYS = 14;
+function burnRate(history, now = Date.now()) {
+  const pts = (Array.isArray(history) ? history : []).filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.c) && Number.isFinite(p.s)).sort((a, b) => a.t - b.t);
+  const days = pts.length > 1 ? (pts[pts.length - 1].t - pts[0].t) / 86400000 : 0;
+  // A few minutes' slack: readings are every half hour, so the oldest one
+  // may land just inside the two weeks.
+  if (days < BURN_DAYS - 1 / 48) return { ok: false, days, need: BURN_DAYS };
+  const f = flows(pts, BURN_DAYS, now);
+  if (!f.ok || !(f.hours > 0)) return { ok: false, days, need: BURN_DAYS };
+  return { ok: true, days, need: BURN_DAYS, perDay: f.spentPerDay, spent: f.spent, earnedPerDay: f.earnedPerDay, from: f.from, to: f.to };
+}
+
 // Day by day, for a chart: the last `days` days with what came in, went out
 // and stayed each day (UTC days), from the money history's points.
 function daily(history, days = 14, now = Date.now()) {
@@ -819,6 +835,9 @@ function gardenParts(ctx) {
   const hours = g.harvestHours != null && Number.isFinite(Number(g.harvestHours)) ? Number(g.harvestHours) : null;
   return {
     ready: (Number(g.readyValue) || 0) * SALE_M,
+    // Crops in your bag (v0.63.10): harvested but not sold yet. Counted, so
+    // harvesting doesn't dip the forecast until you sell.
+    bag: (Number(ctx.bagWorth) || 0) * SALE_M,
     readyCount: Number(g.ready) || 0,
     growing: (Number(g.growingValue) || 0) * SALE_M,
     potential: (Number(g.growingPotential) || 0) * SALE_M,
@@ -1117,6 +1136,31 @@ function procRate(settings, now = Date.now()) {
   return { perHour: hours > 0 ? count / hours : null, hours, count };
 }
 
+/* Steadier estimates (v0.63.10). What a ready crop is worth and how fast
+ * crops mature are re-picked on every update (the best of a few sources,
+ * whichever is available), so they jumped, and the forecast with them. With
+ * ctx.steady (the app sets it; the unit tests don't), each moves toward its
+ * new reading gradually: half way in 2 hours. Real changes still come
+ * through within a few hours; flip-flops are smoothed out. */
+const STEADY_HALF_MS = 2 * 3600000;
+const STEADY = {};
+function steady(key, v, now) {
+  if (v == null || !Number.isFinite(v)) return v;
+  const s = STEADY[key];
+  if (!s || !Number.isFinite(s.v) || !Number.isFinite(s.t)) {
+    STEADY[key] = { v, t: now };
+    return v;
+  }
+  const dt = Math.max(0, now - s.t);
+  const w = 1 - Math.pow(0.5, dt / STEADY_HALF_MS);
+  const nv = s.v + w * (v - s.v);
+  STEADY[key] = { v: nv, t: dt > 0 ? now : s.t };
+  return nv;
+}
+function resetSteady() {
+  for (const k of Object.keys(STEADY)) delete STEADY[k];
+}
+
 function estimate(settings, ctx = {}, pred = null, now = Date.now()) {
   const parts = gardenParts(ctx);
   const R = parts.readyCount;
@@ -1148,11 +1192,13 @@ function estimate(settings, ctx = {}, pred = null, now = Date.now()) {
   if (G > 0 && notReady > 0 && parts.potential > 0) candidates.push({ v: parts.potential / notReady, src: 'floor' });
   if (pred && pred.valueSource === 'cycles' && pred.predictedGrowing > 0 && G > 0) candidates.push({ v: pred.predictedGrowing / G, src: 'cycles' });
   const best = candidates.reduce((m, c) => (!m || c.v > m.v ? c : m), null);
-  const perCrop = best ? best.v : null;
+  let perCrop = best ? best.v : null;
+  let perCropRaw = perCrop;
   const perCropSource = best ? best.src : null;
   // The rate: what you've actually been doing; else "all of them by the
   // predicted harvest" (requirements, or your cycles).
   let rate = null;
+  let rateRaw = null;
   let rateSource = null;
   // Gold/Rainbow is the slow, steady last step of the owner's process, so
   // while crops still need it, how fast they turn is how fast they mature.
@@ -1174,6 +1220,12 @@ function estimate(settings, ctx = {}, pred = null, now = Date.now()) {
     rateSource = 'full';
   }
   const usable = rate != null && perCrop != null && N > 0;
+  if (ctx.steady && usable) {
+    perCropRaw = perCrop;
+    rateRaw = rate;
+    perCrop = steady('perCrop', perCrop, now);
+    rate = steady('rate', rate, now);
+  }
   const hoursToFull = usable ? (G === 0 ? 0 : rate > 0 ? G / rate : null) : null;
   return {
     usable,
@@ -1184,8 +1236,10 @@ function estimate(settings, ctx = {}, pred = null, now = Date.now()) {
     stuckWhy: stuck ? (sizeStuck >= goldStuck ? 'size' : 'color') : null,
     total: N,
     perCrop,
+    perCropRaw,
     perCropSource,
     rate,
+    rateRaw,
     rateSource,
     observedHours: obs.hours,
     hoursToFull,
@@ -1204,9 +1258,10 @@ function foresightOf(settings, ctx, extra, now) {
   const rules = alerts.allRules(settings);
   const wallet = Number.isFinite(Number(ctx.wallet)) ? Number(ctx.wallet) : 0;
   const parts = gardenParts(ctx);
-  // Coins you could have right now: the wallet plus crops ready to sell.
-  // Crops still growing count only once they're ready (the harvest below).
-  const W = wallet + parts.ready;
+  // Coins you could have right now: the wallet plus crops ready to sell (in
+  // the garden, and in your bag since v0.63.10). Crops still growing count
+  // only once they're ready (the harvest below).
+  const W = wallet + parts.ready + parts.bag;
   const pred = predictHarvest(settings, ctx, now);
   const est = estimate(settings, ctx, pred, now);
   const mode = est.usable ? 'estimate' : 'harvest';
@@ -1336,6 +1391,25 @@ function foresightOf(settings, ctx, extra, now) {
       break;
     }
   }
+  // Your expected burn rate: the same coming in, and what you usually spend
+  // a day going out (everything, not just your wants). Two weeks of history
+  // first; until then it's left out.
+  const burnInfo = burnRate(settings.moneyHistory, now);
+  let burn = { ok: false, days: burnInfo.days, need: burnInfo.need };
+  if (burnInfo.ok) {
+    const burnAt = (t) => W - extra + inflow(t, true) - burnInfo.perDay * t;
+    const bLine = [...new Set([0, ...samples, ...fullMark, end, ...Array.from({ length: 12 }, (_, i) => (end * i) / 12)])].sort((a, b) => a - b).map((t) => [t, burnAt(t)]);
+    let out = null;
+    for (let i = 1; i < bLine.length; i += 1) {
+      if (bLine[i][1] < 0 && bLine[i - 1][1] >= 0) {
+        const [ta, va] = bLine[i - 1];
+        const [tb, vb] = bLine[i];
+        out = ta + (tb - ta) * (va / (va - vb));
+        break;
+      }
+    }
+    burn = { ok: true, days: burnInfo.days, need: burnInfo.need, perDay: burnInfo.perDay, line: bLine, runsOut: out != null ? { t: out, at: now + out * D_MS } : null };
+  }
   // What comes in a day, to set against it: value maturing while crops
   // mature (the estimate), else your usual pace.
   const inPerDay = mode === 'estimate' && est.perDay != null ? est.perDay : g;
@@ -1361,6 +1435,7 @@ function foresightOf(settings, ctx, extra, now) {
       rows: ever.rows.slice(0, 14),
       unknown: ever.unknown,
     },
+    burn,
     waitingFor,
     mode,
     estimate: Object.assign({}, est, { fullT: Number.isFinite(tFull) ? tFull : null }),
@@ -1590,7 +1665,8 @@ function netWorthSeries(settings, days = 30, now = Date.now()) {
 // Now, and the change over the last `days` (from the earliest point in it).
 function growth(settings, ctx = {}, days = 7, now = Date.now()) {
   const series = netWorthSeries(settings, 30, now);
-  const live = Number.isFinite(Number(ctx.wallet)) ? { wallet: Number(ctx.wallet), garden: (Number(ctx.gardenWorth) || 0) * SALE_M } : null;
+  // Live net worth counts the crops in your bag too (v0.63.10).
+  const live = Number.isFinite(Number(ctx.wallet)) ? { wallet: Number(ctx.wallet), garden: ((Number(ctx.gardenWorth) || 0) + (Number(ctx.bagWorth) || 0)) * SALE_M } : null;
   const last = series[series.length - 1] || null;
   const nowPoint = live ? { t: now, wallet: live.wallet, garden: live.garden, total: live.wallet + live.garden } : last;
   const start = series.find((p) => p.t >= now - days * 86400000) || null;
@@ -1750,11 +1826,12 @@ function cropStage(ctx = {}) {
   const rule = Object.assign({ size: true, color: true, hydro: true, lunar: true }, ctx.readyRule || {});
   const steps = [
     { id: 'planted', label: total ? 'Planted' : 'Barren', emoji: '🌰', count: total, required: true },
-    { id: 'ripe', label: 'Grown', emoji: '🌿', count: Number(have.ripe) || 0, required: true, hours: hours.ripe },
+    { id: 'ripe', label: 'Ripe', emoji: '🌿', count: Number(have.ripe) || 0, required: true, hours: hours.ripe },
     { id: 'size', label: 'Full size', emoji: '📏', count: Number(have.size) || 0, required: rule.size, hours: hours.size },
-    { id: 'hydro', label: 'Weather', emoji: '🌧️', count: Number(have.hydro) || 0, required: rule.hydro, hours: hours.hydro },
-    { id: 'lunar', label: 'Moon', emoji: '🌕', count: Number(have.lunar) || 0, required: rule.lunar, hours: hours.lunar },
-    { id: 'color', label: 'Gold / Rainbow', emoji: '🌈', count: Number(have.color) || 0, required: rule.color, hours: hours.color },
+    // Labelled as your harvest rule asks (v0.54.7): "Thundercharged or Frozen".
+    { id: 'hydro', label: (rule.labels && rule.labels.hydro) || 'Weather', emoji: '🌧️', count: Number(have.hydro) || 0, required: rule.hydro, hours: hours.hydro },
+    { id: 'lunar', label: (rule.labels && rule.labels.lunar) || 'Moon', emoji: '🌕', count: Number(have.lunar) || 0, required: rule.lunar, hours: hours.lunar },
+    { id: 'color', label: (rule.labels && rule.labels.color) || 'Gold / Rainbow', emoji: '🌈', count: Number(have.color) || 0, required: rule.color, hours: hours.color },
     { id: 'ready', label: 'Ready', emoji: '🧺', count: Number(g.ready) || 0, required: true, hours: g.harvestHours },
   ];
   for (const st of steps) {
@@ -1806,7 +1883,12 @@ function buildView({ settings, now, ctx }) {
   // shown. The owner can also force it shown or hidden (Extras).
   const measuredHours = periods[30].hours || 0;
   const netWorth = (Number.isFinite(Number(ctx.wallet)) ? Number(ctx.wallet) : steady.ok ? steady.coinsNow : 0) + (Number(ctx.gardenWorth) || 0) * SALE_M;
-  const unlockDays = netWorth > 1e9 ? 14 : 1;
+  // Until the wallet and the garden are known (the game not connected yet),
+  // the longer rule: a big account read as worth 0 for a moment used to earn
+  // the one-day unlock and keep it (v0.65.0).
+  const walletKnown = (ctx.wallet != null && Number.isFinite(Number(ctx.wallet))) || steady.ok;
+  const worthKnown = walletKnown && ctx.gardenLoaded !== false;
+  const unlockDays = !worthKnown || netWorth > 1e9 ? 14 : 1;
   const mode = options(settings).unlockMode;
   const earned = Boolean(settings.budget && settings.budget.unlocked) || measuredHours >= unlockDays * 24;
   const unlocked = mode === 'on' ? true : mode === 'off' ? false : earned;
@@ -1861,4 +1943,4 @@ function buildView({ settings, now, ctx }) {
   };
 }
 
-module.exports = { saleCheckStep, saleCheckSummary, KNOWN, CATS, CAT_INFO, CELESTIAL, STAGES, DEFAULT_WANTS, ICONS, DECOR, everything, pastMoney, cropStage, gardenParts, harvestCycles, predictHarvest, maturingRate, procRate, estimate, foresight, whatIf, seedWants, categoryOf, netWorthSeries, growth, engine, split, stage, SHOP_KINDS, BASELINE, shopKind, emptyStats, migrateStats, record, recordMoney, flows, daily, verdict, migratePurchases, itemOfCommand, resetPurchases, PURCHASES_VERSION, recordPurchase, patterns, rate, afford, planIds, setPlan, nextOpening, plan, categories, options, setOptions, view };
+module.exports = { burnRate, BURN_DAYS, resetSteady, saleCheckStep, saleCheckSummary, KNOWN, CATS, CAT_INFO, CELESTIAL, STAGES, DEFAULT_WANTS, ICONS, DECOR, everything, pastMoney, cropStage, gardenParts, harvestCycles, predictHarvest, maturingRate, procRate, estimate, foresight, whatIf, seedWants, categoryOf, netWorthSeries, growth, engine, split, stage, SHOP_KINDS, BASELINE, shopKind, emptyStats, migrateStats, record, recordMoney, flows, daily, verdict, migratePurchases, itemOfCommand, resetPurchases, PURCHASES_VERSION, recordPurchase, patterns, rate, afford, planIds, setPlan, nextOpening, plan, categories, options, setOptions, view };

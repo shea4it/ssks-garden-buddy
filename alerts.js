@@ -52,6 +52,9 @@ const RULES = [
   { id: 'snow', label: 'Snow', kind: 'weather', pattern: /\b(snow|frost|blizzard)\b/i, tier: 'weather' },
   // Catches anything the list above doesn't, including weather added later.
   { id: 'weatherother', label: 'Any other weather', kind: 'weather', pattern: /./, tier: 'weather', fallback: true },
+  // Night (the Haunt Event, Oct 2026): every 10 hours for 30 minutes; the
+  // Spooky Shop opens over the Wishing Well for it.
+  { id: 'night', label: 'Night (Spooky Shop)', kind: 'weather', night: true, pattern: /^spooky$/i, tier: 'weather' },
 
   // Fired by the garden watcher in the game page, not by the shop watcher.
   { id: 'petgold', label: 'Pet turned a crop Gold', kind: 'pet', tier: 'pet' },
@@ -242,11 +245,18 @@ function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
       const ends = Date.parse(cur.endsAt);
       if (starts <= now && now < ends) signals.push(`${cur.weatherId || ''} ${cur.name || ''}`);
     }
+    // (v0.66.0) Only a weather shop opening says the weather changed; the
+    // Spooky Shop opening means night fell; others (an apology shop) are no
+    // weather at all, and used to set off "Any other weather".
+    let nightFell = false;
     for (const [shopId, shop] of Object.entries(data.shops || {})) {
       const was = state.wasOpen[shopId];
       const open = Boolean(shop && shop.open);
       state.wasOpen[shopId] = open;
-      if (open && was === false) signals.push(shopId);
+      if (open && was === false) {
+        if (/^spooky/i.test(shopId)) nightFell = true;
+        else if (weather.KINDS.some((k) => k.id === weather.kindOf(shopId))) signals.push(shopId);
+      }
       if (!open) delete state.openedAt[shopId];
     }
 
@@ -270,10 +280,19 @@ function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
     };
 
     for (const rule of weatherRules) {
-      if (rule.fallback) continue;
+      if (rule.fallback || rule.night) continue;
       if (!signals.some((s) => rule.pattern.test(s))) continue;
       matchedWeather = true;
       fireWeather(rule);
+    }
+
+    // Night: once per night, not for one already under way at start.
+    const nightRule = weatherRules.find((r) => r.night);
+    if (nightFell && nightRule && !state.firstPoll && now - (state.lastFired[nightRule.id] || 0) > WEATHER_COOLDOWN_MS) {
+      state.lastFired[nightRule.id] = now;
+      const sp = Object.entries(data.shops || {}).find(([id]) => /^spooky/i.test(id));
+      const egg = sp && (sp[1].items || []).find((it) => /spookyegg/i.test(String(it.itemId || it.name || '').replace(/\s+/g, '')) && it.stock > 0);
+      fired.push({ ruleId: nightRule.id, tier: 'weather', kind: 'weather', night: true, label: 'Night', itemName: egg ? 'Spooky Egg' : null });
     }
 
     // Nothing named it, but something is happening: announce it anyway.
@@ -451,9 +470,15 @@ function createWatcher({ getSettings, onAlerts, onStatus, onData, fetchImpl }) {
     return out;
   }
 
+  // The shops as last read (items with stock, next restocks), for quests.
+  function shops() {
+    return (state.last && state.last.shops) || {};
+  }
+
   return {
     current,
     listed,
+    shops,
     start() {
       if (state.running) return;
       state.running = true;

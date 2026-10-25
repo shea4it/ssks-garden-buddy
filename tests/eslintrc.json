@@ -1,0 +1,12 @@
+{
+  "root": true,
+  "extends": "eslint:recommended",
+  "env": { "browser": true, "node": true, "es2022": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "script" },
+  "rules": {
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "no-unused-vars": ["error", { "args": "none" }],
+    "no-inner-declarations": "off",
+    "no-useless-escape": "off"
+  }
+}

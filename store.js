@@ -43,6 +43,18 @@ const DEFAULTS = {
     autoCount: true,
   },
   alertHistory: [],
+  // Daily quests (v0.65.0): a line per day for 30 days (quests.js
+  // recordDay), and the day the "an hour left" reminder last went.
+  quests: { days: {}, remindDay: null },
+  // Night (v0.66.0, the Haunt Event): when the Spooky Shop last opened and
+  // closed, so the next night can be worked out (every 10 hours).
+  night: { lastStart: null, lastEnd: null },
+  // Events (v0.67.0): when the game last showed each one was running
+  // (events.js), for its theme.
+  events: {},
+  // Egg locks (v0.69.0): egg ids you've locked so they can't be hatched,
+  // like ['ThunderEgg'], until you unlock them.
+  eggLock: [],
   // Rooms you've saved in the Rooms tab: [{ id, name, addedAt }].
   rooms: { saved: [], showShared: true, clipboard: true },
   garden: {
@@ -70,6 +82,7 @@ const DEFAULTS = {
   logoff: {
     enabled: false,
     kinds: [],
+    ping: true,
     rejoin: true,
     leadSeconds: 30,
   },
@@ -224,12 +237,21 @@ function save() {
   saveTimer = setTimeout(writeSoon, SAVE_DELAY_MS);
 }
 
+// Told how long turning the settings into text took, and how big (v0.73.1:
+// that part runs on the app's main thread).
+let writeWatcher = null;
+function onWrite(fn) {
+  writeWatcher = typeof fn === 'function' ? fn : null;
+}
+
 function writeSoon() {
   saveTimer = null;
   if (!file || writing) return;
   let t;
   try {
+    const t0 = Date.now();
     t = text();
+    if (writeWatcher) writeWatcher(Date.now() - t0, t.length);
   } catch (err) {
     console.error('Could not save settings:', err);
     return;
@@ -268,4 +290,4 @@ function set(next) {
   return data;
 }
 
-module.exports = { init, get, set, save, flush, recovered };
+module.exports = { init, get, set, save, flush, recovered, onWrite };

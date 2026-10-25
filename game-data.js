@@ -115,6 +115,26 @@ function parseGameCode(text) {
     return m ? m[1] : null;
   }
 
+  function abilityTable(block) {
+    var m = /([A-Za-z_$]*[Aa]bilit[A-Za-z_$]*)\s*:\s*(\{[^{}]{1,2000}\})/.exec(block);
+    if (!m) return null;
+    var p = pairs(m[2]);
+    return p && Object.keys(p).length ? { field: m[1], weights: p } : null;
+  }
+  function abilityListOf(block) {
+    var m = /([A-Za-z_$]*[Aa]bilit[A-Za-z_$]*)\s*:\s*\[([^\[\]]{1,2000})\]/.exec(block);
+    if (!m) return null;
+    var names = m[2].match(/[A-Za-z_$][A-Za-z0-9_$]*/g) || [];
+    return names.length ? { field: m[1], names: names.slice(0, 40) } : null;
+  }
+
+  function dietOf(block) {
+    var m = /[,{]\s*diet\s*:\s*\[([^\[\]{}]{0,800})\]/.exec(block);
+    if (!m) return null;
+    var names = m[1].match(/[A-Za-z_$][A-Za-z0-9_$]*/g) || [];
+    return names.length ? names.slice(0, 12) : null;
+  }
+
   // Every key:value pair of a small flat object ({Worm:60,Snail:35}).
   function pairs(block) {
     var out = {};
@@ -166,6 +186,15 @@ function parseGameCode(text) {
       maxScale: num(flat, 'maxScale'),
       sellPrice: num(flat, 'maturitySellPrice'),
       maxHunger: num(flat, 'coinsToFullyReplenishHunger'),
+      // (v0.61.1) Which abilities this kind can roll, if the game says: any
+      // field with "abilit" in its name holding a {Name: weight} table or a
+      // list. (Nested, so it's read from the raw block, not the flat one.)
+      abilityWeights: abilityTable(block),
+      abilityList: abilityListOf(block),
+      // (v0.67.0) What it eats, and whether it's nocturnal (the Haunt
+      // update's isNocturnal: stronger at night).
+      diet: dietOf(block),
+      nocturnal: /[,{]\s*isNocturnal\s*:\s*(?:!0|true)\s*[,}]/.test(flat),
     };
   });
 

@@ -375,6 +375,14 @@ console.log(`budget: ${n} checks passed`);
   ok(vr.unlockDays === 14 && vr.netWorth === 1.1e9, 'garden + wallet over 1B counts');
   vr = budget.view({ settings: rich, now, ctx: { wallet: 0.4e9, gardenWorth: 0.5e9 } });
   ok(vr.unlockDays === 1 && vr.unlocked === true, 'under 1B: a day is enough');
+  // (v0.65.0) Before the game has said what the wallet and garden hold, the
+  // longer rule: reading a big account as worth 0 used to unlock it.
+  const early = base();
+  early.moneyHistory = [{ t: now - 25 * H, c: 0, s: 0, f: 0 }];
+  vr = budget.view({ settings: early, now, ctx: { gardenLoaded: false } });
+  ok(vr.unlockDays === 14 && vr.unlocked === false, `not known yet: 14 days (${vr.unlockDays})`);
+  vr = budget.view({ settings: rich, now, ctx: { wallet: 0.4e9, gardenWorth: 0.5e9, gardenLoaded: false } });
+  ok(vr.unlockDays === 14, 'the garden not read yet: 14 days');
   rich.moneyHistory = [{ t: now - 15 * D, c: 2e9, s: 0, f: 0 }, { t: now, c: 2e9, s: 1e9, f: 0 }];
   ok(budget.view({ settings: rich, now, ctx: { wallet: 2e9 } }).unlocked === true, '15 days: unlocked');
   // Overrides from Extras.
@@ -502,6 +510,33 @@ console.log(`budget: ${n} checks passed`);
   f = budget.foresight(s, { wallet: 1e9 }, 0, now);
   ok(f.unknown.length === 1 && f.unknown[0].label === 'Firepit' && f.signal === 'wait', 'unknown rate listed; no pace measured: wait');
   console.log('budget (foresight): ok');
+}
+{
+  // Expected burn rate (v0.67.3): what goes out a day, over the last two
+  // weeks, only once the history reaches back that far.
+  const now = Date.UTC(2026, 9, 18, 12);
+  // Coins flat at 10B while selling brings in 3B a day: 3B a day goes out.
+  const hist = (days) => Array.from({ length: days * 2 + 1 }, (_, i) => ({ t: now - days * D + i * 12 * H, c: 10e9, s: (i / 2) * 3e9, f: 0 }));
+  ok(budget.burnRate([], now).ok === false && budget.burnRate(hist(13), now).ok === false, 'under two weeks of history: no burn rate yet');
+  ok(Math.round(budget.burnRate(hist(13), now).days) === 13, 'says how far it reaches (13 days)');
+  const b = budget.burnRate(hist(20), now);
+  ok(b.ok && Math.abs(b.perDay - 3e9) < 1e6, 'two weeks and more: 3B a day (' + (b.perDay / 1e9) + ')');
+  // On the forecast: the same coming in (2B a day) less 3B a day.
+  const s = base();
+  s.moneyHistory = hist(15);
+  s.budget = { wantsSeeded: true, plan: [] };
+  const f = budget.foresight(s, { wallet: 10e9, pace: 2e9 }, 0, now);
+  ok(f.burn && f.burn.ok && f.burn.line.length > 5, 'the forecast carries the burn line');
+  const at = (t) => f.burn.line.find((p) => Math.abs(p[0] - t) < 1e-9);
+  const last = f.burn.line[f.burn.line.length - 1];
+  near(last[1], 10e9 + 2e9 * last[0] - 3e9 * last[0], 1e6, 'burn line: wallet + coming in − 3B a day');
+  ok(at(0) && Math.abs(at(0)[1] - 10e9) < 1, 'starts at what you have');
+  const s2 = base();
+  s2.moneyHistory = hist(6);
+  s2.budget = { wantsSeeded: true, plan: [] };
+  const f2 = budget.foresight(s2, { wallet: 10e9, pace: 2e9 }, 0, now);
+  ok(f2.burn && f2.burn.ok === false && !f2.burn.line && Math.round(f2.burn.days) === 6, 'six days of history: no line, days so far given');
+  console.log('budget (burn rate): ok');
 }
 {
   // Already short: any spend deepens the most important shortfall.

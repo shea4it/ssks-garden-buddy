@@ -82,6 +82,8 @@ function countHatch(pity, h, source) {
     const st = petData.strength({ species: h.species, targetScale: h.targetScale, xp: 0 }, []);
     pity.recent.push({
       at: h.at || Date.now(),
+      // The pet's own id (v0.57.2), so a double count would show at a glance.
+      petId: h.petId || null,
       eggId: h.eggId,
       species: h.species,
       mutations: h.mutations || [],
@@ -147,7 +149,16 @@ function onBacklog(pity, hatches, eggsHatched, oldestLogAt) {
     return result;
   }
 
-  const fresh = list.filter((h) => (h.at || 0) > pity.lastHatchAt && !(h.petId && pity.seenIds.includes(h.petId)));
+  // New = a pet we haven't seen (v0.56.11). Timestamps aren't trusted for
+  // this: they're the game server's, compared with this computer's clock (a
+  // fast PC clock skipped real hatches), and two hatches can share one.
+  // Hatches from before counting began, or while auto-count was off, are
+  // already in seenIds. Only an entry without a pet id falls back to time.
+  const fresh = list.filter((h) => (h.petId ? !pity.seenIds.includes(h.petId) : (h.at || 0) > pity.lastHatchAt));
+  // Does the log reach back to hatches we'd already counted? Then every
+  // hatch since is in it and nothing can be missing (v0.56.11: by pet id,
+  // not by comparing the server's times with this computer's clock).
+  const overlap = list.some((h) => h.petId && pity.seenIds.includes(h.petId));
   result.fresh = fresh;
   for (const h of fresh) {
     result.hits.push(...countHatch(pity, h, 'catch-up'));
@@ -157,7 +168,8 @@ function onBacklog(pity, hatches, eggsHatched, oldestLogAt) {
   // holds every hatch since, so nothing can be missing. Only when the log
   // starts later than that (a long time away) can hatches have dropped off
   // it, and the game's own total fills that gap.
-  const logCoversGap = oldestLogAt != null && Number(oldestLogAt) <= pity.lastHatchAt;
+  const withIds = list.some((h) => h.petId);
+  const logCoversGap = withIds ? overlap : oldestLogAt != null && Number(oldestLogAt) <= pity.lastHatchAt;
   if (!logCoversGap && eggsHatched != null && pity.lastEggsHatched != null) {
     // The total as it really was when we left: the last one kept, plus
     // live hatches it hadn't caught up with yet.

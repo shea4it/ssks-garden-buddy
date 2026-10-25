@@ -8,12 +8,108 @@ or save, Growth, Garden worth over time, Gold & Rainbow) and a dashed guide
 follows it, with a dot on each line and a little box saying exactly what each
 line is at that point, and when.
 
+
+Under the title, a short **hello** says the one or two things worth knowing
+right now: a pet getting hungry, crops ready to pick, or the weather. During
+an event it starts with the event ("🎃 Haunt Event · 23 days"), and at
+night with how long night lasts and how much stronger nocturnal pets are
+("🌙 until 9:07pm · +14 STR"). It always stays on one line; hover it for
+the whole thing.
+
+
+**The bell in the header** pauses pings for an hour from any tab (it gets a
+line through it and says until when); tap it again to turn them back on. The
+other round buttons are Harvesting unlocked (the basket), the harvest lock,
+popping the panel out into its own window, and hiding the panel.
+
+
+**Event themes.** While a game event runs, the panel dresses up for it and
+goes back to normal when it ends. During the **Haunt Event** it turns deep
+plum with pumpkin-orange switches and highlights, a dusky glow behind the
+header, a bat flying past now and then, and stars at night. The overlays on
+the game turn orange too. The theme comes on by itself during the event's
+dates, or whenever the game shows the event is on (the Spooky Shop opening,
+a Haunt Quest for today), so next year's Haunt Event gets it too. Switch it
+off in Extras → Panel → Event themes.
+
+
+Back after 30 minutes or more? A **Welcome back** bar under the hello says
+what changed while you were away: crops ready, garden worth, and the alerts
+you missed. It also shows when you come back to the computer after 10
+minutes away (or after the screen was locked or the computer was asleep).
+While you're away like that, Windows notifications are held back so they
+don't pile up; alerts still sound and still go in Recent alerts. A
+notification about weather that's already over never pops up, and no more
+than three pop up in half a minute.
+
+
+**Pet food that needs weather** (Weather tab, off unless you turn it on):
+when a weather you'll stay in for starts, a card on the game offers to plant
+out the pet food in your trough that can't fill a pet's bar without a
+mutation (Lychee, for most), one press per pot, and to pot it back up when
+it ends. The chips show which kinds it uses; tap to change them.
+
+## Setting up
+
+The first time the app opens, a short **setup** walks you through what it
+needs to know, one screen at a time (about a minute). Each answer is set the
+moment you tap it, and **Skip setup** keeps the usual settings.
+
+1. **About your garden**: how far along it is (Early, Mid, Late, or let
+   the app work it out from your garden).
+2. **Shop items to watch for**: the rare ones are on already; tap any you
+   don't care about, or add your own.
+3. **How alerts sound**: volume, spoken or just sounds, sound effects, a
+   sample to hear, and pop-ups on your computer.
+4. **Weather you'd rather not have**, and whether to just get a ping or a
+   card asking you to step away.
+5. **When a crop is ready to sell** (color, weather, moon, full size), and
+   keeping pet food out of sales.
+6. **How you sell**: in a full room with your sell pets (crops count at
+   what you'd get) or not, and whether to share your room on the community
+   list.
+7. **The panel**: beside the game or in its own window, open on Home or
+   Alerts, and event themes.
+
+Then a summary of what's set, and **Start**. Run it again any time from
+Extras → Panel → **Run setup again**; it shows your current choices.
+
+## Home
+
+**Tap the tab you're on again** (or the app's name at the top) and the
+panel goes to **Home**: one page with what matters most right now. Tap any
+tab to leave it. The app remembers if you were on Home.
+
+- **Hello**: what's ready to sell (and how many crops), your wallet and
+  dust, and your **max net worth** with how much it moved in the last 7
+  days. Max net worth is your coins plus your garden sold at the most you
+  could get for it (a full room and your best sell pets out), so it reads
+  higher than the net worth on the game overlay, which counts the garden at
+  its plain price. A green **Live** dot while the game is connected.
+- **Needs you**: only things to do now: a pet out with nothing it eats in
+  the trough, an empty trough, quests or a bonus ready to claim, the Haunt
+  Quest, the harvest lock or Harvesting unlocked left on, pings paused, a
+  new version. With nothing to do it says you're all caught up.
+- **Coming up**, as clock times: the weather on now and the next two
+  events, the spooky night (on now, and when the next one starts, during
+  the Haunt Event), new daily quests (with how many are left today), when
+  the trough runs out, and when your whole garden will be ready to sell (if
+  that's within two days).
+- **Hatching**, only while a rare, Gold or Rainbow pet is 5 hatches away or
+  less, or an egg is locked: each one with how many to go ("Next one!" when
+  it's the next hatch), and a 🔒 button on each egg to lock or unlock it.
+- **Pets out · time to max strength**: each pet out with its strength now
+  and max, and how long until it's there with your team (or Max ✓).
+
+Every line opens the tab (and section) it comes from.
+
 ## Where things are
 
 The panel sits on the right of the game window. **Ctrl+Shift+D** hides it
-and brings it back. The ⧉ button at its top (or the **Panel** menu) pops it
-out into a window of its own; the same button puts it back. Where it sits
-and how wide it is are in Extras, under **Panel**.
+and brings it back. The pop-out button at its top (two overlapping
+windows; or the **Panel** menu) pops it out into a window of its own; the
+same button puts it back. Where it sits, how wide it is and event themes are
+in Extras, under **Panel**.
 
 **Any screen size.** The window opens to fit your screen (maximised on a
 small one, like a 13" laptop). The panel sizes itself to your screen too:
@@ -32,13 +128,23 @@ follow your finger and buttons are bigger to tap.
 - **🌦️ Weather**: today's weather, one line per event, plus **a pet team for
   each weather**, **team triggers** (swap teams when the garden reaches a
   goal), and **logging off during weather**.
-- **🌻 Garden**: **your garden's worth over time** (a chart for the last day,
-  week or month), **your stats** (coins this session and per hour, lifetime
-  earnings and harvests, how often each pet ability has triggered), how many
-  crops are growing and ready, what the unpicked
-  garden is worth, Gold/Rainbow share and **how long until they all are**,
-  each **weather mutation**, **crop size** with how long until everything
-  is full size, the harvest lock and the open-spot map.
+- **🌻 Garden**, in five views (the row of buttons at its top):
+  - **🌱 Now**: how many crops are growing, ripe and ready, what the
+    unpicked garden is worth, and **crop size** with how long until
+    everything is full size.
+  - **✨ Mutations**: every mutation's share now, Gold/Rainbow and **how
+    long until they all are**, **mutations over time**, and Gold & Rainbow
+    by your pets.
+  - **🗺️ Map**: the garden map.
+  - **🧺 Harvest**: what counts as ready, and Harvesting unlocked.
+  - **🏅 Progress**: **your garden's worth over time** (a chart for the
+    last day, week or month), **your stats** (coins this session and per
+    hour, lifetime earnings and harvests, how often each pet ability has
+    triggered) and your stage.
+- **📜 Quests**: today's three daily quests with progress, rewards and a line
+  of help each, the bonus, when new quests come, what you've earned from
+  quests, and the last two weeks. During the Haunt Event, the Haunt Quest
+  too.
 - **💰 Money**: **money in and out** (what you earned, spent and kept over
   the last day, week or month, and whether spending is ahead), **your plan**
   (what you're saving for, how far along, when its shop next opens), **can
@@ -204,6 +310,7 @@ tap their name.
 | Snow | Icy shimmer and "Snow!" |
 | Any other weather, including anything added to the game later | Chime and the weather's name |
 | Amber | Warm chime and "Amber alert!" |
+| Night (during the Haunt Event) | Soft night chime and "Night has fallen. The Spooky Shop is open". Once a night; it also says when the Spooky Egg is in stock |
 
 **Snooze** (top of Alerts, or the Alerts menu) silences alerts for 30
 minutes or an hour. Alerts still get logged, so nothing is lost.
@@ -214,143 +321,50 @@ or snoozed.
 
 ## Weather tab
 
-**Pet team for each weather.** Pick one of the teams you've saved in the
-game (Pet Teams) for Rain, Snow, Thunderstorm, Dawn and Amber Moon, and one
-for clear skies to go back to afterwards. When the weather changes, the app
-switches teams for you, exactly as if you'd tapped that team in the game. It
-switches once per change, so if you swap by hand it leaves you alone until
-the next change. If nothing is picked for clear skies, the team you had out
-before the weather comes back when it ends (unless you've swapped by hand
-since). **Apply** next to each team swaps it in right away, which is
-a good way to check it works. Every swap is listed in Recent alerts.
+**🌙 Night** (during the Haunt Event, until Monday, November 9, 7:00pm
+Eastern). Night comes every 10 hours and lasts 30 minutes. At night the
+Spooky Shop opens over the Wishing Well, haunts come out, and nocturnal pets
+(Bat, Platypus, Red Fox, Moth, Snake and Toad) get stronger the darker it
+gets: up to +20 STR at midnight. The app knows the game's clock, so the top
+of the Weather tab always says when the next night is ("Next night at
+7:40pm, in 3h 20m"). At night it says until when, how dark it is (sunset,
+midnight or sunrise) and how much stronger nocturnal pets are right now.
+There's also a 🌙 Night box next to the weather and restock boxes.
 
-**Log off during weather.** Weather can only change your crops while you're
-in the game. Tap the weather you want to keep off your garden, and the app
-steps out about 30 seconds before it starts. Twenty seconds before that, a
-card over the game asks first: "You're about to step out for upcoming
-Rain: **Confirm** / **Ignore**". Confirm steps out now, Ignore stays in for
-that one weather (the setting stays on for the next), and if you don't
-answer it steps out when the countdown ends. The game window shows a "back
-soon" page with a countdown, and (if **Come back when it's over** is on) the
-app rejoins by itself about 10 seconds after the weather ends. **Rejoin now**
-brings you back early. **Log off now** steps out for a break and never comes
-back by itself.
+**Suggested team for each weather.** Pick one of the teams you've saved in
+the game (Pet Teams) for Rain, Snow, Thunderstorm, Dawn and Amber Moon, and
+one for clear skies. When the weather changes, the app **suggests** that
+team: a card in the middle of the game, a banner in the panel and (if they're on) a
+desktop notification, each with **Put out**. You press it; the app never
+swaps your pets by itself. When the weather ends it suggests your
+clear-skies team, or the one you had out before if you'd put the weather
+team out. A suggestion goes away once that team is out, when you press ✕, or
+once the weather it was for is over: away for a whole spell of rain, you
+won't come back to a rain team card under clear skies (its desktop
+notification is taken down too). **Apply** next to each team puts it out
+right away.
 
-While the app is stepped out, don't play on another device. When it comes
-back it takes over from that session, which is the "two sessions fighting"
-situation the devs warn about.
+**Weather you don't want.** Weather can only change your crops while you're
+in the game. Tap the weather you want to keep off your garden. **Gentle ping
+when it starts** (on unless you switch it off) plays a soft chime and leaves
+a note (and a desktop notification, if those are on) the moment it begins,
+so you notice. With **Ask me to step away** on as well, shortly before it starts (just 10 seconds before, when a Dawn or Amber Moon runs right up to it, so you don't leave the moon early) a card on the game asks: "Rain is coming: step
+away?" **Step away** steps out now; **Stay in** stays in for that one weather
+(the setting stays on for the next). No answer counts as staying in for that weather; it asks once per spell. The game
+window shows a big countdown to the weather's end ("Rain ends in 4:31");
+when it's over it turns into a sunny **Safe to join!** with a big **Join
+the game** button, a cheerful chime in the panel, and a desktop
+notification if those are on. You press Join the game.
 
-Both helpers are off until you switch them on. They're in the modding
-policy's "yellow zone" (pet loadouts are the devs' own example of what's OK).
-Neither one buys, sells, harvests or plants anything.
-
-## Alerts that ring through quiet hours
-
-Tap any alert's name in the Alerts tab and switch on **🌙 Ring during
-quiet hours and snooze**: that alert rings even during quiet hours and while
-alerts are snoozed, and shows a 🌙 in the list. It's for the
-ones worth waking up for, like a Moonbinder at 4am. **Mute alerts** still
-silences everything. The computer has to be awake for any alert to ring,
-so leave it on (the screen can be off).
-
-## Updates
-
-At the top of the Extras tab. The app checks for a new version when it starts
-and every few hours (switch **Check automatically** off if you'd rather not),
-and **Check for updates** (or **Help → Check for updates…**) checks right away.
-When there's one, a banner appears under the tabs and the card shows what's
-new. **Update now** downloads it, checks it's complete and exactly what was
-published, then:
-
-- **Windows:** installs it; the app closes and reopens on the new version.
-- **Mac:** opens it in Finder. Quit the app, drag SSK's Garden Buddy onto
-  Applications, choose Replace, and open it again (right-click → Open the
-  first time).
-
-Nothing is ever installed until you press Update now. Settings, counts and
-history are kept. Once an update has gone through, the app removes the
-installer it downloaded. If there are old installers you downloaded from the
-website still in your Downloads folder, the Updates card offers to move them
-to the Recycle Bin (Trash on a Mac); it never removes them without asking.
-
-## Harvest lock
-
-For moving pots around without harvesting by accident. Press the 🔓 at the
-top of the panel, **Ctrl+Shift+L**, or the switch at the top of the Garden
-tab: while the lock is on (🔒, and a small badge in the game's corner),
-nothing gets harvested, and "Harvest lock has blocked harvesting" flashes up
-if you try. (The game starts its pick-up animation the instant you act, before
-anything is sent, so you may see it begin; it's undone straight away.)
-Press it again when you're ready to harvest.
-
-(The Harvest lock card sits at the top of the Garden tab.)
-
-**Always protect** (under it) lists the crops in your garden: tap one to
-make sure it's never harvested by accident, lock or no lock (your
-celestials, say). Tap it again to allow it.
-
-**Never sell pet food** (the switch in the same card). Pet food is
-whatever you carry in pots. When you sell, the app locks any crops of those
-plants that aren't locked yet, one crop at a time (the same lock as
-right-clicking a crop in your bag), then lets the sale go through, and a
-message says what it kept: "Kept your pet food: locked Eggplant, sold the
-rest." If a lock can't be made, nothing is sold and the message says so.
-After the sale it checks the locked crops are still in your bag; if the game
-sold one anyway, it tells you, and from then on it stops sales with pet food
-in them instead (lock it by hand, then sell). Crops of plants you don't
-carry in pots are never in the way.
-
-The lock never sends anything of its own: it points the game's own harvest at
-a crop spot that doesn't exist, so the game's server refuses it like any bad
-click and nothing is harvested.
-
-**Harvest mode** (Garden tab, under Harvest lock; **Ctrl+Shift+M**): only
-crops that match what you pick can be harvested, and everything else is
-kept, so you can sweep the whole garden harvesting without looking. Pick
-what a crop needs in each row (all rows must match; in a row, any one you
-pick will do; nothing picked in a row means any):
-
-- **Colour:** Any, Gold or Rainbow, or Rainbow.
-- **Weather:** Wet, Chilled, Frozen, Thunderstruck, Thundercharged.
-- **Moon:** Dawnlit, Dawnbound, Amberlit, Amberbound.
-- **Size:** Full size only.
-
-For example Gold or Rainbow + Thundercharged + Amberbound + Full size only.
-Under the rows it says how many ripe crops match right now and what they're
-worth. A kept crop shows one short note in the game ("🧺 Kept Marigold: not
-Amberbound") instead of a pile of them while you sweep; a badge in the
-corner says harvest mode is on and what it lets through, and the map over
-the game shows the plants with crops to harvest. Crops you protect are
-never harvested, and the Harvest lock still stops everything.
-
-## Sharing your room
-
-The Rooms tab's **Open rooms right now** list comes from the community (Arie's
-mod). It's often short, because only that mod's users appear on it. The switch
-**Share my room on the community list** (Rooms tab, **Room settings**) adds the room you're in to
-it, so other players can find and join you. While it's on, about once a minute
-the app sends your room code, how many are in the room, your name and your coin
-balance to that mod's server; the name and coins also show on that mod's own
-site, alongside everyone else who uses it. It never sends your garden,
-inventory or anything about the other players in your room. Turn it off and
-nothing is sent, and your room drops off the list within a few minutes. The
-switch is off unless you turn it on.
-
-When the app starts, it asks once: **Share your room with the public?**
-**Share my room** turns the switch on; **Not now** leaves it off and asks again
-next time, unless you tick **Don't ask me again**. It doesn't ask while
-sharing is already on.
-
-## Playing on another device
-
-Logging in on your phone logs the game out here. In the Extras tab, **Come
-back after I play elsewhere** (off until you switch it on) makes the app wait
-the time you pick (1 to 10 minutes) and then come back, which logs the phone
-out. While it waits, a countdown shows on the game screen and in the panel,
-with **Come back now** and **Stay away**. If you go back to the phone within
-10 minutes of the app coming back, it stops and waits for you instead of the
-two taking turns. Finish anything important on the other device before the
-countdown ends.
+A few seconds after the weather starts, a **Reconnect when Rain ends**
+button floats gently in under the countdown. Press it and you're
+reconnected when that weather ends (a note and a notification say so);
+**Cancel** takes it back. It's only for that weather, and never on by
+default.
+The app never steps out or comes back by itself. **Step away now** steps out
+for the weather that's on (or starting within 10 minutes): the away screen
+counts down to its end and, after 5 seconds, offers **Reconnect when it
+ends**. On a clear sky it's a plain break.
 
 ## Seed deleter
 
@@ -385,7 +399,8 @@ teams.
 - Each trigger shows where the garden is right now ("Now 63% (126 of 200)").
 - A trigger fires once when its goal is reached, and again only after the
   garden drops back below it (you harvest and replant). If a trigger's goal
-  is met, it wins over the weather team, so they don't swap back and forth.
+  is met, its suggestion wins over the weather team's. Like those, you press
+  **Put out**: the app never swaps by itself.
 
 ## Backups
 
@@ -403,23 +418,37 @@ tells you in Recent alerts. The damaged file is kept next to it, in case.
 
 ## Garden tab
 
-The top line counts your crops three ways: growing (all of them), **ripe**
+The Garden tab has five views, picked from the row of buttons at its top,
+which stays in reach as you scroll: **🌱 Now**, **✨ Mutations**, **🗺️
+Map**, **🧺 Harvest** and **🏅 Progress**. The tab opens on the view you
+used last. A link from elsewhere (a number in the stage strip, Money's
+"Change it") opens the view it points to. While Harvesting unlocked is on,
+a small dot sits on 🧺 Harvest. The ← and → keys step through the views.
+On a narrow panel, the view you're on keeps its name and the others show
+their emoji (hover one for what's in it).
+
+**🌱 Now.** The top line counts your crops three ways: growing (all of them), **ripe**
 (the game says they're grown) and **ready to sell** (they meet your rule
-from the Money tab: full size, Gold/Rainbow, weather and moon, whichever you
+in 🧺 Harvest: full size, Gold/Rainbow, weather and moon, whichever you
 count). "Ready" means the same thing everywhere in the app.
 
-**Your stage** sits under Your garden: where you are in the game (seed
+**Your stage** (in 🏅 Progress) shows where you are in the game (seed
 ladder, building your pets, mutation farming) and where your crops are, from
 bare ground to ready to sell.
+
+**✨ Mutations.** **Mutations now** shows every mutation's share of your
+crops: Weather (a crop holds one), Moon (Dawn and Amber can't share a crop)
+and Gold & Rainbow, each with its total, plus how long until every crop is
+Gold or Rainbow at your pets' rate.
 
 **Mutations over time** charts how much of your garden carries each
 mutation, to time a harvest. The boxes at the top are three families, one
 row each: **💧 Hydro** (Wet, Chilled, Frozen, Thunder), **🌙 Lunar** (Dawn,
 Amber) and **🌈 Gold/Rainbow** (Gold, Rainbow). The family's own box ("💧
 93%") is its combined line; tick any mutation next to it to add its own
-line, in its own colour (Rainbow is drawn in rainbow). A box shows its share
-now while its line is on (hover a box for it any time; the Weather mutations
-bars under the chart have them all). Pick 12 h, 24 h, 3 days or 7 days.
+line, in its own color (Rainbow is drawn in rainbow). A box shows its share
+now while its line is on (hover a box for it any time; the Mutations now
+card above the chart has them all). Pick 12 h, 24 h, 3 days or 7 days.
 Right of **Now** is the forecast: every rain, snow and thunder and every
 dawn and amber moon coming up is a band for as long as it lasts, with its
 emoji in a strip above the chart, shown when a line it can move is on. With
@@ -433,6 +462,16 @@ counts, so a harvest doesn't read as mutations lost. It reads your garden
 every 10 minutes and keeps a week; the separate lines start from 0.53.3
 (before it, only the family totals were kept).
 
+**Leaving plants out:** the **🌱 All plants** button left of the time
+buttons opens a list of your plants, biggest first, with how many crops
+each has. Tap one to leave it out of the chart (it's crossed out), like
+crops you never harvest such as Thunder Celestials: every share is then of
+the rest of your garden. Tap it again to count it, or **Count every plant
+again**. The button says how many are left out ("🌱 1 left out"; hover it
+for which). Your choice is remembered. The app tracks each plant from 0.64.0
+on, so with plants left out, the lines start where that began and a note
+under the chart says from when.
+
 **Gold & Rainbow by your pets** is a line graph of how fast your pets turn
 crops Gold and Rainbow: a gold line and a rainbow line, a point for each
 hour (12 h, the default, or 24 h), 3 hours (3 days) or 6 hours (7 days),
@@ -445,64 +484,44 @@ few seconds and files what they went up by under the hour. Hours the game
 wasn't open here show as a faint line and don't count toward the rate (a
 day away isn't dumped into one bar). Two weeks are kept.
 
-**Garden worth over time** has a scale up the side in round steps, so you
+**🏅 Progress.** **Garden worth over time** has a scale up the side in round steps, so you
 can read where the line starts and every level it passes.
 
-**Garden map** shows your garden tile by tile, three ways (the buttons at
+**🗺️ Map.** The **Garden map** shows your garden tile by tile, five ways (the buttons at
 the top; it remembers which):
 
-- **To-do**: each plant coloured by its next step, so a full late-game
-  garden tells you what's worth doing. **Cleanse** (orange): a plant beside
-  a Moonbinder with Dawnlit or Dawnbound crops. Dawn and Amber can't share a
-  crop, and only Amberlit crops beside a Moonbinder bind to Amberbound (x10),
-  so a Crop Cleanser (it takes hydro and lunar off the whole plant and keeps
-  Gold and Rainbow) opens that back up; the hydro comes back with the
-  weather. It's only suggested when what the Dawn crops would gain outweighs
-  what any Amber crops on the same plant would lose. **Pot beside a
-  Moonbinder** (purple): a plant with Amberlit crops that isn't next to one;
-  moved there with a Planter Pot, they bind to Amberbound at the next Amber
-  Moon. Only as many as there are open spots beside a Moonbinder, best
-  first, and the spot to use has a dashed outline; the rest say what they'd
-  gain if you freed up a spot. Everything else is quiet: **waiting** on
-  weather or pets, **growing**, or **done** (at its best for where it is).
-  A binder grows fruit of its own, and next to another binder it mutates
-  and binds like any crop, so a binder can be a to-do too ("Cleanse its
-  fruit": a Moonbinder with Dawnbound fruit beside another Moonbinder); it's
-  never suggested for a pot, since moving it moves its 8 spots. A cleanse
-  on a plant beside both a Moonbinder and a Dawnbinder says to step out
-  during Dawns afterwards (Weather tab), since Dawns come twice as often as
-  Amber Moons and it could go Dawn again.
-  Cleanse and pot tiles glow in their colour, like open spots do in Spots;
-  binders have a white outline and a soft glow, and the spot to pot into
-  pulses. Until you have a binder, the map opens on Spots, and To-do just
-  says suggestions start once you have one. "Next to" is the 8 tiles around a binder,
-  diagonals too, on the same side of the garden. A to-do has to be worth
-  at least 0.1% of your garden's value, so small chores stay off the list
-  (the tile still says what it would add).
-- **Value**: each plant from dim to bright gold by what it's worth now;
-  your ten most valuable glow.
-- **Spots**: what's on each spot (open, plant, egg, decoration, shard),
-  open ones glowing, for placing a pot.
+- **🪴 Spots**: the open spots, glowing, so you can see where a pot fits.
+- **⚡ Thunder**: what a Thunderspire's ring reaches.
+- **🌅 Dawn** and **🌕 Amber**: what a binder's ring reaches, with the open
+  spots beside it.
+- **💰 Value**: each plant shaded by what it's worth.
 
-**Cleanse** means a plant with Dawn crops next to a Moonbinder: Dawn and
-Amber can't be on the same crop, so a Crop Cleanser (it clears weather and
-moon mutations, and keeps Gold and Rainbow) lets it go Amberbound instead,
-which is worth more (x10, against Dawnbound's x7). **Pot** means an Amberlit
-crop that isn't next to a Moonbinder: pot it and plant it in a dashed spot
-next to one. The To-do view says this under its count and opens the plant
-with the most to gain, with a How step.
+Hover a tile for the plant on it. While you're in the game, a ring on the
+map shows where you're standing. On a narrow panel the buttons you haven't
+picked show just their emoji.
 
-Tap any tile for its crops, their mutations, what it's worth and its next
-step (and how much that step adds). While you hold a pot (empty or with a
-plant in it), **🪴 Open spots** shows in the corner of the game, like the
-other maps: open spots glowing green, the count at the top, and in a full
-garden "No open spots: every tile has something on it. Pot a plant to
-free one." (the switch under the map).
+**📌 Keep this map on the game** (the switch under the map) puts the view
+you picked over the game and leaves it there, so you always have it, like
+the map in the panel. Nothing else changes: when open spots, the binder map
+or a finder applies, it shows first as usual and the kept map waits as a 📌
+tab on its title. If the view has nothing to show (no Thunderstruck crops,
+say) it shows your plain garden and says so. Off unless you turn it on.
+
+The map over the game can be resized: drag the grip in its bottom-right
+corner, or double-click it for its normal size.
+
+While you hold a pot (empty or with a plant in it), **🪴 Open spots** shows
+in the corner of the game, like the other maps: open spots glowing green and
+the count at the top; in a full garden it says "No open spots: every tile
+has something on it. Pot a plant to free one." (the switch is under the
+map).
 
 **One map over the game.** Everything below shows on a single map in the
 bottom-right corner, and what it shows follows what you're doing, most
-pressing first: a pot in your hand (open spots), harvest mode (what it
-lets you harvest), then an Amber Moon or Dawn
+pressing first: an Amber Moon or Dawn with that binder (the binder map,
+which also lights up every open spot while you hold a pot, brightest beside
+the binder), a pot in your hand (open spots), Harvesting unlocked (what it lets you
+harvest)
 with that binder (the binder map), riding an Ostrich or Phoenix, a Thunder
 Wolf out (the Thunderstruck finder), and an Ostrich or Phoenix out. When
 more than one fits, small tabs on its title show the others with their
@@ -514,13 +533,13 @@ The switches under the Garden map turn each view on or off.
 **The binder map** pops up in the bottom-right corner of the game during an
 Amber Moon if you have a Moonbinder (or a Dawn, with a Dawnbinder), for
 moving plants so lit crops bind before it ends. Bigger than the open-spot
-map, it's in the event's colours (amber for an Amber Moon, purple for a
+map, it's in the event's colors (amber for an Amber Moon, purple for a
 Dawn): the binder (white) and its 8 spots (outlined); lit crops glowing:
 steady beside a binder (binding now), pulsing anywhere else (move them in);
 open binder spots green; bound crops and the rest dimmed. A binder whose
 own fruit is lit glows too (binding, when it's beside another binder). The other moon's
 crops sitting in a binder spot (Amber crops by a Dawnbinder) keep their
-own muted colour, and only pulse (to swap out) when you have more lit
+own muted color, and only pulse (to swap out) when you have more lit
 crops waiting than open binder spots for them; an Amberbound crop is
 already worth more than Dawnbound would be, so otherwise they're left
 alone. A line on top counts it all ("1 binding · 3 to move in · 2 open
@@ -563,12 +582,55 @@ open.
 Every heading in the panel folds: click it to tuck the cards under it away
 (the little arrow turns), click again to open them. The panel remembers
 which you've opened and folded. Settings and the long lists start folded
-(sound and voice, the three alert lists, harvest lock, weather mutations,
-crop size, your stats, room settings, panel, backups, and so on), and a
+(sound and voice, the three alert lists, your stats, room settings, panel,
+backups, and so on), and a
 folded heading shows a one-line summary of what's underneath ("14 of 14
 on", "🔊 95% · Leah", "sharing off · copy prompts on"), so a tab reads at
 a glance even with everything closed. Long explanations show two lines
 (the alert lists' sound descriptions one); tap one to read all of it.
+
+## Quests tab
+
+The game gives three daily quests (easy, medium and hard) at the Quest
+Booth in the Village, with a bonus for finishing all three. New ones come at
+midnight UTC (8:00pm in New York, 7:00pm once the clocks go back). The
+Quests tab reads them from the game:
+
+- **Today's quests**, in the game's own words, each with a progress bar
+  ("12 / 15"), its reward, and how it stands: so many to go, **Ready to
+  claim!** (claim it at the Quest Booth), or **Claimed ✓**. A quest you
+  re-rolled says **re-rolled**; one you still can says **↻ re-roll left**.
+  A gold dot on the tab means something's ready to claim.
+- **A line of help** under each one, from what the app already knows:
+  - **Buying a seed or egg:** whether the shop has it now, or when it
+    restocks.
+  - **Harvesting:** how many ripe crops in your garden would count. With a
+    harvest rule set, it also says how many of those the rule counts as
+    ready, so you know what you'd pick anyway.
+  - **Hatching eggs:** how many are growing and how many are ready.
+  - **Pet abilities:** which of your pets out do it, and about how long it
+    takes at their usual rate.
+  - **Selling for coins:** what your ready crops would bring.
+  - **New mutations:** when the right weather is next.
+  - **Journal entries:** how much of your Garden Journal is filled in.
+- **The bonus**, its reward, and how many quests are left for it.
+  Unfinished at the reset, that day's bonus goes.
+- **Your quests so far:** quests done, coins and Magic Dust from quests,
+  re-rolls used, and your journal (crop and pet entries), from the game's
+  own counters. Under them, the last two weeks as the app saw them: ✓ for
+  each quest done, and the bonus. Hover a day for its quests.
+- **Reminder** (on unless you turn it off): an hour before new quests, once
+  a day, only if something's left to do or claim.
+
+**👻 The Haunt Quest** (during the Haunt Event) has its own card: how many
+haunts you've snapped with your Camera today ("3 / 8"), what it pays (the
+Black Cat outfit, or a Haunt Lamp if you already have it), and when haunts
+are out next. Haunts roam the villages at night and during weather, so the
+card says "It's night: haunts are out now" or "Next chance: Rain at
+4:10pm". The gold dot on the tab lights up when it's ready to claim, and
+**Your quests so far** counts Haunt Quests done.
+
+The app only reads your quests. You do them and claim them in the game.
 
 ## Money tab
 
@@ -606,7 +668,7 @@ when they show up, and how much can you spend on decor meanwhile?
   what's coming in covers all your wants, so all of it is free; or which
   want you'd be short for.) **How it's worked out** under it walks through
   the four steps: what you have now (coins plus crops ready by your
-  "ready" rule), what's coming in, your wants on the days they usually
+  harvest rule), what's coming in, your wants on the days they usually
   show up, and the walk forward through those days (✅ bought, *skip* when
   it would cost you one higher on your list, 🔴 short). Safe to spend is
   what's left at the tightest moment; if anything is short, it's 0. The
@@ -623,7 +685,7 @@ when they show up, and how much can you spend on decor meanwhile?
   everything (every alert item and every decoration from 100M up, each time
   it shows up); if it goes under zero it turns red, and a note under the
   chart says when it would run out. Where each line ends up is written in
-  the margin on the right, in its colour. Nothing is written on the lines:
+  the margin on the right, in its color. Nothing is written on the lines:
   **hover anywhere** for that day's date and exact amounts, and any
   purchase that day. Your wants sit in a row under the chart on the days
   they're due, ringed green (you'll have the money), amber (worth skipping
@@ -635,19 +697,14 @@ when they show up, and how much can you spend on decor meanwhile?
   **How to read this** explains it. With a "Can I buy this?" check, the
   dashed line shows what happens after buying it, and today's forecast
   stays behind as a faint dotted "without it".
-- **The buy-everything line** is a race, under the chart. The 🏁 flag is
-  what buying every item you have an alert for and every decoration from
-  100M up costs a day (every time each shows up, at how often it does:
-  the Mini Wizard Tower, Mini Fairy Castle and Wind Turner lead, ~11–14B a
-  day each). You (🌱) are what you make a day: this week's earnings once
-  the app has them, what your garden is maturing until then. Short of the
-  flag it says how far along you are and how much a day is left to go;
-  past it, the track turns gold, you become a 🏆 and it says by how much.
-  A little ▲ marks your best. The first time you cross it the app
-  celebrates (confetti over the game and a cheer) and remembers the day.
-  **What "everything" is** lists the biggest costs; decor nobody pings
-  (Stone Firepit, Mini Fairy Keep, Stone Torch…) is listed as not counted
-  yet until the app has watched its shop for at least 10 restocks.
+- **Expected burn rate.** Once the app has two weeks of your money
+  history, an orange dotted line shows where your money goes if you keep
+  spending like you have those two weeks (every coin that went out,
+  wherever you spent it, averaged a day; the key shows how much). If it
+  would run out inside the chart, a line under the chart says when. Until
+  then, How to read this says how many of the 14 days are in.
+- **The purple line** is if you bought everything: every item you have an
+  alert for and every decoration from 500M up, each time it shows up.
 - The coins line starts from your
   wallet plus the crops ready to sell right now, steps up at the next
   harvest (🌾, when your growing crops will all be ready; they don't count
@@ -677,7 +734,7 @@ when they show up, and how much can you spend on decor meanwhile?
   crops' full-size-and-gold floor). The line rises as crops mature,
   flattens when the garden is full (🌾 full), and follows your usual pace
   after that. The Growth card shows the formula as a picture: estimated
-  value when full, a ready / can-mature bar, and where each number came
+  worth when it's all ready, a ready / can-become-ready bar, and where each number came
   from.
 - Each want has its own icon everywhere: 🌙 Moonbinder, 🌅 Dawnbinder, ⭐
   Starweaver, 🔥 Emberbloom, 🌄 Dawnbreaker, 🥚 Mythical Egg.
@@ -736,14 +793,43 @@ Below it, five sections, each answered with a picture first:
 
 ## Pets tab
 
+Like the Garden tab, the Pets tab has five views along the top (it
+remembers the one you were on). On a narrow panel the ones you're not on
+show just their emoji.
+
+- **🐾 Now**: Your team right now and Pets that are out.
+- **🍽️ Food**: when the trough runs out, and how hungry each pet is. A
+  red dot on it means a pet out has nothing it eats in the trough, or the
+  trough is empty.
+- **👥 Teams**: your saved teams, the team builder and the swap-back
+  button. The 🔁 on the game (or Ctrl+Shift+T) puts back the pets you had
+  out before; press it again to swap back. New pets count as your team
+  once you close the Pet Hutch window, put a whole team out, do something
+  else (harvest, plant, buy…) or press the button, so swapping pets one
+  by one never counts the ones in between, and there's no waiting.
+- **🏆 Rankings**: Pet Power Rankings, Best pets for… and Time to max
+  strength.
+- **✨ Made**: the Gold, Rainbow and coins your pets have made.
+
 - **Your team right now** adds up what the pets that are out do, goal by
-  goal: Gold crops, coins, crop size, selling, and so on. Abilities that only
+  goal: Rainbow and Gold crops, coins, crop size, selling, and so on, each
+  as its name with what it adds up to underneath. Abilities that only
   work in certain weather are listed underneath, greyed out, until that
   weather comes.
 - **Pets that are out** shows each pet's strength (and pings you when one
   reaches full strength) (worked out from its size
   and XP, the same way the game does), how long until it's fully grown, and
   what each ability does at that strength ("about 16.6M coins an hour").
+- **Time to max strength**: every pet that's still growing, with its
+  strength now and its max ("STR 58 → 86") and how long it takes out and
+  fed. Pets that are out (marked OUT) show the time with your team's XP
+  Boost. The rest show the time with your two best XP Boost pets out with
+  them, and on their own. The top says how much faster your XP Boost pets
+  make everything grow ("they grow 2.5× as fast"), and what your best two
+  would do at full strength. Pets only grow while they're out and fed, not
+  in your bag or the hutch.
+- **🌙 nocturnal** marks the Bat, Platypus, Red Fox, Moth, Snake and Toad.
+  At night they get up to +20 STR, the darker the stronger.
 - **Best pets for…**: pick a goal (Gold crops, coins, crop size, selling,
   hatch XP, max strength, Gold/Rainbow pets, double hatch, and more) and
   every pet you own is ranked for it,
@@ -751,6 +837,20 @@ Below it, five sections, each answered with a picture first:
   in. Handy while you build a team.
 - **Your saved teams** lists every team from the game with what it would do,
   and an **Apply** button.
+
+**Pet Power Rankings** (Pets tab, Rankings) give each pet Pet Power (PP):
+for every ability you tick, how close the pet is to that ability's best,
+times the ability's weight, plus +50 for a Rainbow pet and +20 for a Gold
+one. A perfect Rainbow Granter is 100 PP. The default weights are each
+ability's coins a day compared with Rainbow Granter's (the working is in
+docs/ability-weights.md), and **they follow your stage**: early and mid
+gardens weigh every weather and moon granter by its own mutation, so Frost
+Granter (x6) counts a lot; late gardens save the weather slot for
+Thunderstruck → Thundercharged and the moon slot for Amberlit → Amberbound,
+so Thunderstruck and Amberlit Granters and the Thundercharger count more,
+Frost, Rain and Snow Granters count for nothing, and Dawnlit only for Dawn
+captures. Your stage comes from the stage bar (Auto or picked). Any weight
+can be changed under ⚖️ What counts.
 
 **Level next** (Pets tab) says which pet is most worth levelling next.
 For each ability line (Sell Boost I-IV, Gold Granter, Coin Finder I-IV...)
@@ -778,10 +878,14 @@ Since the September update, every egg, plant and capsule has its own
 counters for its rare results, and the game guarantees each one at twice the
 usual number of tries. A Common Egg's Bee by 40 hatches, a Carrot's Gold
 crop by 200 Carrots, a Purple Daisy by 500 Daisies, a Dawnbreaker Spore by
-400 Dawn Capsules. Rare pets are per egg (a Common Egg's progress does
-nothing for a Rare Egg's Turkey), but **Gold and Rainbow pets are one
-counter each across every egg**: any hatch that isn't Gold adds to the Gold
-counter, whichever egg it was.
+400 Dawn Capsules. **Everything is per egg, Gold and Rainbow pets
+included**: a Common Egg's progress does nothing for a Rare Egg's Turkey,
+or for a Thunder Egg's Gold. Each egg's line has its rare pets and its own
+Gold pet (by 200 of that egg) and Rainbow pet (by 2,000 of that egg).
+When two guarantees from the same roll are due together (Gold and
+Rainbow, or the Amber Egg's Phoenix and Fire Horse), the rarer one comes
+first and the other stays due; a rare pet and Gold or Rainbow are separate
+rolls, so a hatch can force both (a guaranteed Rainbow Thunder Wolf).
 
 - **The top of the tab answers "am I about to pull something rare?"**
   Your nearest rare pull is up top, big: its icon, its name, the odds ("1
@@ -803,13 +907,22 @@ counter, whichever egg it was.
   most urgent first, with a 🍀 next / 🔍 look / 👀 watch chip, and each
   rare pet or item with its icon) and a
   bar; open it to see every result with its chance a pull, its bar, and
-  **misses so far**, which you can type over. Lines that are close open by
-  themselves.
-- The game keeps the real counts to itself, so these are the app's own
-  count. Accounts from before the update started halfway, so counters the
-  app hasn't seen yet start halfway too (tagged **estimate**; hover it).
-  Switch that off in **Luck settings** (bottom of the tab, with which kinds
-  get heads-ups) if your account is new.
+  its **misses** since the last one, in a box you can type in. Lines that
+  are close open by themselves.
+- **Each counter starts the first time the app sees that result happen.**
+  The game keeps the real counts to itself, so the app can only know where
+  one stands once it has watched it reset: your first Gold pet, your first
+  Thunder Wolf, your first Dawnbreaker Spore. From then on its count is the
+  game's. Until then the line says **waiting for the first one**, with no
+  number, and it's left out of the top of the tab, the hatch warning and
+  the heads-ups. If a counter ever goes past its guarantee without the
+  result (some pulls weren't seen), it goes back to waiting rather than
+  guess. **Luck settings** (bottom of the tab) picks which kinds get
+  heads-ups.
+- **Tracked one yourself?** Type your misses since your last one in its
+  box, even on a line that's waiting. It's marked **your count** and
+  counts on from there; once the app sees the result itself it's measured
+  like the rest. Clear the box to make it wait again.
 - What counts: hatches from the game's log (it catches up on recent ones when
   it starts), crops that start growing while the game is open in the app,
   and capsules from the game's own totals (so those catch up too). Double
@@ -819,13 +932,36 @@ counter, whichever egg it was.
   odds say to expect. **Rare finds** lists each rare result and how many
   pulls it took.
 
+**Check the counts** (top of Eggs): the app's own check that every hatch it
+counted landed on its egg. The shared Gold counter sees every hatch; each
+egg's counters see that egg's. If they agree, it says "✅ Every hatch the app
+has counted is on its egg". If not, it says how many hatches couldn't be put
+on an egg: ones made while the app was closed that had left the game's log
+(it keeps only recent entries) before the app opened; Gold and Rainbow count
+those, the egg counters can't. **Hatches counted, by egg** lists the totals
+to compare with a paper tally.
+
+
+**🔒 Egg locks** (Luck tab, under Eggs). Lock an egg and it can't be
+hatched: tapping a locked egg in the game does nothing, and a card says
+"🔒 Thunder Egg is locked" with a **Go to egg locks** button that opens
+this list with that egg lit up. It stays locked until you unlock it here
+(or with the 🔒 on Home). Handy for holding Thunder Eggs while the Thunder
+Wolf is next and you hatch other eggs until the Rainbow guarantee is next
+too. The top line shows how far the any-egg Gold and Rainbow guarantees
+are. **🥚 Hatch warning on the game** (on by default): when you hatch an
+egg and a rare, Gold or Rainbow pet is 5 hatches away or less, a counter
+pops up at the top middle of the game ("🥚 Rare hatch soon · Thunder Wolf ·
+next one!") and goes 10 seconds after your last hatch.
 ## How the money numbers fit together
 
-**Your best sell pets, and a reminder to put them out.** Under the Growth
-chart on the Money tab: "🐾 Best sell pets +31.3%: Pig (+3.2% sell) · Pig
-(+3.2% sell) · Capybara (Double Harvest 4.0%, Crop Refund 15.8%)", then
-✅ when they're all out, or "⚠️ put Capybara out before you sell (about X
-more on your ripe crops, in a full room)". The Garden tab shows that
+**Your best sell pets, and a reminder to put them out.** Under net worth
+on the Money tab's Growth card, one line: "💰 Including full-room prices and
+best sell pets ×1.78" (with "⚠️ 1 not out" beside it if one isn't out).
+Tap it for the details: the full room's +50%, each pet and its share (Pig
++3.2% sell, Capybara Double Harvest 4.0% · Crop Refund 15.8%), what they add
+up to, and ✅ when they're all out or "⚠️ Put Capybara out before you sell:
+about X more on your ripe crops in a full room". The Garden tab shows that
 reminder too, only while one of them isn't out. The team is the three pets
 you own (out, in your inventory or the hutch) that multiply a sale the most,
 at their strength now, so it changes as pets grow or you get new ones. Sell
@@ -849,16 +985,15 @@ Three totals appear, counting different things on purpose:
   plus every crop at what you'd get. The Wallet · Ready · Growing bar adds
   up to it.
 - **Your money** (the Money forecast and safe to spend): your coins plus
-  only the crops that are ready by your "ready" rule (ripe, and full size,
-  Gold/Rainbow, hydro and lunar if you ask for them), at what you'd get.
+  only the crops that are ready by your harvest rule (see Harvesting &
+  ready), at what you'd get.
   The sentence under safe to spend says how much more is in crops that
   aren't ready yet.
 
 So net worth = your money + the crops that aren't ready yet. The Money
 engine is different again: the coins you actually earned a day (selling
 crops and pets, and what your pets found). The forecast's "growing ~X a
-day" is crops becoming ready times what they're worth. "Estimated value
-when full" is your ready crops plus the ones that can still get there, each
+day" is crops becoming ready times what they're worth. "Worth when it's all ready" is your ready crops plus the ones that can still get there, each
 at least at its full-size-and-Gold value (with the base value beside it).
 
 **Checked against your sales.** Each time you sell, the app compares the
@@ -878,7 +1013,7 @@ pets' sell boosts included, and what it would fetch in a full room (+50%)
 with your best sell pets: the three pets you own (out, in your inventory
 or the hutch) whose Sell Boost, Double Harvest and Crop Refund multiply a
 sale the most, named, since few people look at these numbers with their
-sell pets already out. The Money tab's "Estimated value when full" uses
+sell pets already out. The Money tab's "Worth when it's all ready" uses
 the same team for "+ bonuses" and "in a full room with your best sell
 pets".
 
@@ -911,3 +1046,40 @@ Leah, Cori, Alan and Alba to the speaker you pick, but the Mac's own
 (Computer) voice always plays on the default speaker. And the downloaded
 voices are less tested on a Mac: if one won't download or play, pick
 Computer voice instead.
+
+**Stacked** (on by default; the chip at the end of the legend): within a
+family, each mutation you show sits on the ones below it, a stacked area
+chart. Tick Wet and Chilled and the Chilled line is the two together, with
+the line between the bands where they split; tick all four and the top is
+the family's total. Families stack separately, because a crop can have one
+weather, one moon and one color, but never two of a kind: Wet and Dawn
+can't be added up. The legend shows each mutation's own share; the numbers
+at the right are where the lines are; hovering shows both.
+
+**Harvesting unlocked takes over** while it's on (the 🧺 button turns red,
+and the game's badge says HARVESTING UNLOCKED): only its rule decides what can be
+harvested, and Lock harvesting and Always protect step aside (they're kept
+exactly as they are, and apply again the moment you lock harvesting again).
+It looks switched on: a red switch with ON next to it, the 🧺 button at
+the top of the panel (next to the 🔒) turns red, a red badge on the game,
+and the 🧺 slot on the action bar glows red. The 🧺 up top turns it on and
+off too (as does Ctrl+Shift+M).
+
+**🐾 Team for harvesting** (under the switch) picks one of your saved teams
+to put out when you turn Harvesting unlocked on, however you turn it on
+(the switch, the 🧺 up top, Ctrl+Shift+M or the action bar). With **Put my
+pets back when I turn it off** on, the pets you had out before come back
+when you lock harvesting again, unless you've changed pets in the
+meantime (then they're left as you set them). Each turn is your press and
+one swap; Recent alerts notes each one.
+
+**Protecting is by the crop itself:** a Thunderspire grows Thunderpeel and
+Stormcap, and protecting one doesn't protect the other.
+
+**You are here:** a white dot in a gold-and-white ring marks the garden tile
+you're standing on, on the map over the game and on the Garden map card.
+The app learns where your garden sits from your own play: harvest, plant or
+pot a few crops by hand (a few on each bed) and the marker appears; until
+then the card says so. On the walkway between the beds it sits in the gap
+on your row (once both beds are learned). Off your garden, there's no
+marker.

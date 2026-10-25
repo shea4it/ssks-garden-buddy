@@ -162,6 +162,15 @@ const WEATHER_NAMES = { frost: 'Snow', snow: 'Snow', ambermoon: 'Amber Moon', da
 const MUTATION_NAMES = { ambershine: 'Amberlit', dawncharged: 'Dawnbound', ambercharged: 'Amberbound' };
 const TRIGGER_PER = { sellallcrops: 'sale', sellcrop: 'sale', hatchegg: 'hatch', harvest: 'harvest', harvestcrop: 'harvest', sellpet: 'pet sold' };
 
+// A granted mutation's name, as the app spells it. The game's catalog wraps
+// some in backticks ("`Rainbow`"), which kept the Rainbow Granter out of
+// the Rainbow total, the team summary and Best pets for… (v0.67.3).
+function mutationName(raw) {
+  const m = String(raw || '').replace(/[`*_]/g, '').trim();
+  if (!m) return '';
+  return MUTATION_NAMES[norm(m)] || m.charAt(0).toUpperCase() + m.slice(1);
+}
+
 // Fills in what the live catalog says over the built-in numbers. The
 // built-in entry still decides the group and kind; the game decides chances
 // and amounts.
@@ -180,10 +189,7 @@ function applyLive(def, live) {
   if (p.hungerRestorePercentage != null) out.restorePct = p.hungerRestorePercentage;
   if (p.hungerDepletionRateDecreasePercentage != null) out.hungerPct = p.hungerDepletionRateDecreasePercentage;
   if (p.baseMaxCoinsFindable != null) out.coinMax = p.baseMaxCoinsFindable;
-  if (Array.isArray(p.grantedMutations) && p.grantedMutations[0]) {
-    const m = String(p.grantedMutations[0]);
-    out.grants = MUTATION_NAMES[norm(m)] || m;
-  }
+  if (Array.isArray(p.grantedMutations) && p.grantedMutations[0]) out.grants = mutationName(p.grantedMutations[0]);
   if (p.requiredWeather) out.weather = WEATHER_NAMES[norm(p.requiredWeather)] || String(p.requiredWeather);
   out.live = true;
   out.older = false;
@@ -274,9 +280,10 @@ const GOALS = [
 ];
 
 function goalOf(a) {
-  if (a.grants === 'Gold') return 'gold';
-  if (a.grants === 'Rainbow') return 'rainbow';
-  if (a.grants) return 'grant:' + a.grants;
+  const grants = a.grants ? mutationName(a.grants) : '';
+  if (/^gold$/i.test(grants)) return 'gold';
+  if (/^rainbow$/i.test(grants)) return 'rainbow';
+  if (grants) return 'grant:' + grants;
   if (a.coinMax) return 'coins';
   if (a.group === 'Selling') return 'sell';
   if (a.sizePct) return 'size';
@@ -455,4 +462,4 @@ function summarise(pets, opts) {
   return { rows, totals, waiting, unknown, defaultStrength: DEFAULT_STRENGTH };
 }
 
-module.exports = { ABILITIES, GAME_IDS, GOALS, lookup, describe, summarise, setLive, goalOf, everyText, oftenText, DEFAULT_STRENGTH };
+module.exports = { mutationName, ABILITIES, GAME_IDS, GOALS, lookup, describe, summarise, setLive, goalOf, everyText, oftenText, DEFAULT_STRENGTH };

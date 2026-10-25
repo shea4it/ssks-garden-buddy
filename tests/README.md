@@ -24,6 +24,11 @@ and paste the printed BASELINE block into budget.js. Windows and clustering
 rules are at the top of the script; if the game moves an item to another
 shop, add a window for it.
 
+Lint (the settings live here, so they survive a fresh checkout):
+
+    npm install eslint@8 --no-save
+    npx eslint --no-eslintrc -c tests/eslintrc.json *.js tests/*.js tools/*.js default-scripts/*.js
+
 End to end, in real Electron against a stand-in game (Linux, needs Xvfb):
 
     npm install electron@32.3.3 ws --no-save
@@ -397,4 +402,11 @@ chart-your-garden.png.
 "already your best"; `todo.sub` explains 🧼 Cleanse, `todo.tile` has the
 How step and `todo.outlined` the plant opened by itself. The stand-in now
 hands items over by `heldItem.itemId` (the game's way since v0.54.5).
+
+`MG_CHART=stage` (v0.56.0): `stage.auto.stage.auto` 'early' on the stand-in
+garden, its strip coins / sell now / earned an hour / crops ripe and the
+Garden tab leading with your-garden ★; `late` after a real click (saved
+`savedPick` 'late', strip safe / ready / sell pets / next want, Garden
+leading with harvest-lock ★); `jumped` to the tab a strip number lives on;
+`backToAuto`; `card` lists what Mid needs.
 

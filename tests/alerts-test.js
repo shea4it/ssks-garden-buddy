@@ -62,4 +62,21 @@ const f3 = w3._evaluate(feed, T);
 ok(f3.some((f) => f.ruleId === 'custom:dawnegg' && f.tier === 'big'), 'picked item matched by its game id after a rename');
 w3._state.last = feed;
 ok(w3.listed().length === 1 && w3.listed()[0].shop === 'dawn' && w3.listed()[0].price === 5e8, 'listed(): every item a shop lists');
+// 8. (v0.66.0) Night: the Spooky Shop opening is one night alert (with the
+// Spooky Egg when it's in), never "Any other weather"; an apology shop
+// opening is nothing.
+const ns = { alerts: { disabled: [], custom: [], levels: {}, quietHours: {} } };
+const w4 = alerts.createWatcher({ getSettings: () => ns, onAlerts: () => {}, onStatus: () => {}, fetchImpl: async () => ({ ok: false }) });
+w4._state.firstPoll = false;
+const night = (open, apology) => ({ shops: { spooky: { open, items: open ? [{ itemId: 'SpookyEgg', name: 'Spooky Egg', stock: 5, coinPrice: 8e8 }] : [] }, apology: { open: Boolean(apology), items: [] } }, weather: { current: null, upcoming: [] } });
+w4._evaluate(night(false, false), T);
+let f4 = w4._evaluate(night(true, true), T + 60000);
+ok(f4.length === 1 && f4[0].ruleId === 'night' && f4[0].night && f4[0].itemName === 'Spooky Egg', `night falls: one night alert (${JSON.stringify(f4)})`);
+f4 = w4._evaluate(night(true, true), T + 120000);
+ok(!f4.length, 'the same night: quiet');
+w4._evaluate(night(false, false), T + 1800000);
+f4 = w4._evaluate(night(false, true), T + 1900000);
+ok(!f4.length, 'an apology shop opening is no weather');
+f4 = w4._evaluate(night(true, false), T + 10 * 3600000);
+ok(f4.length === 1 && f4[0].ruleId === 'night', 'the next night: again');
 console.log(`alerts: ${n} checks passed`);

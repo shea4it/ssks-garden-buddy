@@ -79,6 +79,16 @@ app.whenReady().then(async () => {
       await run(p, `(() => { window.__realRefresh = refreshBudget; refreshBudget = async () => {}; BUDGET = Object.assign({}, BUDGET, { unlocked: true, foresight: ${JSON.stringify(fsReal)}, stage: ${JSON.stringify(gameSt)}, cropStage: ${JSON.stringify(cropSt)} }); renderBudget(); })()`);
     }
     if (FRESH) fs.writeFileSync(path.join(OUT, 'launch.png'), (await p.capturePage()).toPNG());
+    // MG_NO_THEME=1: the everyday look (event themes off), v0.67.0.
+    if (process.env.MG_NO_THEME) {
+      await run(p, "(() => { S.ui = Object.assign({}, S.ui, { eventThemes: false }); save(); applyTheme(null); return true; })()");
+      await wait(1500);
+    }
+    // MG_SKIP_WELCOME=1: past the first-run card, as an owner sees it.
+    if (process.env.MG_SKIP_WELCOME) {
+      await run(p, "(() => { const sk = document.querySelector('[data-wgo=\"skip\"]'); if (sk) sk.click(); return true; })()");
+      await wait(500);
+    }
     // Answer the launch question (Not now) so it doesn't cover the tour.
     await run(p, "(() => { const b = document.getElementById('shareAskNo'); if (b) b.click(); })()");
     await wait(400);
@@ -133,7 +143,7 @@ app.whenReady().then(async () => {
     }
     // The Luck tab with one guarantee a pull away and its egg opened.
     if (!FRESH) {
-      await run(p, "(() => { showTab('pity'); document.querySelector('main').scrollTop = 0; const g = LUCK.groups.egg && LUCK.groups.egg[0]; if (g) { const r = g.rows[0]; r.value = r.threshold - 1; r.left = 1; r.primed = true; r.estimated = false; } renderLuck(); })()");
+      await run(p, "(() => { showTab('pity'); document.querySelector('main').scrollTop = 0; const g = LUCK.groups.egg && LUCK.groups.egg[0]; if (g) { const r = g.rows[0]; r.value = r.threshold - 1; r.left = 1; r.primed = true; r.known = true; } renderLuck(); })()");
       await wait(400);
       fs.writeFileSync(path.join(OUT, 'luck-primed.png'), (await p.capturePage()).toPNG());
       await run(p, "(() => { const d = document.querySelector('#luckEggs details:nth-of-type(2)'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } })()");
@@ -154,10 +164,10 @@ app.whenReady().then(async () => {
       fs.writeFileSync(path.join(OUT, 'how-open.png'), (await p.capturePage()).toPNG());
       await run(p, "(() => { MC_HOW_OPEN = false; renderBudget(); })()");
     }
-    // The buy-everything meter short of the line (62%, best 80%).
-    if (!FRESH) await run(p, "(() => { showTab('money'); const e = BUDGET.foresight.everything; Object.assign(e, { ratio: 0.62, income: e.perDay * 0.62, best: 0.8, crossedAt: null }); renderBudget(); document.querySelector('.ev-box').scrollIntoView({ block: 'center' }); })()");
+    // The money chart (the buy-everything bar under it was taken out in v0.67.3).
+    if (!FRESH) await run(p, "(() => { showTab('money'); renderBudget(); const c = document.querySelector('.fs-chart'); if (c) c.scrollIntoView({ block: 'center' }); })()");
     await wait(500);
-    fs.writeFileSync(path.join(OUT, 'meter-short.png'), (await p.capturePage()).toPNG());
+    fs.writeFileSync(path.join(OUT, 'money-chart.png'), (await p.capturePage()).toPNG());
     fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ index, errors }, null, 1));
   } catch (err) {
     errors.push(String(err.stack || err));

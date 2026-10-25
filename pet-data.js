@@ -36,6 +36,11 @@ const PETS = {
   Rooster: [1000, ['Corn', 'Daisy', 'Habanero', 'Cardoon']],
   'Red Fox': [75000, ['Peach', 'Persimmon', 'Prickly Pear', 'Violet Cort']],
   Phoenix: [300000, ['Dragon Fruit', 'Saffron', 'Cacao', 'Marigold', 'Milkcap']],
+  // The Spooky Egg's Mythical pets (the game's own table, 17 Oct 2026;
+  // Toad's list was cut short in the sample, the live table fills it in).
+  Moth: [50000, ['Lavender', 'Lily', 'Ghost Plant', 'Saffron']],
+  Snake: [100000, ['Foxfire', 'Prickly Pear', 'Cardoon', 'Cactus']],
+  Toad: [75000, ['Leek', 'Persimmon']],
 };
 
 // How many hours of XP a pet needs to reach its max strength (wiki "Hours to
@@ -55,7 +60,15 @@ const GROWTH = {
   Sheep: [100, null], Ostrich: [144, null],
   Bat: [100, null], Platypus: [100, null], 'Thunder Wolf': [144, null],
   Rooster: [144, null], 'Red Fox': [144, null], Phoenix: [168, null],
+  // The Spooky Egg's Mythical pets (Haunt Event; the game's table, 17 Oct).
+  Moth: [144, 2.5], Snake: [144, 2.5], Toad: [144, 2.5],
 };
+
+// Nocturnal pets (Haunt Event, Oct 2026): stronger the darker it gets at
+// night, up to +20 STR (the devs' notes). The game's own isNocturnal flags
+// replace this list once its table is read.
+const NOCTURNAL = ['Bat', 'Platypus', 'Red Fox', 'Moth', 'Snake', 'Toad'];
+const NIGHT_STR = 20;
 
 // Hatch odds per egg. Since the Bad Luck Protection update every egg is
 // 65% / 30% / 5% (the devs' announcement). The game's own table replaces
@@ -74,6 +87,8 @@ const EGGS = {
   // and Phoenix at 2%; Rooster and Red Fox from the wiki's table.
   AmberEgg: { name: 'Amber Egg', odds: { Rooster: 60, RedFox: 33, FireHorse: 5, Phoenix: 2 } },
   ThunderEgg: { name: 'Thunder Egg', odds: { Bat: 65, Platypus: 30, ThunderWolf: 5 } },
+  // The Haunt Event's egg (the game's table, 17 Oct 2026): 800M, 24 h.
+  SpookyEgg: { name: 'Spooky Egg', odds: { Snake: 65, Moth: 30, Toad: 5 } },
 };
 
 // Bad Luck Protection (the devs' announcement): the rare outcome is
@@ -118,8 +133,10 @@ for (const [name, [hours, maxScale]] of Object.entries(GROWTH)) {
 // The game's own catalog, when the observer could read it (game-data.js).
 // Anything it has wins over the tables above.
 let LIVE_EGGS = {};
+let LIVE_NOCTURNAL = new Set();
 function setLive(catalog) {
   if (!catalog) return;
+  LIVE_NOCTURNAL = new Set();
   for (const [id, p] of Object.entries(catalog.pets || {})) {
     const key = norm(id);
     const e = BY_NORM[key] || (BY_NORM[key] = { name: p.name || id, diet: [], dietNorm: [] });
@@ -130,6 +147,12 @@ function setLive(catalog) {
     }
     if (p.maxHunger > 0 && !e.maxHunger) e.maxHunger = p.maxHunger;
     if (p.name) e.displayName = p.name;
+    // The game's own diet (ids like "PricklyPear"), shown in words.
+    if (Array.isArray(p.diet) && p.diet.length) {
+      e.diet = p.diet.map((d) => String(d).replace(/([a-z])([A-Z])/g, '$1 $2'));
+      e.dietNorm = p.diet.map(norm);
+    }
+    if (p.nocturnal) LIVE_NOCTURNAL.add(norm(id));
   }
   LIVE_EGGS = {};
   for (const [id, egg] of Object.entries(catalog.eggs || {})) {
@@ -229,8 +252,19 @@ function describePets(pets, trough) {
   });
 }
 
+function isNocturnal(species) {
+  const k = norm(species);
+  if (LIVE_NOCTURNAL.size) return LIVE_NOCTURNAL.has(k);
+  return NOCTURNAL.some((n) => norm(n) === k);
+}
+// Every nocturnal species, the game's list when it's been read.
+function nocturnalList() {
+  if (!LIVE_NOCTURNAL.size) return NOCTURNAL.slice();
+  return [...LIVE_NOCTURNAL].map((k) => (BY_NORM[k] && (BY_NORM[k].displayName || BY_NORM[k].name)) || k);
+}
+
 module.exports = {
   PETS, GROWTH, EGGS, GOLD_CHANCE, RAINBOW_CHANCE, GUARANTEE_FACTOR, guarantee,
   lookup, eats, describePets, strength, inferMaxScale, setLive,
-  eggInfo, allEggs, prettySpecies, norm, WARN_AT,
+  eggInfo, allEggs, prettySpecies, norm, WARN_AT, NOCTURNAL, NIGHT_STR, isNocturnal, nocturnalList,
 };

@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="64" x2="0" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f3bc9"/>
+      <stop offset="0.38" stop-color="#9a58d6"/>
+      <stop offset="0.66" stop-color="#ff86ae"/>
+      <stop offset="0.9" stop-color="#ffc38a"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="512" cy="470" r="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0.6" stop-color="#1b0f3a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1b0f3a" stop-opacity=".28"/>
+    </radialGradient>
+    <linearGradient id="gloss" x1="0" y1="64" x2="0" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="hillBack" x1="0" y1="700" x2="0" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4cc073"/>
+      <stop offset="1" stop-color="#2a8a57"/>
+    </linearGradient>
+    <linearGradient id="hillFront" x1="0" y1="790" x2="0" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ae37f"/>
+      <stop offset="1" stop-color="#3eab5f"/>
+    </linearGradient>
+    <linearGradient id="pot" x1="340" y1="0" x2="690" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffa16e"/>
+      <stop offset="0.5" stop-color="#f07446"/>
+      <stop offset="1" stop-color="#c94f30"/>
+    </linearGradient>
+    <linearGradient id="potShade" x1="0" y1="660" x2="0" y2="890" gradientUnits="userSpaceOnUse">
+      <stop offset="0.55" stop-color="#7a2a1a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7a2a1a" stop-opacity=".3"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="312" y1="0" x2="712" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffb07f"/>
+      <stop offset="0.55" stop-color="#f8834f"/>
+      <stop offset="1" stop-color="#d65c38"/>
+    </linearGradient>
+    <linearGradient id="leafLo" x1="0" y1="250" x2="0" y2="450" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5fd36f"/>
+      <stop offset="1" stop-color="#23994f"/>
+    </linearGradient>
+    <linearGradient id="leafHi" x1="0" y1="250" x2="0" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d2ffb4"/>
+      <stop offset="1" stop-color="#6fdc78"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="490" y1="0" x2="530" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5cd176"/>
+      <stop offset="1" stop-color="#249a50"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fff6c4" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#fff6c4" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tile"><rect x="64" y="64" width="896" height="896" rx="200"/></clipPath>
+    <clipPath id="mouth"><path d="M480 786 C488 832 536 832 544 786 Z"/></clipPath>
+    <filter id="blur18" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="18"/></filter>
+    <filter id="blur6" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+    <radialGradient id="moonGlow" cx=".5" cy=".5" r=".5">
+      <stop offset="0.5" stop-color="#ffd98c" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#ffd98c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <rect x="64" y="64" width="896" height="896" fill="url(#sky)"/>
+
+    <!-- stars and a little amber moon -->
+<!--d-->    <g fill="#fff">
+      <circle cx="196" cy="214" r="7" opacity=".85"/>
+      <circle cx="268" cy="140" r="4" opacity=".6"/>
+      <circle cx="708" cy="132" r="5" opacity=".7"/>
+      <circle cx="150" cy="372" r="4" opacity=".5"/>
+      <circle cx="884" cy="338" r="5" opacity=".55"/>
+      <circle cx="610" cy="186" r="3.5" opacity=".55"/>
+    </g>
+<!--/d-->    <!--d--><circle cx="822" cy="202" r="66" fill="url(#moonGlow)"/><!--/d-->
+    <path d="M858 152 A56 56 0 1 0 870 246 A46 46 0 1 1 858 152 Z" fill="#ffd98c"/>
+
+    <!-- rainbow, with a soft glow behind it -->
+    <g fill="none" stroke-width="28" filter="url(#blur18)" opacity=".55">
+      <circle cx="512" cy="800" r="396" stroke="#ff6b6b"/>
+      <circle cx="512" cy="800" r="284" stroke="#9775fa"/>
+    </g>
+    <g fill="none" stroke-width="25">
+      <circle cx="512" cy="800" r="396" stroke="#ff6b6b"/>
+      <circle cx="512" cy="800" r="372" stroke="#ff9f43"/>
+      <circle cx="512" cy="800" r="348" stroke="#ffd93d"/>
+      <circle cx="512" cy="800" r="324" stroke="#6bdb6f"/>
+      <circle cx="512" cy="800" r="300" stroke="#45a8f5"/>
+      <circle cx="512" cy="800" r="276" stroke="#9b7bff"/>
+    </g>
+    <!--d--><circle cx="512" cy="800" r="408" fill="none" stroke="#fff" stroke-width="3" opacity=".35"/><!--/d-->
+
+    <!-- hills -->
+    <path d="M64 772 C214 700 384 708 516 768 C660 706 832 690 960 752 L960 960 L64 960 Z" fill="url(#hillBack)"/>
+    <path d="M64 842 C262 786 762 786 960 842 L960 960 L64 960 Z" fill="url(#hillFront)"/>
+    <path d="M64 842 C262 786 762 786 960 842" fill="none" stroke="#c4f5a8" stroke-width="5" opacity=".6"/>
+<!--d-->    <!-- tiny flowers -->
+    <g>
+      <g transform="translate(176 878)"><circle r="13" cx="0" cy="-12" fill="#fff"/><circle r="13" cx="11" cy="-3" fill="#fff"/><circle r="13" cx="7" cy="10" fill="#fff"/><circle r="13" cx="-7" cy="10" fill="#fff"/><circle r="13" cx="-11" cy="-3" fill="#fff"/><circle r="8" fill="#ffd23f"/></g>
+      <g transform="translate(250 912) scale(.8)"><circle r="13" cx="0" cy="-12" fill="#ff9ec4"/><circle r="13" cx="11" cy="-3" fill="#ff9ec4"/><circle r="13" cx="7" cy="10" fill="#ff9ec4"/><circle r="13" cx="-7" cy="10" fill="#ff9ec4"/><circle r="13" cx="-11" cy="-3" fill="#ff9ec4"/><circle r="8" fill="#fff3b0"/></g>
+      <g transform="translate(838 884) scale(.9)"><circle r="13" cx="0" cy="-12" fill="#ffe27a"/><circle r="13" cx="11" cy="-3" fill="#ffe27a"/><circle r="13" cx="7" cy="10" fill="#ffe27a"/><circle r="13" cx="-7" cy="10" fill="#ffe27a"/><circle r="13" cx="-11" cy="-3" fill="#ffe27a"/><circle r="8" fill="#ff8a3d"/></g>
+      <g transform="translate(770 922) scale(.7)"><circle r="13" cx="0" cy="-12" fill="#fff"/><circle r="13" cx="11" cy="-3" fill="#fff"/><circle r="13" cx="7" cy="10" fill="#fff"/><circle r="13" cx="-7" cy="10" fill="#fff"/><circle r="13" cx="-11" cy="-3" fill="#fff"/><circle r="8" fill="#ffd23f"/></g>
+    </g>
+<!--/d-->
+    <!-- the pot's shadow -->
+    <ellipse cx="512" cy="888" rx="214" ry="30" fill="#1d6a3e" opacity=".4"/>
+
+    <!-- pot body -->
+    <path d="M340 636 L684 636 L648 862 Q644 890 616 890 L408 890 Q380 890 376 862 Z" fill="url(#pot)"/>
+    <path d="M340 636 L684 636 L648 862 Q644 890 616 890 L408 890 Q380 890 376 862 Z" fill="url(#potShade)"/>
+    <!--d--><path d="M378 690 L394 840" stroke="#fff" stroke-width="16" stroke-linecap="round" opacity=".2"/><!--/d-->
+    <path d="M340 636 L684 636 L678 672 L346 672 Z" fill="#8f3720" opacity=".32"/>
+
+    <!-- rim with soil inside -->
+    <rect x="312" y="580" width="400" height="76" rx="30" fill="url(#rim)"/>
+    <ellipse cx="512" cy="582" rx="190" ry="24" fill="#ffbe94"/>
+    <ellipse cx="512" cy="584" rx="166" ry="16" fill="#6b3426"/>
+    <ellipse cx="512" cy="588" rx="150" ry="10" fill="#4e2419"/>
+    <rect x="336" y="606" width="200" height="12" rx="6" fill="#fff" opacity=".3"/>
+
+    <!-- sprout -->
+    <path d="M512 590 C509 520 498 456 506 372" fill="none" stroke="url(#stem)" stroke-width="30" stroke-linecap="round"/>
+    <!--d--><path d="M504 560 C501 500 494 450 498 400" fill="none" stroke="#b9f5a8" stroke-width="6" stroke-linecap="round" opacity=".5"/><!--/d-->
+    <!-- left leaf: lower half, then the lit upper half, then a rim of light -->
+    <path d="M506 434 C470 352 380 286 258 292 C292 396 402 466 506 434 Z" fill="url(#leafLo)"/>
+    <path d="M506 434 C470 352 380 286 258 292 Q392 356 506 434 Z" fill="url(#leafHi)"/>
+    <!--d--><path d="M490 404 C456 346 382 300 280 296" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".35"/><!--/d-->
+    <!-- right leaf -->
+    <path d="M510 394 C580 290 672 244 772 252 C742 354 644 422 510 394 Z" fill="url(#leafLo)"/>
+    <path d="M510 394 C580 290 672 244 772 252 Q634 310 510 394 Z" fill="url(#leafHi)"/>
+    <!--d--><path d="M532 362 C590 296 668 260 750 256" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".35"/><!--/d-->
+    <!--d--><ellipse cx="690" cy="300" rx="11" ry="13" fill="#fff" opacity=".75"/>
+    <circle cx="686" cy="295" r="4" fill="#fff"/><!--/d-->
+    <!-- new leaf on top -->
+    <path d="M506 380 C484 326 496 278 534 242 C556 296 546 348 506 380 Z" fill="url(#leafHi)"/>
+    <path d="M506 380 C520 330 528 290 534 242 C556 296 546 348 506 380 Z" fill="#4cc56a" opacity=".55"/>
+
+    <!-- face -->
+    <ellipse cx="402" cy="800" rx="36" ry="21" fill="#ff5f93" opacity=".5"/>
+    <ellipse cx="622" cy="800" rx="36" ry="21" fill="#ff5f93" opacity=".5"/>
+    <ellipse cx="450" cy="748" rx="26" ry="34" fill="#3a1d2c"/>
+    <ellipse cx="574" cy="748" rx="26" ry="34" fill="#3a1d2c"/>
+    <circle cx="459" cy="735" r="10" fill="#fff"/>
+    <circle cx="583" cy="735" r="10" fill="#fff"/>
+    <!--d--><circle cx="443" cy="762" r="5" fill="#fff" opacity=".85"/>
+    <circle cx="567" cy="762" r="5" fill="#fff" opacity=".85"/><!--/d-->
+    <path d="M480 786 C488 832 536 832 544 786 Z" fill="#3a1d2c"/>
+    <g clip-path="url(#mouth)"><ellipse cx="512" cy="826" rx="22" ry="14" fill="#ff7a96"/></g>
+    <path d="M480 786 L544 786" stroke="#3a1d2c" stroke-width="8" stroke-linecap="round"/>
+
+    <!-- sparkles: gold for Gold, white for the stars -->
+    <circle cx="232" cy="520" r="54" fill="url(#glow)"/>
+    <path d="M232 470 Q236 516 282 520 Q236 524 232 570 Q228 524 182 520 Q228 516 232 470 Z" fill="#ffe27a"/>
+    <path d="M800 462 Q803 497 838 500 Q803 503 800 538 Q797 503 762 500 Q797 497 800 462 Z" fill="#fff"/>
+    <!--d--><path d="M174 640 Q176 660 196 662 Q176 664 174 684 Q172 664 152 662 Q172 660 174 640 Z" fill="#fff" opacity=".8"/><!--/d-->
+
+    <rect x="64" y="64" width="896" height="896" fill="url(#gloss)"/>
+    <rect x="64" y="64" width="896" height="896" fill="url(#vignette)"/>
+  </g>
+  <rect x="66" y="66" width="892" height="892" rx="198" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="4"/>
+</svg>

@@ -42,6 +42,15 @@ The build also leaves a zip of the app in the `release` folder for another
 Mac: unzip it, drag the app into Applications, then right-click it and choose
 **Open** the first time.
 
+## The icon
+
+The app's icon lives in `build/` (`icon.ico`, `icon.icns`, `icon.png`), where
+electron-builder looks for it, and in `art/` for the app's own windows and
+notifications. Because the Windows build skips electron-builder's own .exe
+editing (see BUILD.bat), `tools/after-pack.js` puts the icon and the app's
+name on the .exe after packing, before the installer is made. To change the
+icon, see `art/source/README.md`.
+
 ## Releases
 
 Publishing a release on GitHub builds the installers automatically
