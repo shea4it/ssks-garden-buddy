@@ -113,6 +113,7 @@ const hatches = require('./hatches');
 const petRank = require('./pet-rank');
 const weather = require('./weather');
 const gameData = require('./game-data');
+const petNames = require('./pet-names');
 const pity = require('./pity');
 const roomsMod = require('./rooms');
 const backup = require('./backup');
@@ -993,6 +994,47 @@ function setWeatherReturn(v) {
   store.save();
 }
 
+/* Your usual clear-skies team (v0.75.1), for "Detect my usual team" as the
+ * clear-skies pick: the last saved team you ran for 10 minutes in clear
+ * skies. Harvesting unlocked's team doesn't count, and neither does time
+ * while a clear-skies suggestion is waiting for you (whatever's out then
+ * isn't your pick yet). Kept in settings (main-owned), so a restart keeps it. */
+let USUAL_SETTLE_MS = 10 * 60000;
+let clearRun = null; // { teamId, since, last }
+function usualTeamState() {
+  const s = store.get();
+  if (!s.usualTeam || typeof s.usualTeam !== 'object') s.usualTeam = { teamId: null, name: null, at: null };
+  return s.usualTeam;
+}
+function trackUsualTeam(st) {
+  if (!st || !st.foundSelf || parked) {
+    clearRun = null;
+    return;
+  }
+  const waiting = Boolean(teamSuggestion && teamSuggestion.weather === 'clear');
+  const out = weather.kindOf(st.weather) === 'clear' && !harvestLock().mode.on && !waiting
+    ? (st.teams || []).find((t) => teamIsOut(t, st.pets))
+    : null;
+  const now = Date.now();
+  // A gap in the game's reports (asleep, disconnected) starts the clock again.
+  if (!out || !clearRun || clearRun.teamId !== out.id || now - clearRun.last > 120000) {
+    clearRun = out ? { teamId: out.id, since: now, last: now } : null;
+    return;
+  }
+  clearRun.last = now;
+  if (now - clearRun.since < USUAL_SETTLE_MS) return;
+  const u = usualTeamState();
+  if (u.teamId !== out.id || u.name !== out.name) {
+    Object.assign(u, { teamId: out.id, name: out.name, at: now });
+    store.save();
+  }
+}
+function usualTeam(st) {
+  const u = usualTeamState();
+  const t = u.teamId && st && (st.teams || []).find((x) => x.id === u.teamId);
+  return t ? { id: t.id, name: t.name } : null;
+}
+
 function checkWeatherTeam(st) {
   const cfg = store.get().weatherTeams;
   if (!cfg || !cfg.enabled || parked || !st.foundSelf || !st.canSend) return;
@@ -1008,7 +1050,9 @@ function checkWeatherTeam(st) {
   // the whole spell, you came back to "Put out your rain team?" under clear
   // skies. (So does "go back" once new weather starts.)
   if (teamSuggestion && teamSuggestion.weather && teamSuggestion.weather !== kind) clearTeamSuggestion();
-  const teamId = cfg[kind];
+  let teamId = cfg[kind];
+  // "Detect my usual team" (v0.75.1); none learned yet: as if none was picked.
+  if (teamId === 'auto') teamId = kind === 'clear' ? (usualTeam(st) || {}).id || null : null;
   const back = weatherReturn();
   if (kind === 'clear') {
     if (teamId) {
@@ -1596,6 +1640,11 @@ if (process.env.MG_TEST_DIR) {
     weatherOver: () => weatherOver(),
     recheckWeatherTeam: (connection) => checkWeatherTeam(Object.assign({}, gardenStatus, { connection })),
     suggestedAt: () => (lastSuggested ? lastSuggested.at : null),
+    namingRaw: () => JSON.parse(JSON.stringify(petNaming())),
+    namingTier: (id) => namingTier(gardenStatus, id),
+    usualSettle: (ms) => {
+      USUAL_SETTLE_MS = ms;
+    },
     plantMutRows: (plants) => plantMutRows(plants),
     plantStateAt: (h, end) => plantStateAt(h, end),
     recordMutations: (st, t) => recordMutations(st, t),
@@ -2283,14 +2332,27 @@ function noteForecast(view) {
 let viewCache = { at: 0, view: null };
 function budgetView(fresh) {
   if (!fresh && viewCache.view && Date.now() - viewCache.at < 3000) return viewCache.view;
-  const view = budget.view({ settings: store.get(), ctx: budgetContext() });
+  let view = budget.view({ settings: store.get(), ctx: budgetContext() });
+  // A new install's wants (v0.78.0): the defaults once the garden is known to
+  // be worth 1B+; under that, the list starts empty.
+  const bs = store.get().budget || {};
+  if (bs.wantsPending && view.worthKnown) {
+    const s = store.get();
+    delete s.budget.wantsPending;
+    if (view.netWorth >= 1e9) {
+      s.budget.wantsSeeded = false;
+      budget.seedWants(s);
+    }
+    store.save();
+    view = budget.view({ settings: s, ctx: budgetContext() });
+  }
   noteForecast(view);
-  // Once the Money tab has earned its unlock it stays unlocked.
+  // Once the Money tab has opened it stays open (v0.78.0: that's as soon as
+  // the wallet and garden are read; no note, there was no wait).
   if (view.unlockEarned && !(store.get().budget && store.get().budget.unlocked)) {
     const s = store.get();
     s.budget = Object.assign({}, s.budget, { unlocked: true });
     store.save();
-    recordNote('💰 The Money tab has unlocked: a full day of coins in and out has been measured. It gets better with every day of play.', 'Money tab unlocked');
   }
   viewCache = { at: Date.now(), view };
   return view;
@@ -2967,6 +3029,10 @@ function handleGardenMessage(type, payload) {
     checkLogoffFromGame(gardenStatus);
     checkPendingTeam(gardenStatus);
     trackTeams(gardenStatus);
+    trackUsualTeam(gardenStatus);
+    gardenStatus.usualTeam = usualTeam(gardenStatus);
+    flushNamingWait(gardenStatus);
+    followStageRule(gardenStatus);
     if (checkTriggers(gardenStatus)) {
       // A trigger just swapped: don't let the weather team undo it.
       // (v0.74.1: the weather alone, as checkWeatherTeam keys it since
@@ -3143,6 +3209,66 @@ function handleGardenMessage(type, payload) {
     }
     return;
   }
+  // Pets named by hatch number (v0.75.0): the rename command, learned from
+  // one you did yourself; and each name the server took (or didn't).
+  if (type === 'petNamingLearned') {
+    const shape = cleanNamingShape(payload);
+    if (!shape) return;
+    const n = petNaming();
+    const had = Boolean(n.shape);
+    n.shape = shape;
+    store.save();
+    if (!had) recordNote(n.on ? '🏷️ Learned how the game names pets: new pets get their hatch number' : '🏷️ Learned how the game names pets');
+    sendToControl('naming', namingView());
+    pushPetNaming();
+    return;
+  }
+  // New pets to give cute names (v0.77.0): named once ranked (flushNamingWait).
+  if (type === 'petsToName') {
+    const now = Date.now();
+    for (const p of (payload && Array.isArray(payload.pets) ? payload.pets : []).slice(0, 20)) {
+      if (!p || !p.id || namingWait.some((w) => w.id === String(p.id))) continue;
+      namingWait.push({ id: String(p.id), species: String(p.species || ''), mutations: Array.isArray(p.mutations) ? p.mutations.map(String) : [], at: now });
+    }
+    if (gardenStatus) flushNamingWait(gardenStatus);
+    setTimeout(() => flushNamingWait(gardenStatus, true), 9000);
+    return;
+  }
+  if (type === 'petNamed') {
+    const n = petNaming();
+    const what = { at: Date.now(), species: String((payload && payload.species) || '').slice(0, 40), name: String((payload && payload.name) || '').slice(0, 20) };
+    const petId = String((payload && payload.petId) || '');
+    namingSent.delete(petId);
+    if (namingBulk && namingBulk.ids.has(petId)) {
+      if (payload && payload.ok) namingBulk.done += 1;
+      else namingBulk.failed += 1;
+      if (namingBulk.active && namingBulk.done + namingBulk.failed >= namingBulk.total) {
+        namingBulk.active = false;
+        recordNote(`🎀 Gave ${namingBulk.done} pet${namingBulk.done === 1 ? '' : 's'} cute names`);
+      }
+    }
+    if (payload && payload.skipped) {
+      sendToControl('naming', namingView());
+      return;
+    }
+    if (payload && payload.ok) {
+      n.named = (Number(n.named) || 0) + 1;
+      n.last = what;
+      n.failed = null;
+      // Cute names are remembered so they aren't given again for a while.
+      if (!/^\d+$/.test(what.name)) {
+        n.recent = (Array.isArray(n.recent) ? n.recent : []).concat([what.name]).slice(-NAME_RECENT);
+      }
+    } else {
+      const first = !n.failed;
+      n.failed = Object.assign(what, { code: String((payload && payload.code) || '').slice(0, 80) || null });
+      if (first) recordNote(`⚠️ The game didn't take the name ${what.name} for your ${what.species.replace(/([a-z])([A-Z])/g, '$1 $2')}`);
+    }
+    store.save();
+    sendToControl('naming', namingView());
+    return;
+  }
+
   // Logged in on another device: a note (v0.60.0: the app no longer comes
   // back by itself afterwards).
   if (type === 'superseded') {
@@ -3757,6 +3883,7 @@ function createGameView() {
     }
     relayoutSoon();
     pushHarvestLock();
+    pushPetNaming();
     pushSpotMap();
     pushBinderMap(true);
     pushThunderMap();
@@ -3772,6 +3899,7 @@ function createGameView() {
     // Again once the game has had a moment (the observer is ready by then).
     setTimeout(() => {
       pushHarvestLock();
+      pushPetNaming();
       pushSpotMap();
       pushBinderMap(true);
       pushThunderMap();
@@ -4475,6 +4603,129 @@ function pushTheme(force = false) {
   pushedTheme = id;
   contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setTheme && window.__mgLoaderObserver.setTheme(${JSON.stringify(t ? { id: t.id } : null)})`, true).catch(() => {});
 }
+/* Pets named by hatch number (v0.75.0; the work is in garden-observer.js).
+ * Settings: petNaming { on, shape: the game's rename command as learned from
+ * your own rename, named, last, failed }. Off unless you turn it on. */
+function petNaming() {
+  const s = store.get();
+  if (!s.petNaming || typeof s.petNaming !== 'object') s.petNaming = { on: false, style: 'number', shape: null, named: 0, last: null, failed: null };
+  return s.petNaming;
+}
+// v0.76.0: style 'number' (the hatch number) or 'cute' (pet-names.js).
+const namingStyle = (n) => (n && n.style === 'cute' ? 'cute' : 'number');
+function namingView() {
+  const n = petNaming();
+  const st = gardenStatus;
+  const unnamed = st && st.foundSelf && Array.isArray(st.allPets) ? st.allPets.filter((p) => !p.name).length : null;
+  const b = namingBulk;
+  return {
+    on: Boolean(n.on),
+    style: namingStyle(n),
+    learned: Boolean(n.shape),
+    named: Number(n.named) || 0,
+    last: n.last || null,
+    failed: n.failed || null,
+    unnamed,
+    bulk: b ? { active: b.active, total: b.total, done: b.done, failed: b.failed } : null,
+  };
+}
+
+/* Cute names, picked here (v0.77.0): pet-names.js, ranked by Pet Power at
+ * max against your other pets (your best 10% grand names, the next 30%
+ * fancy ones), never a name one of your pets has or one given in the last
+ * 1,500 (petNaming.recent). */
+const NAME_RECENT = 1500;
+let namingWait = []; // new pets the game page asked names for: { id, species, mutations, at }
+let namingSent = new Map(); // petId → name sent to the game page, until it answers
+let namingBulk = null; // "Name my unnamed pets": { active, ids:Set, total, done, failed }
+function namingTier(st, id) {
+  const rk = (st && st.petRank && st.petRank.ranking) || [];
+  const vals = rk.map((x) => Number(x.atMax) || 0).filter((v) => v > 0);
+  const me = rk.find((x) => x.id === id);
+  const v = me ? Number(me.atMax) || 0 : 0;
+  if (!(v > 0) || vals.length < 3) return 'normal';
+  const share = vals.filter((x) => x < v).length / vals.length;
+  return share >= 0.9 ? 'top' : share >= 0.6 ? 'high' : 'normal';
+}
+function cuteNames(st, pets) {
+  const n = petNaming();
+  const taken = ((st && st.allPets) || []).map((p) => p.name).filter(Boolean)
+    .concat(Array.isArray(n.recent) ? n.recent : [], [...namingSent.values()]);
+  return pets.map((p) => {
+    const name = petNames.pick({ species: p.species, mutations: p.mutations }, { tier: namingTier(st, p.id), taken });
+    taken.push(name);
+    return { petId: p.id, species: p.species, name };
+  });
+}
+function sendNamesToGame(list, bulk) {
+  const contents = gameView && gameView.webContents;
+  if (!list.length || !contents || contents.isDestroyed()) return Promise.resolve(0);
+  for (const j of list) namingSent.set(j.petId, j.name);
+  return contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.queuePetNames ? window.__mgLoaderObserver.queuePetNames(${JSON.stringify(list)}, ${bulk ? 'true' : 'false'}) : 0`, true).catch(() => 0);
+}
+// New pets wait here until the game's report has them ranked (their Pet
+// Power), at most 8 s; then they're named.
+function flushNamingWait(st, force) {
+  if (!namingWait.length) return;
+  const ranked = new Set((((st && st.petRank && st.petRank.ranking) || [])).map((x) => x.id));
+  const now = Date.now();
+  const ready = namingWait.filter((p) => force || ranked.has(p.id) || now - p.at > 8000);
+  if (!ready.length) return;
+  namingWait = namingWait.filter((p) => !ready.includes(p));
+  sendNamesToGame(cuteNames(st, ready), false);
+}
+function cleanNamingShape(p) {
+  if (!p || typeof p.type !== 'string' || typeof p.idField !== 'string' || typeof p.nameField !== 'string') return null;
+  const extra = {};
+  for (const [k, v] of Object.entries((p.extra && typeof p.extra === 'object') ? p.extra : {}).slice(0, 10)) {
+    if (typeof v === 'number' || typeof v === 'boolean') extra[String(k).slice(0, 40)] = v;
+  }
+  return { type: p.type.slice(0, 60), idField: p.idField.slice(0, 40), nameField: p.nameField.slice(0, 40), extra };
+}
+function pushPetNaming() {
+  const contents = gameView && gameView.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  const n = petNaming();
+  contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setPetNaming && window.__mgLoaderObserver.setPetNaming(${JSON.stringify({ on: Boolean(n.on), style: namingStyle(n), shape: n.shape || null })})`, true).catch(() => {});
+}
+ipcMain.handle('naming:get', () => namingView());
+// "Name my unnamed pets" (v0.77.0): a cute name for every pet of yours that
+// has none, one at a time. Pets with a name are never touched.
+ipcMain.handle('naming:bulk', async () => {
+  const n = petNaming();
+  const st = gardenStatus;
+  if (!n.shape) return Object.assign(namingView(), { ok: false, reason: 'Rename any pet once in the game first, so the app learns how.' });
+  if (!st || !st.foundSelf || !st.canSend) return Object.assign(namingView(), { ok: false, reason: 'The game isn\'t connected.' });
+  const pets = (st.allPets || []).filter((p) => !p.name && !namingSent.has(p.id));
+  if (!pets.length) return Object.assign(namingView(), { ok: true, count: 0 });
+  const list = cuteNames(st, pets);
+  namingBulk = { active: true, ids: new Set(list.map((j) => j.petId)), total: list.length, done: 0, failed: 0 };
+  await sendNamesToGame(list, true);
+  sendToControl('naming', namingView());
+  return Object.assign(namingView(), { ok: true, count: list.length });
+});
+ipcMain.handle('naming:bulkStop', async () => {
+  const contents = gameView && gameView.webContents;
+  if (contents && !contents.isDestroyed()) await contents.executeJavaScript('window.__mgLoaderObserver && window.__mgLoaderObserver.stopPetNames ? window.__mgLoaderObserver.stopPetNames() : 0', true).catch(() => 0);
+  if (namingBulk) {
+    for (const id of namingBulk.ids) namingSent.delete(id);
+    namingBulk.active = false;
+  }
+  sendToControl('naming', namingView());
+  return namingView();
+});
+ipcMain.handle('naming:set', (event, change) => {
+  const n = petNaming();
+  if (change && typeof change.on === 'boolean') n.on = change.on;
+  if (change && ['number', 'cute'].includes(change.style)) n.style = change.style;
+  if (change && change.forget) n.shape = null;
+  if (change && change.on) n.failed = null;
+  store.save();
+  pushPetNaming();
+  sendToControl('naming', namingView());
+  return namingView();
+});
+
 function pushHarvestLock() {
   const contents = gameView && gameView.webContents;
   if (!contents || contents.isDestroyed()) return;
@@ -4482,13 +4733,45 @@ function pushHarvestLock() {
   contents.executeJavaScript(`window.__mgLoaderObserver && window.__mgLoaderObserver.setHarvestLock(${JSON.stringify(lock)})`, true).catch(() => {});
 }
 
-function setHarvestLock(change) {
+// What "ready" means by stage, for a new install until you pick your own
+// (v0.78.0, the first-run test: a new player's ripe Carrot never counted as
+// ready under the late-game rule, so Home said 0 ready and Harvesting
+// unlocked let nothing come off). Early: ripe. Mid: Gold or Rainbow, full
+// size. Late: the full rule, as before.
+function readyRuleFor(stageId) {
+  if (stageId === 'late') return { color: 'goldOrRainbow', hydro: harvestRule.HYDRO.slice(), lunar: harvestRule.LUNAR.slice(), size: true };
+  if (stageId === 'mid') return { color: 'goldOrRainbow', hydro: [], lunar: [], size: true };
+  return { color: 'any', hydro: [], lunar: [], size: false };
+}
+// While the rule is still the app's pick (modeAuto), it follows your stage.
+function followStageRule(st) {
+  const lock = harvestLock();
+  if (!lock.modeAuto || !st || !st.stage || !st.stage.id) return;
+  const want = readyRuleFor(st.stage.id);
+  const cur = lock.mode || {};
+  const same = cur.color === want.color && cur.size === want.size && (cur.hydro || []).join() === want.hydro.join() && (cur.lunar || []).join() === want.lunar.join();
+  if (!same) setHarvestLock({ mode: want }, true);
+}
+// A new install's defaults (v0.78.0): the ready rule by stage, and the
+// action bar off until you turn it on (in the setup or Extras).
+// The wants list waits too: the late-game defaults (Moonbinder 50B...) only
+// once the garden turns out to be worth 1B+; a new player starts with an
+// empty list (otherwise "safe to spend" said save all 1.9K for a Moonbinder).
+function freshInstallDefaults(s) {
+  s.harvestLock = Object.assign({}, s.harvestLock, { mode: Object.assign({ on: false }, readyRuleFor('early')), modeSet: true, modeAuto: true });
+  s.ui = Object.assign({}, s.ui, { actionBar: Object.assign({}, (s.ui || {}).actionBar, { on: false }) });
+  s.budget = Object.assign({}, s.budget, { plan: [], wantsSeeded: true, wantsMythic: true, wantsAmber: true, wantsPending: true });
+}
+
+function setHarvestLock(change, auto) {
   const lock = harvestLock();
   const wasOn = Boolean(lock.mode && lock.mode.on);
   if (change && typeof change.on === 'boolean') lock.on = change.on;
   if (change && typeof change.petFood === 'boolean') lock.petFood = change.petFood;
   if (change && Array.isArray(change.species)) lock.species = change.species.map(String).slice(0, 100);
   if (change && change.mode && typeof change.mode === 'object') lock.mode = harvestRule.clean(Object.assign({}, lock.mode, change.mode));
+  // Your own pick of what "ready" means ends the app's pick by stage.
+  if (!auto && change && change.mode && ['color', 'hydro', 'lunar', 'size'].some((k) => k in change.mode)) lock.modeAuto = false;
   // The harvest team (v0.73.0): a saved team to put out with Harvesting
   // unlocked, and whether the pets before come back when it's turned off.
   if (change && 'team' in change) lock.team = change.team ? String(change.team).slice(0, 80) : null;
@@ -5449,6 +5732,8 @@ if (!gotLock) {
     const settings = store.get();
     if (!settings.firstRunDone) {
       settings.firstRunDone = true;
+      // A brand-new install (nothing saved before): its own defaults.
+      if (!(settings.alertHistory || []).length && !(settings.moneyHistory || []).length && !(settings.ui && settings.ui.welcomed)) freshInstallDefaults(settings);
       store.save();
     }
 

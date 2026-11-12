@@ -1877,10 +1877,14 @@ function buildView({ settings, now, ctx }) {
   const p = migratePurchases(settings.purchases);
   // The longest period that is ready decides the "afford" times (steadier).
   const steady = periods[30].ok ? periods[30] : periods[7].ok ? periods[7] : periods[1];
-  // The tab shows once enough has been measured: a day for most gardens,
-  // two weeks when garden + wallet are worth over 1B (big accounts' numbers
-  // take longer to settle: one 50B purchase skews a day). Then it stays
-  // shown. The owner can also force it shown or hidden (Extras).
+  // v0.78.0: no waiting room. The tab opens as soon as your wallet and
+  // garden have been read (a moment after the game connects): the forecast,
+  // safe-to-spend and your wants work from the garden from the start, and
+  // what needs time says so in place. It used to stay locked for a day, or
+  // two weeks for gardens over 1B: a new user with a big account couldn't
+  // see it for a fortnight. settleDays is still how long the measured
+  // numbers take to settle (one 50B purchase skews a day), for the "still
+  // learning" note. It can still be forced shown or hidden (Extras).
   const measuredHours = periods[30].hours || 0;
   const netWorth = (Number.isFinite(Number(ctx.wallet)) ? Number(ctx.wallet) : steady.ok ? steady.coinsNow : 0) + (Number(ctx.gardenWorth) || 0) * SALE_M;
   // Until the wallet and the garden are known (the game not connected yet),
@@ -1888,9 +1892,10 @@ function buildView({ settings, now, ctx }) {
   // the one-day unlock and keep it (v0.65.0).
   const walletKnown = (ctx.wallet != null && Number.isFinite(Number(ctx.wallet))) || steady.ok;
   const worthKnown = walletKnown && ctx.gardenLoaded !== false;
-  const unlockDays = !worthKnown || netWorth > 1e9 ? 14 : 1;
+  const settleDays = !worthKnown || netWorth > 1e9 ? 14 : 1;
+  const unlockDays = settleDays;
   const mode = options(settings).unlockMode;
-  const earned = Boolean(settings.budget && settings.budget.unlocked) || measuredHours >= unlockDays * 24;
+  const earned = Boolean(settings.budget && settings.budget.unlocked) || worthKnown;
   const unlocked = mode === 'on' ? true : mode === 'off' ? false : earned;
   // The buy-everything meter: what you make a day against what buying
   // everything costs a day. "What you make" is this week's measured
@@ -1932,6 +1937,9 @@ function buildView({ settings, now, ctx }) {
     unlockEarned: earned,
     unlockMode: mode,
     unlockDays,
+    settleDays,
+    settled: measuredHours >= settleDays * 24,
+    worthKnown,
     netWorth,
     measuredHours,
     options: options(settings),

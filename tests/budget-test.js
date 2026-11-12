@@ -351,40 +351,43 @@ console.log(`budget: ${n} checks passed`);
   console.log(`budget (daily): ok`);
 }
 
-/* 10. Unlocking, and purchases from the game's per-restock tally */
+/* 10. Unlocking (v0.78.0: as soon as the wallet and garden are read; no
+ * day or two-week wait), how far it's settled, and purchases from the
+ * game's per-restock tally */
 {
   const now = 30 * D;
   const s = base();
   let v = budget.view({ settings: s, now });
-  ok(v.unlocked === false && v.measuredHours === 0, 'nothing measured: locked');
+  ok(v.unlocked === false && v.measuredHours === 0 && v.worthKnown === false, 'nothing known yet (game not connected): waiting');
+  v = budget.view({ settings: s, now, ctx: { wallet: 1850, gardenWorth: 64 } });
+  ok(v.unlocked === true && v.measuredHours === 0 && v.settled === false && v.settleDays === 1, 'a new player, wallet and garden read: open at once, still learning (a day)');
   s.moneyHistory = [{ t: now - 20 * H, c: 1, s: 1, f: 0 }, { t: now, c: 2, s: 2, f: 0 }];
   v = budget.view({ settings: s, now });
-  ok(v.unlocked === false && Math.round(v.measuredHours) === 20, '20 h: still locked');
+  ok(v.unlocked === true && Math.round(v.measuredHours) === 20 && v.settled === false, '20 h measured: open, not settled');
   s.moneyHistory = [{ t: now - 25 * H, c: 1, s: 1, f: 0 }, { t: now, c: 2, s: 2, f: 0 }];
   v = budget.view({ settings: s, now });
-  ok(v.unlocked === true, '25 h: unlocked');
-  s.moneyHistory = [];
-  s.budget = { unlocked: true };
-  ok(budget.view({ settings: s, now }).unlocked === true, 'once unlocked, stays unlocked');
-  // Over 1B net worth: two weeks instead of a day.
+  ok(v.unlocked === true && v.settled === true, '25 h: settled');
+  const kept = base();
+  kept.budget = { unlocked: true };
+  ok(budget.view({ settings: kept, now }).unlocked === true, 'once open, stays open (even before the game connects)');
+  // Over 1B net worth: open at once too; two weeks to settle.
   const rich = base();
+  let vr = budget.view({ settings: rich, now, ctx: { wallet: 36e9, gardenWorth: 600e9 } });
+  ok(vr.unlocked === true && vr.settleDays === 14 && vr.settled === false && vr.measuredHours === 0, 'an existing player new to the app: open at once, two weeks to settle');
   rich.moneyHistory = [{ t: now - 25 * H, c: 2e9, s: 0, f: 0 }, { t: now, c: 2e9, s: 1e9, f: 0 }];
-  let vr = budget.view({ settings: rich, now, ctx: { wallet: 2e9 } });
-  ok(vr.unlockDays === 14 && vr.unlocked === false && vr.netWorth === 2e9, 'wallet 2B: 14 days, 25 h is not enough');
+  vr = budget.view({ settings: rich, now, ctx: { wallet: 2e9 } });
+  ok(vr.unlocked === true && vr.settleDays === 14 && vr.settled === false && vr.netWorth === 2e9, 'wallet 2B, 25 h: open, still settling');
   vr = budget.view({ settings: rich, now, ctx: { wallet: 0.4e9, gardenWorth: 0.7e9 } });
-  ok(vr.unlockDays === 14 && vr.netWorth === 1.1e9, 'garden + wallet over 1B counts');
+  ok(vr.settleDays === 14 && vr.netWorth === 1.1e9, 'garden + wallet over 1B counts');
   vr = budget.view({ settings: rich, now, ctx: { wallet: 0.4e9, gardenWorth: 0.5e9 } });
-  ok(vr.unlockDays === 1 && vr.unlocked === true, 'under 1B: a day is enough');
-  // (v0.65.0) Before the game has said what the wallet and garden hold, the
-  // longer rule: reading a big account as worth 0 used to unlock it.
+  ok(vr.settleDays === 1 && vr.settled === true, 'under 1B: a day settles it');
+  // Before the game has said what the garden holds: not open yet (and the
+  // longer settle rule meanwhile).
   const early = base();
-  early.moneyHistory = [{ t: now - 25 * H, c: 0, s: 0, f: 0 }];
-  vr = budget.view({ settings: early, now, ctx: { gardenLoaded: false } });
-  ok(vr.unlockDays === 14 && vr.unlocked === false, `not known yet: 14 days (${vr.unlockDays})`);
-  vr = budget.view({ settings: rich, now, ctx: { wallet: 0.4e9, gardenWorth: 0.5e9, gardenLoaded: false } });
-  ok(vr.unlockDays === 14, 'the garden not read yet: 14 days');
+  vr = budget.view({ settings: early, now, ctx: { wallet: 5e9, gardenLoaded: false } });
+  ok(vr.unlocked === false && vr.settleDays === 14, `the garden not read yet: waiting (${vr.unlockDays})`);
   rich.moneyHistory = [{ t: now - 15 * D, c: 2e9, s: 0, f: 0 }, { t: now, c: 2e9, s: 1e9, f: 0 }];
-  ok(budget.view({ settings: rich, now, ctx: { wallet: 2e9 } }).unlocked === true, '15 days: unlocked');
+  ok(budget.view({ settings: rich, now, ctx: { wallet: 2e9 } }).settled === true, '15 days: settled');
   // Overrides from Extras.
   const o = base();
   ok(budget.setOptions(o, { unlockMode: 'on' }).unlockMode === 'on' && budget.view({ settings: o, now }).unlocked === true, 'forced shown');

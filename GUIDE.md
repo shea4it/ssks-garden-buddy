@@ -64,14 +64,22 @@ moment you tap it, and **Skip setup** keeps the usual settings.
 4. **Weather you'd rather not have**, and whether to just get a ping or a
    card asking you to step away.
 5. **When a crop is ready to sell** (color, weather, moon, full size), and
-   keeping pet food out of sales.
+   keeping pet food out of sales. Until you pick your own, it follows your
+   stage: Early counts any ripe crop, Mid a full-size Gold or Rainbow one,
+   Late the full rule (Gold or Rainbow, a weather and a moon mutation, full
+   size).
 6. **How you sell**: in a full room with your sell pets (crops count at
    what you'd get) or not, and whether to share your room on the community
-   list.
+   list. Answered here (or passed by), the share question doesn't pop up
+   again right after.
 7. **The panel**: beside the game or in its own window, open on Home or
-   Alerts, and event themes.
+   Alerts, the action bar on the game (off to start with), and event themes.
 
-Then a summary of what's set, and **Start**. Run it again any time from
+Then a summary of what's set, a note on what fills in as you play, and
+**Start**, which opens Home (or Alerts, if you picked it). A new install
+starts with an empty wants list unless your garden and wallet are worth 1B
+or more (then the usual celestials and eggs), so "safe to spend" never asks
+a new player to save for a Moonbinder. Run it again any time from
 Extras → Panel → **Run setup again**; it shows your current choices.
 
 ## Home
@@ -338,7 +346,12 @@ team: a card in the middle of the game, a banner in the panel and (if they're on
 desktop notification, each with **Put out**. You press it; the app never
 swaps your pets by itself. When the weather ends it suggests your
 clear-skies team, or the one you had out before if you'd put the weather
-team out. A suggestion goes away once that team is out, when you press ✕, or
+team out. For clear skies you can pick **🔍 Detect my usual team**: the
+app uses the last saved team you ran for 10 minutes in clear skies, so you
+don't have to change the pick when your everyday team changes (the line
+under it shows what it's detected). Harvesting unlocked's team doesn't
+count, and neither does whatever's out while a clear-skies suggestion is
+still waiting for you. A suggestion goes away once that team is out, when you press ✕, or
 once the weather it was for is over: away for a whole spell of rain, you
 won't come back to a rain team card under clear skies (its desktop
 notification is taken down too). **Apply** next to each team puts it out
@@ -634,14 +647,16 @@ The app only reads your quests. You do them and claim them in the game.
 
 ## Money tab
 
-The Money tab is in the tab bar from the start, but at first it shows a
-welcome card: what the tab does, a bar for how far along it is, and what
-you'll get. It fills in by itself after a full day of coins in and out has
-been measured, or after two weeks when your garden and wallet together are
-worth over 1B (big accounts' numbers take longer to settle: one 50B purchase
-skews a day). **Show it now anyway** on the card opens it straight away. In
-the Extras tab, **Money tab** does the same, or **Keep it hidden** takes it
-out of the tab bar. Purchases
+The Money tab opens as soon as the app has read your wallet and garden, a
+moment after the game connects. Safe to spend, the forecast and your wants
+work from your garden from the start. What needs watching takes a little
+longer, and a slim **Still learning your pace** banner at the top says how
+far along it is: a day of coins in and out, or two weeks when your garden
+and wallet together are worth over 1B (one 50B purchase skews a day). In
+the Extras tab, **Money tab** can show it even before the game connects, or
+**Keep it hidden** takes it out of the tab bar. Gardens under 1B don't get
+the "if you bought everything" line on the forecast: at a few thousand
+coins it only dives off the chart. Purchases
 are counted from the game's own record of what you bought in each shop's
 current restock, so they're exact — item, count, wherever you bought it —
 from the moment the app is running.
@@ -871,6 +886,32 @@ yet, so its max strength is an estimate.
 
 The app reads pet, ability and egg numbers from the game's own code when it
 loads, so they stay current when the game changes something.
+
+**Name new pets** (Now view, off unless you turn it on). Pick **🔢 Hatch
+number** or **🎀 Cute name**. Cute names are random, from about 15,000
+("Mochi", "Sleepy Tofu", "Lil Waffles", "Wartholomew"). Some fit the
+species, and Gold and Rainbow pets usually get their own ("Goldie",
+"Disco Bean"). Your best pets get better names: the top 10% by Pet Power
+(at max strength, against your other pets) get grand ones ("Maximus",
+"Empress Tofu", "Midas" for a Gold one), the next 30% fancy ones
+("Reginald", "Sir Waffles"). A name is never one a pet of yours has, or
+one of the last 1,500 the app gave, so thousands of hatches don't repeat.
+
+**Name my unnamed pets** (the button under it) gives every pet of yours
+that has no name a cute name, one at a time, with the same ranks. Pets
+with a name, yours or the app's, are left alone. Stop halts it. With Hatch number, each new pet gets the game's own
+eggs-hatched count as its name: your 3,445th hatch is "3445". A Double Hatch's extra pet counts too (the game's
+total includes it): the egg's own pet gets its number and the extra pet the
+next one. A pet that already has a name keeps it, and pets you had before
+you turned it on aren't touched. The first time, rename any pet once in the
+game yourself (any name; you can change it back): that's how the app learns
+the way the game names pets, and the line under the switch says when it
+has. Names go out one at a time right after the hatch, so a quick run of
+hatches gets named a moment later. If the numbers ever don't add up (a
+hatch the app didn't see, say), it leaves that pet unnamed rather than give
+it a wrong number. Pet naming is the one exception to "one press, one
+action": new pets are named after your hatch, and Name my unnamed pets
+sends a name for each pet from one press. Either way, only names change.
 
 ## Luck tab (Bad Luck Protection)
 

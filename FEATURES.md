@@ -1,4 +1,4 @@
-# 🌱 SSK's Garden Buddy: a calm companion for Magic Garden (beta 0.71)
+# 🌱 SSK's Garden Buddy: a calm companion for Magic Garden (beta 0.75)
 
 hey! this is my helper app for Magic Garden. it runs the game in its own window with a side panel that quietly keeps an eye on your garden, so you can just enjoy playing. it's a beta, so there'll be bugs. if you find one, tell me (Extras → Troubleshooting → Save a sample helps a ton).
 
@@ -29,7 +29,7 @@ the idea is simple: the game is yours to play. the Buddy watches, gives you a ge
 - **your wants list**: reorder it, add or remove stuff. tap any want on the chart (or "✏️ edit what you want" under it) to jump straight there
 - **money engine**: what you actually earn a day, week vs week
 - **money box** over the game (Ctrl+Shift+B): your net worth (coins + garden) and the next weather with a countdown
-- the Money tab needs to watch you play for a bit first (it shows how far along it is). can't wait? hit **Show it now anyway**
+- the Money tab opens as soon as your garden's been read. it keeps learning your pace over the first day (two weeks for big gardens) and says so with a slim banner until it's settled
 
 ## 🔔 Alerts
 
@@ -91,6 +91,7 @@ the idea is simple: the game is yours to play. the Buddy watches, gives you a ge
 - **your saved teams** as cards (each pet's picture, strength and Pet Power, the team's total, the abilities it covers) with Put this team out, and a **team builder** to try any three pets
 - **team suggestions when your garden is ready**: once your garden hits a goal, like "once 95% of my crops are Thunderstruck", or every crop is full size, or Gold / Rainbow, the app suggests the team you picked. **You press Put out**; it never swaps by itself (you set them up in the Weather tab)
 - pet food (who's hungry, what's in the trough) and what your pets have made
+- **🏷️ name new pets** (off unless you turn it on): by **hatch number** (the game's eggs-hatched count, so your 3,445th hatch is "3445"; a Double Hatch's extra pet gets the next number) or a random **cute name** from about 15,000 (some fit the species, Gold and Rainbow pets get their own, your best pets by Pet Power get grand ones like "Maximus" or "Empress Tofu", and no repeats across thousands of hatches). plus **name my unnamed pets**: one press gives every pet without a name a cute one. pets that already have a name keep it. rename any pet once in the game first so the app learns how
 
 ## 🌦️ Weather
 
@@ -98,7 +99,7 @@ the idea is simple: the game is yours to play. the Buddy watches, gives you a ge
 - **🌙 night** during the Haunt Event, to the minute from the game's own clock: when the next night is, or that it's night now, until when, and how much stronger nocturnal pets are right now (up to +20 STR at midnight)
 - **pet food that needs weather** (off unless you turn it on): when a weather you'll stay in for starts, a card offers to plant out the pet food in your trough that can't fill a pet's bar without a mutation (one press per pot), and to pot it back up when it ends (one press per plant); you can see and change which kinds
 - **a weather planner**: each weather now and next, what it could do to your crops, and your plan for it (the team it'll suggest, or that you'd rather not have it)
-- **a suggested team for each weather**: pick a team for rain, snow, thunder, dawn and amber moon (and clear skies). When the weather changes, a card on the game suggests it, with **Put out**: you press it. It never swaps your pets by itself
+- **a suggested team for each weather**: pick a team for rain, snow, thunder, dawn and amber moon (and clear skies). When the weather changes, a card on the game suggests it, with **Put out**: you press it. It never swaps your pets by itself, and the card goes away once that weather is over, so you don't come back to a stale one. for clear skies, **detect my usual team** uses the last team you ran 10+ minutes in clear weather, so you never have to update it
 - **weather you don't want**: a **gentle ping** (a soft chime, a note, a desktop notification) when it starts, so it never sneaks up on you; and, if you like, **step away** from it: shortly before it starts, a card asks "Rain is coming: step away?" (**Step away** / **Stay in**), and when it's over a big countdown turns into a sunny **Safe to join!** with Join the game. A few seconds into the weather, a **Reconnect when Rain ends** button floats in: press it, and you're reconnected when that weather ends (for that weather only; never on by default). Otherwise it never steps out or comes back by itself
 - **desktop notifications**: weather (step away, it's over) and team suggestions, so you hear about them while you're away from the game
 
@@ -130,7 +131,7 @@ the idea is simple: the game is yours to play. the Buddy watches, gives you a ge
 ## 🤝 Fair play: what it sends
 
 - it **reads** your game's own data in its window, plus the game's public shop feed
-- it sends game commands **only when you press something, one press, one action, never on a timer or by itself** (the one thing that waits for a moment is **Reconnect when [weather] ends**, and only after you've pressed it, for that weather): putting out one of your saved teams (Put out, Apply, the 🔁, an action-bar key, turning Harvesting unlocked on or off with a harvest team picked), putting out pets from your hutch (the team builder), planting one seed or potted plant (the action bar, quick plant, the pet-food pots card), potting one plant back up (the pet-food pots card), throwing a seed into the wishing well (seed deleter), and locking a crop kind (only with "never sell pet food" on, when you sell)
+- it sends game commands **only when you press something, one press, one action, never on a timer or by itself** (the one thing that waits for a moment is **Reconnect when [weather] ends**, and only after you've pressed it, for that weather; the one exception, off unless you use it, is **pet naming**: name new pets renames each new pet right after your hatch, and name my unnamed pets names every unnamed pet from one press; both change nothing but names): putting out one of your saved teams (Put out, Apply, the 🔁, an action-bar key, turning Harvesting unlocked on or off with a harvest team picked), putting out pets from your hutch (the team builder), planting one seed or potted plant (the action bar, quick plant, the pet-food pots card), potting one plant back up (the pet-food pots card), throwing a seed into the wishing well (seed deleter), and locking a crop kind (only with "never sell pet food" on, when you sell)
 - the harvest lock doesn't send anything. it just makes the game's own harvest miss
 - the **only** thing that sends anything about you is **Share my room**, and only if you switch it on: your room code, player count, name and coins go to Arie's Mod's room list (at most once a minute)
 - no accounts, no tracking. all the code is plain JavaScript you can read

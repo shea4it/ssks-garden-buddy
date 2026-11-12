@@ -247,6 +247,23 @@ downloads from Hugging Face load as they are).
   repeated phrases and doesn't know the game's words; read its transcripts
   rather than trusting the error rate.
 
+**First run (v0.78.0).** `tests/first-run.js` goes through the app from a
+fresh install the way a new user would: the setup (Continue each time),
+every tab, view and Extras tile, the Money tab's lock and unlocks, and the
+harvest lock / Harvesting unlocked buttons, screenshotting each step into
+`tests/shots/firstrun/<persona>/` with `first-run.json` (each screen's text,
+console errors, what each lock did). Start the stand-in with
+`MG_FIXTURE=newplayer` (a brand-new account) or `MG_FIXTURE=veteran` (the
+big garden, a late-game wallet), then:
+
+    MG_PERSONA=newplayer XDG_CONFIG_HOME=$(mktemp -d) NODE_TLS_REJECT_UNAUTHORIZED=0 \
+      MG_SHOPS_API=https://127.0.0.1:8443/platform/v1/shops MG_UPDATE_API=https://127.0.0.1:8443/releases/latest \
+      xvfb-run -a -s "-screen 0 1400x900x24" npx electron --no-sandbox tests/first-run.js
+
+Expected: `errors` and `console` empty, nine setup steps, no share question
+right after the setup, the Money tab open, and each lock on and off with the
+game's badge.
+
 **Charts (v0.51).** `tests/chart-shots.js` sets up the Money forecast and
 Mutations over time in several data scenarios, screenshots each into
 `tests/shots/chart-*.png`, measures every label and dot for overlaps

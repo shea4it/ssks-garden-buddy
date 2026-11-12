@@ -402,7 +402,42 @@ app.whenReady().then(async () => {
     await run(game(), "window.__gameSend({ type: '__TestWeather', weather: 'Sunny' })");
     await wait(4000);
     const awayOver = { suggested: await sugg(), card: await card(), banner: await run(panel(), "!document.getElementById('teamSuggestBar').hidden"), commands: teamCmds().slice(t3) };
-    out.weatherTeams = { onDawn, noRepeat, afterPress, onClear, afterDismiss, dawnAgain, notNow, afterHandSwap, handOnly, awayRain, awayOver, hadS: Boolean(S0) };
+    // (v0.75.1) Clear skies set to "Detect my usual team": A out in clear
+    // skies long enough is your usual team; Dawn → B put out; when it
+    // clears, A is suggested. B out while that waits doesn't count; dismissed,
+    // B becomes your usual team. (The 10 minutes are 1.5 s here.)
+    TT.usualSettle(1500);
+    // (Picked the way the menu does it, so the panel's copy has it too. The
+    // stand-in is quiet between commands, so a repeat of the same weather
+    // nudges the game page into reporting, as a live room's traffic would.)
+    await run(panel(), "(() => { S.weatherTeams = Object.assign({}, S.weatherTeams, { enabled: true, dawn: 'teamB', rain: 'teamB', clear: 'auto' }); save(); renderTeams(); return true; })()");
+    const nudge = async (n) => {
+      for (let i = 0; i < n; i += 1) {
+        await run(game(), "window.__gameSend({ type: '__TestWeather', weather: 'Sunny' })");
+        await wait(2600);
+      }
+    };
+    await wait(1500);
+    await nudge(3);
+    const usualId = () => run(panel(), 'GARDEN_STATUS && GARDEN_STATUS.usualTeam ? GARDEN_STATUS.usualTeam.id : null');
+    const detect = { usualA: await usualId(), hint: await run(panel(), "(() => { const d = document.querySelector('#teamPicks .team-pick .rule-desc'); return d ? d.textContent : null; })()"), opt: await run(panel(), "(document.querySelector('#teamPicks [data-team-kind=clear]') || {}).value || null") };
+    await run(game(), "window.__gameSend({ type: '__TestWeather', weather: 'Dawn' })");
+    await wait(4000);
+    detect.dawn = await sugg();
+    await run(game(), "document.querySelector('#mg-team-suggest [data-act=apply]').click()");
+    await wait(3000);
+    await run(game(), "window.__gameSend({ type: '__TestWeather', weather: 'Sunny' })");
+    await wait(4000);
+    detect.cleared = await sugg();
+    await nudge(2);
+    detect.whileWaiting = await usualId();
+    await run(panel(), "window.app.answerTeam('dismiss')");
+    await wait(500);
+    await nudge(3);
+    detect.afterDismiss = await usualId();
+    TT.usualSettle(600000);
+    await run(panel(), "(() => { S.weatherTeams = Object.assign({}, S.weatherTeams, { clear: null }); save(); renderTeams(); return true; })()");
+    out.weatherTeams = { onDawn, noRepeat, afterPress, onClear, afterDismiss, dawnAgain, notNow, afterHandSwap, handOnly, awayRain, awayOver, detect, hadS: Boolean(S0) };
     const wt = out.weatherTeams;
     const okWT = wt.noRepeat && wt.onDawn.commands.length === 0 && wt.onDawn.suggested === 'teamB' && wt.onDawn.card && wt.onDawn.banner
       && wt.afterPress.commands.join() === 'teamB' && wt.afterPress.suggested === null && !wt.afterPress.card
@@ -411,7 +446,9 @@ app.whenReady().then(async () => {
       && wt.notNow.suggested === null && !wt.notNow.card
       && wt.dawnAgain === 'teamB' && wt.afterHandSwap === null && wt.handOnly.join() === 'teamB'
       && wt.awayRain.suggested === 'teamB' && wt.awayRain.card
-      && wt.awayOver.suggested === null && !wt.awayOver.card && !wt.awayOver.banner && wt.awayOver.commands.length === 0;
+      && wt.awayOver.suggested === null && !wt.awayOver.card && !wt.awayOver.banner && wt.awayOver.commands.length === 0
+      && wt.detect.usualA === 'teamA' && /Detected:/.test(wt.detect.hint || '') && wt.detect.opt === 'auto' && wt.detect.dawn === 'teamB'
+      && wt.detect.cleared === 'teamA' && wt.detect.whileWaiting === 'teamA' && wt.detect.afterDismiss === 'teamB';
     if (!okWT) out.errors.push(`weather teams should only suggest: ${JSON.stringify(wt)}`);
     // A picture of the Spend-or-save card with the owner's real numbers
     // (his 0.34.0 sample: wallet 36B, 121 of 270 crops ready worth 410.7B).
@@ -1088,6 +1125,95 @@ app.whenReady().then(async () => {
       const okR = !shownEarly && shownLater.shown && shownLater.popped && ignoredFromElsewhere && pressed.autoBack && !reconnected.parked && /magicgarden/.test(reconnected.url) && notPressed.parked && notPressed.safe && !notPressed.autoBack;
       if (!okR) out.errors.push(`reconnect when the weather ends: ${JSON.stringify(reconnect)}`);
       out.stepOut = { card, afterIgnore, afterConfirm, backIn: !T.parked(), unanswered, spells, reconnect };
+    }
+    // Pets named by hatch number (v0.75.0). Nothing until the app has seen
+    // the game rename a pet once (the stand-in's own RenamePet, which the app
+    // can't know beforehand); then each new pet with no name gets the game's
+    // eggs-hatched count, a Double Hatch's extra pet the next number, a pet
+    // that has a name keeps it, and off means off. The game's own commands
+    // after the app's are renumbered with no gap or repeat.
+    {
+      const TN = globalThis.__mgTest;
+      for (let i = 0; i < 40 && !(game() && !game().isLoading()); i += 1) await wait(500);
+      await wait(7500);
+      const renames = () => serverLog().filter((l) => l.renamed).map((l) => l.renamed + '=' + l.name + (l.ok ? '' : '!'));
+      const count = () => run(game(), 'window.__mgLoaderObserver.naming.count');
+      const r0 = renames().length;
+      const logAt = serverLog().length;
+      await run(panel(), 'window.app.namingSet({ on: true })');
+      await wait(1200);
+      const before = { learned: Boolean(TN.namingRaw().shape), line: await run(panel(), "document.getElementById('namingLine').textContent") };
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Toad' })");
+      await wait(2500);
+      const unlearnedRenames = renames().slice(r0);
+      await run(game(), "window.__gameSend({ type: 'RenamePet', petItemId: 'pet-3', name: 'Bob' })");
+      await wait(2500);
+      const shape = TN.namingRaw().shape;
+      const c1 = await count();
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Turtle' })");
+      await wait(3000);
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Bee', double: 'Snail' })");
+      await wait(4000);
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Ostrich', name: 'Hot Rod' })");
+      await wait(2500);
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Worm' })");
+      await wait(3000);
+      const onRenames = renames().slice(r0);
+      const line = await run(panel(), "document.getElementById('namingLine').textContent");
+      const sw = await run(panel(), "document.getElementById('namingOn').getAttribute('aria-checked')");
+      await run(panel(), 'window.app.namingSet({ on: false })');
+      await wait(1200);
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Pig' })");
+      await wait(3000);
+      const offRenames = renames().slice(r0 + onRenames.length);
+      // (v0.76.0; v0.77.0 picked by the app, ranked) The cute style: a
+      // Double Hatch of two Pigs and a Rainbow Goat get three different safe
+      // names, none a number; then "Name my unnamed pets" names every pet
+      // with no name, and only those, and a second press has nothing to do.
+      await run(panel(), "window.app.namingSet({ on: true, style: 'cute' })");
+      await wait(1200);
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Pig', double: 'Pig' })");
+      await wait(5000);
+      await run(game(), "window.__gameSend({ type: '__TestHatch', species: 'Goat', mutations: ['Rainbow'] })");
+      await wait(5000);
+      const cuteRenames = renames().slice(r0 + onRenames.length + offRenames.length).map((x) => x.split('=')[1]);
+      const SAFE = /^[A-Za-z]+( [A-Za-z]+)*$/;
+      const cute = { names: cuteRenames, line: await run(panel(), "document.getElementById('namingLine').textContent"), seg: await run(panel(), "(() => { const b = document.querySelector('#namingStyle [aria-checked=true]'); return b ? b.dataset.val : null; })()"), recent: (TN.namingRaw().recent || []).slice(-3) };
+      const okCute = cuteRenames.length === 3 && cuteRenames.every((n) => SAFE.test(n) && n.length <= 12) && new Set(cuteRenames).size === 3 && cute.seg === 'cute' && /7 named so far/.test(cute.line) && cute.recent.join() === cuteRenames.join();
+      if (!okCute) out.errors.push(`cute pet names: ${JSON.stringify(cute)}`);
+      await wait(2500);
+      const petsNow = () => run(panel(), "(GARDEN_STATUS.allPets || []).map((p) => ({ id: p.id, name: p.name || null }))");
+      const beforeBulk = await petsNow();
+      const unnamedIds = beforeBulk.filter((p) => !p.name).map((p) => p.id).sort();
+      const r1 = renames().length;
+      const press = await run(panel(), "(async () => { const r = await window.app.namingBulk(); return { ok: r.ok, count: r.count, active: r.bulk && r.bulk.active }; })()");
+      const midLine = await run(panel(), "(() => { renderNaming(); return document.getElementById('namingBulkLine').textContent; })()");
+      for (let i = 0; i < 30 && renames().length - r1 < unnamedIds.length; i += 1) await wait(1000);
+      await wait(4000);
+      const bulkRenames = renames().slice(r1);
+      const bulkIds = bulkRenames.map((x) => x.split('=')[0]).sort();
+      const afterBulk = await petsNow();
+      const again = await run(panel(), "(async () => { const r = await window.app.namingBulk(); return { ok: r.ok, count: r.count }; })()");
+      const bulk = { unnamedIds, press, midLine, bulkRenames, view: await run(panel(), "(async () => (await window.app.namingGet()).bulk)()"), endLine: await run(panel(), "(() => { renderNaming(); return document.getElementById('namingBulkLine').textContent; })()"), stillUnnamed: afterBulk.filter((p) => !p.name).length, again };
+      const keptNames = beforeBulk.filter((p) => p.name).every((p) => (afterBulk.find((q) => q.id === p.id) || {}).name === p.name);
+      const okBulk = unnamedIds.length >= 2 && press.ok && press.count === unnamedIds.length && /Naming \d+ of \d+/.test(midLine) && bulkIds.join() === unnamedIds.join()
+        && bulkRenames.every((x) => SAFE.test(x.split('=')[1])) && keptNames && bulk.stillUnnamed === 0 && bulk.view && !bulk.view.active && bulk.view.done === unnamedIds.length
+        && /All your pets have names/.test(bulk.endLine) && again.ok && again.count === 0;
+      if (!okBulk) out.errors.push(`name my unnamed pets: ${JSON.stringify(bulk)}`);
+      out.namingBulk = bulk;
+      const seqs = serverLog().slice(logAt).filter((l) => l.in === 'QuinoaCommand').map((l) => l.seq);
+      const gapless = seqs.every((s, i) => i === 0 || s === seqs[i - 1] + 1);
+      const h = (n) => 'hatched-' + n;
+      // (onRenames[0] is your own rename of pet-3; the app's follow.)
+      const ids = onRenames.slice(1).map((x) => x.split('=')[0]);
+      const first = ids.length ? Number(ids[0].split('-')[1]) : 0;
+      const want = [`${h(first)}=${c1 + 1}`, `${h(first + 1)}=${c1 + 2}`, `${h(first + 2)}=${c1 + 3}`, `${h(first + 4)}=${c1 + 5}`];
+      out.naming = { before, unlearnedRenames, shape, c1, onRenames, want, line, sw, offRenames, cute, seqs, gapless, raw: TN.namingRaw() };
+      const okN = !before.learned && /rename any pet once/.test(before.line) && unlearnedRenames.length === 0
+        && shape && shape.type === 'RenamePet' && shape.idField === 'petItemId' && shape.nameField === 'name'
+        && onRenames.slice(1).join() === want.join() && onRenames[0] === 'pet-3=Bob'
+        && /4 named so far/.test(line) && /"\d+"/.test(line) && sw === 'true' && offRenames.length === 0 && gapless && seqs.length >= 8;
+      if (!okN) out.errors.push(`pets named by hatch number: ${JSON.stringify(out.naming)}`);
     }
   } catch (e) {
     out.errors.push('probe: ' + (e.stack || e));

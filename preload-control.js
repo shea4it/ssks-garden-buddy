@@ -133,6 +133,12 @@ contextBridge.exposeInMainWorld('app', {
   mapCard: (view) => ipcRenderer.invoke('map:card', view),
   petPrefs: (change) => ipcRenderer.invoke('pets:prefs', change),
   teamSuggestion: () => ipcRenderer.invoke('teams:suggestion'),
+  // Pets named by hatch number (v0.75.0).
+  namingGet: () => ipcRenderer.invoke('naming:get'),
+  namingSet: (change) => ipcRenderer.invoke('naming:set', change),
+  namingBulk: () => ipcRenderer.invoke('naming:bulk'),
+  namingBulkStop: () => ipcRenderer.invoke('naming:bulkStop'),
+  onNaming: on('naming'),
   answerTeam: (act) => ipcRenderer.invoke('teams:answer', act),
   onTeamSuggest: on('team:suggest'),
   onWeatherPing: on('weather:ping'),

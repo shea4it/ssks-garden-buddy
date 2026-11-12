@@ -55,7 +55,35 @@ state.child.data.userSlots[0].data.shopPurchases = { egg: { restockId: 'egg:1', 
 // A late-game garden (v0.73.1, the freeze test): MG_BIG_GARDEN=1 fills the
 // garden from tests/fixtures/big-garden.json (191 plants, 57 pets), and
 // potting / replanting answer the game's way, with small patches.
-const BIG = Boolean(process.env.MG_BIG_GARDEN);
+// First-run walkthroughs (v0.78.0, tests/first-run.js): MG_FIXTURE=newplayer
+// is a brand-new account (a few coins, three plants, no pets, nothing
+// hatched); MG_FIXTURE=veteran is the big garden with a late-game wallet.
+// Either way the harness's scripted patches after connecting are left out.
+const FIXTURE = process.env.MG_FIXTURE || '';
+const BIG = Boolean(process.env.MG_BIG_GARDEN) || FIXTURE === 'veteran';
+if (FIXTURE === 'newplayer') {
+  const d = state.child.data.userSlots[0].data;
+  const plant = (sp, ripe, grow) => ({ objectType: 'plant', species: sp, plantedAt: Date.now() - 1800000, maturedAt: Date.now() - (ripe ? 60000 : -grow), slots: [{ species: sp, startTime: Date.now() - 1800000, endTime: ripe ? Date.now() - 60000 : Date.now() + grow, size: ripe ? 62 : 40, mutations: [], slotId: 0 }] });
+  Object.assign(d, {
+    coinsCount: 1850,
+    magicDustCount: 0,
+    activityLogs: [{ action: 'plantSeed', timestamp: Date.now() - 1800000, parameters: { species: 'Carrot' } }],
+    stats: { player: { numEggsHatched: 0, totalEarningsSellCrops: 240, totalEarningsSellPet: 0, numDailyQuestsCompleted: 0, numDailyQuestsRefreshed: 0, numEasyDailyQuestsCompleted: 0, numMediumDailyQuestsCompleted: 0, numHardDailyQuestsCompleted: 0, totalCoinsFromDailyQuests: 0, totalDustFromDailyQuests: 0, numSpookyQuestsCompleted: 0 }, petAbility: {}, capsulePulls: {} },
+    journal: { produce: { Carrot: { variantsLogged: [{ variant: 'Normal', createdAt: Date.now() - 1700000 }] } }, pets: {} },
+    garden: { tileObjects: { 30: plant('Carrot', true), 31: plant('Carrot', false, 20 * 60000), 32: plant('Strawberry', false, 50 * 60000) } },
+    inventory: { items: [{ id: 'seed-1', itemType: 'Seed', species: 'Carrot', quantity: 4 }, { id: 'crop-1', itemType: 'Produce', species: 'Carrot', size: 55, mutations: [] }], storages: [], favoritedItemIds: [] },
+    petSlots: [],
+    petTeams: [],
+    shopPurchases: { seed: { restockId: 'seed:1', startedAtMs: Date.now(), purchases: { Carrot: 2 } } },
+  });
+  d.dailyQuests.quests = [
+    { instanceId: 'q0', difficulty: 'easy', objective: { kind: 'harvestCrops', target: 5, speciesId: 'Carrot' }, progress: 1, reward: { kind: 'coins', amount: 500 }, completedAt: null, claimedAt: null, refreshed: false },
+    { instanceId: 'q1', difficulty: 'easy', objective: { kind: 'hatchEggs', target: 1 }, progress: 0, reward: { kind: 'dust', amount: 100 }, completedAt: null, claimedAt: null, refreshed: false },
+    { instanceId: 'q2', difficulty: 'medium', objective: { kind: 'harvestCrops', target: 10, speciesId: 'Strawberry' }, progress: 0, reward: { kind: 'coins', amount: 2000 }, completedAt: null, claimedAt: null, refreshed: false },
+  ];
+  d.spookyQuest = Object.assign({}, d.spookyQuest, { progress: 0 });
+  state.child.data.userSlots[0].heldItem = null;
+}
 if (BIG) {
   const fx = JSON.parse(fs.readFileSync(__dirname + '/fixtures/big-garden.json', 'utf8'));
   const RAW = { gold: 'Gold', rainbow: 'Rainbow', wet: 'Wet', chilled: 'Chilled', frozen: 'Frozen', thunderstruck: 'Thunderstruck', thundercharged: 'Thundercharged', dawnlit: 'Dawnlit', dawnbound: 'Dawncharged', amberlit: 'Ambershine', amberbound: 'Ambercharged' };
@@ -70,6 +98,19 @@ if (BIG) {
   d.petSlots = fx.pets.filter((p) => p.where === 'out').map(pet);
   d.inventory.storages[0].items = fx.pets.filter((p) => p.where !== 'out').map((p) => Object.assign({ itemType: 'Pet' }, pet(p)));
   d.activityLogs = d.activityLogs.concat(Array.from({ length: 60 }, (x, k) => ({ action: 'harvest', timestamp: Date.now() - 600000 + k * 1000, parameters: { crops: [{ id: 'c' + k, species: 'Ube', itemType: 'Produce', size: 100, mutations: ['Gold', 'Thundercharged', 'Ambercharged'] }] } })));
+  if (FIXTURE === 'veteran') {
+    d.coinsCount = 36e9;
+    d.stats.player.numEggsHatched = 3444;
+    d.stats.player.totalEarningsSellCrops = 4.2e12;
+    // Teams of real pets from the big garden.
+    const ids = fx.pets.map((p) => p.id);
+    d.petTeams = [
+      { id: 'vt1', name: 'farm team', members: ids.slice(0, 3).map((id) => ({ petId: id })) },
+      { id: 'vt2', name: 'sell team', members: ids.slice(3, 6).map((id) => ({ petId: id })) },
+      { id: 'vt3', name: 'dawn team', members: ids.slice(6, 9).map((id) => ({ petId: id })) },
+    ];
+    state.child.data.players = [{ id: 'me', name: 'Tester', isConnected: true }].concat(['Ada', 'Bo', 'Cy', 'Di'].map((n) => ({ id: n, name: n, isConnected: true })));
+  }
 }
 let pottedSeq = 0;
 const srv = https.createServer({ key: fs.readFileSync(__dirname + '/key.pem'), cert: fs.readFileSync(__dirname + '/cert.pem') }, (req, res) => {
@@ -123,6 +164,7 @@ const srv = https.createServer({ key: fs.readFileSync(__dirname + '/key.pem'), c
 });
 const wss = new WebSocketServer({ server: srv });
 let serverSeq = 0;
+let hatchSeq = 0;
 wss.on('connection', (ws) => {
   const log = (m) => fs.appendFileSync((process.env.MG_TEST_DIR || __dirname) + '/server.log', JSON.stringify(m) + '\n'); const _send = ws.send.bind(ws); ws.send = (d) => { if (ws.readyState === 1) _send(d); };
   ws.on('message', (raw) => {
@@ -149,6 +191,8 @@ wss.on('connection', (ws) => {
           if (tick % 5 === 0) ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/currentTime', value: Date.now() }] } }));
         }, 1000);
       }
+      // The harness's scripted patches (not for the first-run fixtures).
+      if (!FIXTURE) {
       // 6 s later the game's own hatch total goes up by 2 with no log entries (dropped off the log).
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/stats/player/numEggsHatched', value: 42 }] } })), 6000);
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/coinsCount', value: 1.5e9 }] } })), 9000);
@@ -156,6 +200,7 @@ wss.on('connection', (ws) => {
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/shopPurchases/egg/purchases', value: { CommonEgg: 1, LegendaryEgg: 1 } }] } })), 8000);
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/heldItem', value: { itemId: 'pot-1', decorRotation: 0 } }] } })), 21000);
       setTimeout(() => ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/heldItem', value: { itemId: 'Carrot', decorRotation: 0 } }] } })), 26000);
+      }
     } else if (m.type === 'QuinoaCommand') {
       serverSeq = m.commandSequence;
       // The big garden's potting and replanting, as the live game patches
@@ -285,6 +330,45 @@ wss.on('connection', (ws) => {
       // id and a path of points) is a guess the app's reader must cope with.
       if (m.command.type === '__movePlayer') {
         ws.send(JSON.stringify({ type: 'QuinoaMovementBatch', segments: [{ playerId: 'me', seq: Date.now(), path: [{ x: m.command.x - 1, y: m.command.y, t: Date.now() - 300 }, { x: m.command.x, y: m.command.y, t: Date.now() }] }, { playerId: 'someone-else', path: [{ x: 99, y: 99 }] }], activities: [], removedPlayers: [] }));
+        return;
+      }
+      // Renaming a pet (v0.75.0). The live game's command isn't known: this
+      // stand-in's own { petItemId, name } is what the app has to learn from
+      // the game sending it once. An empty or over-long name is refused.
+      if (m.command.type === 'RenamePet') {
+        const d = state.child.data.userSlots[0].data;
+        const lists = [d.petSlots, d.inventory.items].concat((d.inventory.storages || []).map((x) => x.items));
+        const name = typeof m.command.name === 'string' ? m.command.name.trim() : '';
+        let pet = null;
+        for (const l of lists) pet = pet || (l || []).find((p) => p && p.id === m.command.petItemId && p.petSpecies);
+        const ok = Boolean(pet) && name.length > 0 && name.length <= 20;
+        if (ok) pet.name = name;
+        log({ renamed: m.command.petItemId, name, ok, seq: m.commandSequence });
+        ws.send(JSON.stringify({ type: 'QuinoaCommandResult', requestId: m.requestId, commandType: m.command.type, ok, code: ok ? undefined : 'invalid_name' }));
+        if (ok) ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [{ op: 'replace', path: '/child/data/userSlots/0/data/petSlots', value: d.petSlots }, { op: 'replace', path: '/child/data/userSlots/0/data/inventory', value: d.inventory }] } }));
+        return;
+      }
+      // Test hook (v0.75.0): a hatch, as the game shows one: the pet joins
+      // the bag with no name, the hatch total goes up and the log gets an
+      // entry, all in one frame. double: a Double Hatch's extra pet too (in
+      // the total, not in the log).
+      if (m.command.type === '__TestHatch') {
+        const d = state.child.data.userSlots[0].data;
+        // (An ability each, so the app can rank them by Pet Power, v0.77.0.)
+        const mk = (sp) => ({ id: 'hatched-' + (hatchSeq += 1), itemType: 'Pet', petSpecies: sp, name: null, hunger: 400, xp: 0, mutations: m.command.mutations || [], abilities: ['SellBoostI'], targetScale: 1 });
+        const pet = mk(m.command.species || 'Turtle');
+        if (m.command.name) pet.name = m.command.name;
+        const pets = [pet].concat(m.command.double ? [mk(m.command.double)] : []);
+        d.inventory.items = d.inventory.items.concat(pets);
+        // (The 6 s patch above shows 42 without changing this state.)
+        d.stats.player.numEggsHatched = Math.max(d.stats.player.numEggsHatched, 42) + pets.length;
+        d.activityLogs = d.activityLogs.concat([{ action: 'hatchEgg', timestamp: Date.now(), parameters: { eggId: 'CommonEgg', pet } }]);
+        ws.send(JSON.stringify({ type: 'QuinoaCommandResult', requestId: m.requestId, commandType: m.command.type, ok: true }));
+        ws.send(JSON.stringify({ type: 'RoomFrame', executedCommandSequence: serverSeq, state: { patches: [
+          { op: 'replace', path: '/child/data/userSlots/0/data/inventory/items', value: d.inventory.items },
+          { op: 'replace', path: '/child/data/userSlots/0/data/stats/player/numEggsHatched', value: d.stats.player.numEggsHatched },
+          { op: 'replace', path: '/child/data/userSlots/0/data/activityLogs', value: d.activityLogs },
+        ] } }));
         return;
       }
       // Test hook: add activity-log entries (e.g. a pet turning a crop Gold).

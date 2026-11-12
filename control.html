@@ -298,6 +298,13 @@
   /* The Money tab's cover (v0.63.6): the tab underneath, blurred and
    * dimmed (a glimpse of what's coming), and a frosted card held in view. */
   #tab-money.warming > :not(#moneyIntro) { filter: blur(5px) saturate(.75); opacity: .4; pointer-events: none; user-select: none; }
+  /* v0.78.0: "still learning your pace", over the open tab. */
+  .money-learn { margin: 2px 0 12px; padding: 11px 13px; border-radius: 14px; background: rgba(245, 201, 106, .08); border: 1px solid rgba(245, 201, 106, .28); }
+  .money-learn .ml-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 13px; }
+  .money-learn .ml-top span { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .money-learn .ml-bar { height: 4px; border-radius: 3px; background: rgba(255, 255, 255, .08); margin: 7px 0 7px; overflow: hidden; }
+  .money-learn .ml-bar i { display: block; height: 100%; background: #f5c96a; border-radius: 3px; }
+  .money-learn .ml-text { font-size: 12px; line-height: 1.45; color: var(--faint); text-wrap: pretty; }
   #tab-money.warming > #moneyIntro { position: sticky; top: 14px; z-index: 6; max-width: 380px; margin: 4px auto 18px; text-align: center; padding: 20px 20px 16px; border-radius: 20px; background: rgba(45, 35, 55, .86); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(240, 207, 134, .35); box-shadow: 0 18px 50px rgba(0, 0, 0, .45); }
   .money-intro .mi-ring { position: relative; width: 84px; height: 84px; margin: 0 auto 10px; }
   .money-intro .mi-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -2424,6 +2431,7 @@
 
   <section id="tab-money" hidden>
     <div class="card money-intro" id="moneyIntro" hidden></div>
+    <div class="money-learn" id="moneyLearn" hidden></div>
     <h2 style="margin-top:4px">Spend or save?</h2>
     <div class="card">
       <div id="moneyForesight"></div>
@@ -2489,6 +2497,12 @@
     <h2 data-pview="now">Pets that are out</h2>
     <div data-pview="now" id="petCards"></div>
     <p data-pview="now" class="hint" style="padding: 0 4px">Strength comes from each pet's size and XP. If one looks wrong, tap the pet and type over it; clear the box to go back.</p>
+    <div data-pview="now" class="card" id="namingCard" style="margin-top:10px"><div class="row">
+      <span>🏷️ Name new pets<div class="rule-desc no-clamp" id="namingLine">Each new pet gets the game's eggs-hatched count as its name: your 3,445th hatch is "3445".</div></span>
+      <button class="switch" role="switch" id="namingOn" aria-label="Name new pets"></button>
+    </div>
+    <div class="row" style="margin-top:6px"><span>Name</span><div class="seg" id="namingStyle" role="radiogroup" aria-label="How new pets are named"><button role="radio" data-val="number">🔢 Hatch number</button><button role="radio" data-val="cute">🎀 Cute name</button></div></div>
+    <div class="row" style="margin-top:10px"><span>🎀 Name my unnamed pets<div class="rule-desc no-clamp" id="namingBulkLine">A cute name for each pet that has none. Pets with a name are left alone.</div></span><button class="btn small" id="namingBulkBtn" style="white-space:nowrap;flex-shrink:0">Name them</button></div></div>
 
     <h2 data-pview="food">Food</h2>
     <div data-pview="food" class="card trough-card" id="troughTimer"></div>
@@ -2714,7 +2728,7 @@
         <button class="chip" data-unlock="on">Show it now</button>
         <button class="chip" data-unlock="off">Keep it hidden</button>
       </div>
-      <div class="note" id="moneyUnlockNote">On its own the Money tab opens after a day of play (two weeks once your garden and wallet pass 1B), showing its progress until then. Show it now skips the wait; Keep it hidden removes the tab.</div>
+      <div class="note" id="moneyUnlockNote">On its own the Money tab opens as soon as the game is connected and your garden has been read. Show it now opens it even before that; Keep it hidden removes the tab.</div>
     </div>
 
     <h2>Backups</h2>
@@ -5587,7 +5601,8 @@ function shortNumber(n) {
     // Trillions under 10 get two decimals (v0.53.15): at a full-room price
     // gardens run 1-2T, and "1.1T" would hide the difference between 1.07T
     // and 1.14T.
-    if (v >= size) return (v / size).toFixed(v / size >= 100 ? 0 : suffix === 'T' && v / size < 10 ? 2 : 1).replace(/\.0+$/, '').replace(/(\.\d)0$/, '$1') + suffix;
+    // (v0.78.0: from 99.95% of a unit up, so 999,998,055 reads 1B, not 1000M.)
+    if (v >= size * 0.9995) return (v / size).toFixed(v / size >= 100 ? 0 : suffix === 'T' && v / size < 10 ? 2 : 1).replace(/\.0+$/, '').replace(/(\.\d)0$/, '$1') + suffix;
   }
   return String(Math.round(v));
 }
@@ -5749,7 +5764,8 @@ function renderPetRank() {
   PR_PENDING = false;
   PR_SIG = sig;
   if (!R || !R.ranking || !R.ranking.length) {
-    box.innerHTML = '<div class="empty">Ranks your pets once the game is connected.</div>';
+    const conn = GARDEN_STATUS && GARDEN_STATUS.foundSelf;
+    box.innerHTML = `<div class="empty">${conn ? 'No pets with abilities yet. Hatch an egg and your pets are ranked here.' : 'Ranks your pets once the game is connected.'}</div>`;
     return;
   }
   const open = (id) => (box.querySelector(`#${id}`) ? box.querySelector(`#${id}`).open : false);
@@ -6209,6 +6225,82 @@ function wireLastTeam() {
     });
   }
   if (window.app.onLastTeamResult) window.app.onLastTeamResult(lastTeamSaid);
+  wireNaming();
+}
+
+/* Pets named by hatch number (v0.75.0): one switch, and a line saying what
+ * it's waiting for or what it last named. */
+let NAMING = null;
+function renderNaming() {
+  const n = NAMING;
+  if (!n || !$('namingOn')) return;
+  setSwitch($('namingOn'), n.on);
+  setSeg('namingStyle', n.style === 'cute' ? 'cute' : 'number');
+  const sp = (x) => speciesName(x).toLowerCase();
+  const what = n.style === 'cute'
+    ? 'Each new pet gets a random cute name like "Mochi" or "Hamlet": some fit the species, and Gold and Rainbow pets get their own.'
+    : 'Each new pet gets the game\'s eggs-hatched count as its name: your 3,445th hatch is "3445".';
+  let t;
+  if (!n.learned) t = 'First rename any pet once in the game (any name; you can change it back). That shows the app how the game names pets.';
+  else if (!n.on) t = what;
+  else if (n.failed) t = `The game didn't take "${n.failed.name}" for your ${sp(n.failed.species)}${n.failed.code ? ` (${n.failed.code})` : ''}. The next pet gets a try.`;
+  else if (n.last) t = `${n.named.toLocaleString()} named so far · last: your ${sp(n.last.species)}, "${n.last.name}". Pets you've named keep their names.`;
+  else t = `On. ${what} Pets you've named keep their names.`;
+  $('namingLine').textContent = t;
+  // "Name my unnamed pets" (v0.77.0): only pets with no name.
+  const st = GARDEN_STATUS;
+  const unnamed = st && st.foundSelf && Array.isArray(st.allPets) ? st.allPets.filter((p) => !p.name).length : n.unnamed;
+  const b = n.bulk;
+  const btn = $('namingBulkBtn');
+  let bl;
+  if (b && b.active) {
+    bl = `Naming ${Math.min(b.total, b.done + b.failed + 1).toLocaleString()} of ${b.total.toLocaleString()}…`;
+    btn.textContent = 'Stop';
+    btn.disabled = false;
+  } else {
+    btn.textContent = 'Name them';
+    btn.disabled = !n.learned || !unnamed;
+    const pets = (k) => `${k.toLocaleString()} pet${k === 1 ? '' : 's'}`;
+    const doneBit = b && b.done ? `Named ${pets(b.done)}. ` : '';
+    if (!n.learned) bl = 'A cute name for each pet that has none. Rename any pet once in the game first.';
+    else if (unnamed == null) bl = 'A cute name for each pet that has none, once the game is connected.';
+    else if (!unnamed) bl = `${doneBit}All your pets have names.`;
+    else bl = `${doneBit}${pets(unnamed)} with no name. Each gets a cute name (your best pets get grand ones); pets with a name are left alone.`;
+  }
+  $('namingBulkLine').textContent = bl;
+}
+async function wireNaming() {
+  if (!$('namingOn') || !window.app.namingGet) {
+    if ($('namingCard')) $('namingCard').hidden = true;
+    return;
+  }
+  try {
+    NAMING = await window.app.namingGet();
+  } catch (err) {
+    NAMING = { on: false, learned: false, named: 0 };
+  }
+  renderNaming();
+  $('namingOn').addEventListener('click', async () => {
+    NAMING = await window.app.namingSet({ on: !(NAMING && NAMING.on) });
+    renderNaming();
+  });
+  $('namingBulkBtn').addEventListener('click', async () => {
+    const running = NAMING && NAMING.bulk && NAMING.bulk.active;
+    const r = running ? await window.app.namingBulkStop() : await window.app.namingBulk();
+    if (r) NAMING = r;
+    if (r && r.ok === false && r.reason) toast(r.reason);
+    renderNaming();
+  });
+  $('namingStyle').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-val]');
+    if (!b) return;
+    NAMING = await window.app.namingSet({ style: b.dataset.val });
+    renderNaming();
+  });
+  if (window.app.onNaming) window.app.onNaming((v) => {
+    NAMING = v;
+    renderNaming();
+  });
 }
 
 /* ================================================================== *
@@ -6362,6 +6454,7 @@ function renderPets() {
   renderPetRank();
   renderTrough(GARDEN_STATUS);
   renderDevDetails();
+  if (NAMING) renderNaming();
   const st = GARDEN_STATUS;
   const live = st && st.foundSelf && Date.now() - st.at < 45000;
   if (!st || !st.pets) {
@@ -6375,7 +6468,7 @@ function renderPets() {
 
 
   $('teamNow').innerHTML = (live ? '' : '<div class="note" style="margin-top:0">From the last time the game was connected.</div>') +
-    summaryLines(st.abilities) +
+    (st.pets.length ? summaryLines(st.abilities) : '<div class="empty">No pets are out. Put some out in the game and what they do adds up here.</div>') +
     '';
 
   if (!typing) {
@@ -6422,7 +6515,7 @@ function renderPets() {
   };
   $('goalRank').innerHTML = ranked.length
     ? ranked.slice(0, 8).map(bpRow).join('') + (ranked.length > 8 ? `<details class="more"><summary>${ranked.length - 8} more</summary>${ranked.slice(8, 30).map((x, i) => bpRow(x, i + 8)).join('')}</details>` : '')
-    : '<div class="empty">None of your pets help with this.</div>';
+    : `<div class="empty">${all.length ? 'None of your pets help with this.' : 'No pets yet. Hatch an egg and your best pets for each goal show up here.'}</div>`;
 
   renderSavedTeams(st);
   renderPetGrowth(st);
@@ -6510,7 +6603,7 @@ function renderPetGrowth(st) {
   const rows = g.rows;
   const list = rows.length
     ? `<div class="pg-list">${rows.slice(0, 8).map(row).join('')}</div>${rows.length > 8 ? `<details class="more"${wasOpen ? ' open' : ''}><summary>${rows.length - 8} more growing</summary><div class="pg-list">${rows.slice(8).map(row).join('')}</div></details>` : ''}`
-    : '<div class="empty" style="margin-top:8px">Every pet you have is at its max strength. 🎉</div>';
+    : `<div class="empty" style="margin-top:8px">${((st && st.allPets) || []).length ? 'Every pet you have is at its max strength. 🎉' : 'No pets yet. Hatch an egg and how long each pet takes to grow shows up here.'}</div>`;
   const foot = [];
   if (g.maxed) foot.push(`${g.maxed} pet${g.maxed === 1 ? ' is' : 's are'} fully grown.`);
   foot.push('Times are while out and fed: pets in your bag or the hutch don\'t grow.');
@@ -6595,7 +6688,7 @@ function renderSavedTeams(st) {
   const opts = (sel) => pickList.map((x) => `<option value="${esc(String(x.id))}"${String(x.id) === String(sel) ? ' selected' : ''}>${esc(x.name && x.name !== x.species ? `${x.name} (${String(x.species).replace(/([a-z])([A-Z])/g, '$1 $2')})` : String(x.species).replace(/([a-z])([A-Z])/g, '$1 $2'))} · ${Math.round(x.value * 100)} PP · STR ${x.strength}${where(x)}</option>`).join('');
   const slots = [0, 1, 2].map((i) => `<select data-build-slot="${i}" aria-label="Team builder: pet ${i + 1}"><option value="">(empty)</option>${opts(BUILD[i])}</select>`).join('');
   const load = teams.length ? `<select id="buildLoad" aria-label="Start from a saved team"><option value="">Start from a saved team…</option>${teams.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} · ${t.pp} PP</option>`).join('')}</select>` : '';
-  box.innerHTML = `${saved}<div class="pr-label">🛠️ Team builder</div><div class="tm-build">${slots}${load}</div>${teamCardHtml('Your build', BUILD.filter(Boolean), { build: true, out: BUILD.filter(Boolean).length > 0 && BUILD.filter(Boolean).every((id) => out.includes(String(id))), button: `<div class="button-row" style="margin-top:6px"><button class="btn small" data-put-out${PARKED ? ' disabled' : ''}>Put this team out</button></div>` })}`;
+  box.innerHTML = `${saved}<div class="pr-label">🛠️ Team builder</div><div class="tm-build">${slots}${load}</div>${teamCardHtml('Your build', BUILD.filter(Boolean), { build: true, out: BUILD.filter(Boolean).length > 0 && BUILD.filter(Boolean).every((id) => out.includes(String(id))), button: `<div class="button-row" style="margin-top:6px"><button class="btn small" data-put-out${PARKED || !BUILD.filter(Boolean).length ? ' disabled' : ''}>Put this team out</button></div>` })}`;
 }
 /* A team suggestion (v0.60.0): the app never swaps your pets; it suggests,
  * and Put out is your press (here or on the game). */
@@ -6657,6 +6750,9 @@ const SETUP_STEPS = ['hello', 'account', 'alerts', 'sound', 'weather', 'harvest'
 let WELCOME_STEP = 0; // 0: closed; else 1-based index into SETUP_STEPS
 let SETUP = { panelMode: null, start: null };
 let SHARE_ASK_LATER = false;
+// The setup's selling step asks about sharing too: seen there, the launch
+// question doesn't follow straight after (v0.78.0, it asked twice).
+let SHARE_ASKED_IN_SETUP = false;
 const setupOpen = () => WELCOME_STEP > 0;
 function welcomeDone() {
   S.ui = Object.assign({}, S.ui, { welcomed: true });
@@ -6670,14 +6766,16 @@ function welcomeDone() {
   }
   document.body.classList.remove('setup-on');
   // Where the panel goes and the tab it opens on, now that it's finished.
-  if (SETUP.start === 'home') showTab('home');
+  // (v0.78.0: Home unless you picked Alerts; the step shows Home picked, and
+  // pressing Continue used to leave you on Alerts.)
+  if ((SETUP.start || 'home') === 'home') showTab('home');
+  else showTab(SETUP.start);
   if (SETUP.panelMode && PANEL && SETUP.panelMode !== PANEL.mode) setPanel(SETUP.panelMode === 'window' ? { mode: 'window', show: true } : { mode: 'attached', open: true });
   SETUP = { panelMode: null, start: null };
   // The room question waited for the setup; ask it now if setup didn't.
-  if (SHARE_ASK_LATER) {
-    SHARE_ASK_LATER = false;
-    setTimeout(askShareOnLaunch, 600);
-  }
+  if (SHARE_ASK_LATER && !SHARE_ASKED_IN_SETUP) setTimeout(askShareOnLaunch, 600);
+  SHARE_ASK_LATER = false;
+  SHARE_ASKED_IN_SETUP = false;
 }
 const suOpt = (group, val, title, desc, on) => `<button class="su-opt${on ? ' on' : ''}" data-su="${group}" data-val="${esc(val)}" aria-pressed="${Boolean(on)}"><span class="su-opt-t"><b>${title}</b>${desc ? `<small>${desc}</small>` : ''}</span><span class="su-check" aria-hidden="true"></span></button>`;
 const suChip = (attr, val, label, on) => `<button class="chip${on ? ' on' : ''}" data-${attr}="${esc(val)}" aria-pressed="${Boolean(on)}">${label}</button>`;
@@ -6786,6 +6884,7 @@ function setupBody(step) {
           ${suOpt('start', 'home', '🏠 Home', 'One page with what matters now. Tap the tab you\'re on again (or the title) to come back to it.', start === 'home')}
           ${suOpt('start', 'alerts', '🔔 Alerts', 'The shop and weather alerts.', start === 'alerts')}
         </div>
+        ${suSwitch('actionbar', '⌨️ Action bar on the game', 'Nine buttons over the game on keys 1–9: plant a pot, your last team, harvesting and your saved teams. Drag it anywhere; change it in Extras.', Boolean(KEYS && KEYS.bar && KEYS.bar.on))}
         ${suSwitch('themes', 'Event themes', 'During game events, like the Haunt Event, the panel dresses up to match.', !(S.ui && S.ui.eventThemes === false))}` };
   }
   // done: what was set
@@ -6798,7 +6897,7 @@ function setupBody(step) {
   const kinds = (list, all, word) => {
     const l = list || [];
     if (!l.length) return '';
-    if (l.length >= all.length) return `any ${word}`;
+    if (l.length >= all.length) return `a ${word} mutation`;
     if (l.length <= 2) return l.map((k) => (all.find((x) => x[0] === k) || [k, k])[1]).join(' or ');
     return `${l.length} ${word} kinds`;
   };
@@ -6813,6 +6912,7 @@ function setupBody(step) {
   ];
   return { hero: '✨', title: 'You\'re all set', lead: 'Everything here can be changed later on its tab, or by running setup again in Extras → Panel.',
     body: `<div class="su-sum">${rows.map(([i, a, b]) => `<div class="su-sum-row"><span class="su-sum-i" aria-hidden="true">${i}</span><span class="su-sum-a">${a}</span><span class="su-sum-b">${esc(b)}</span></div>`).join('')}</div>
+      <div class="su-note">📈 Some numbers fill in as you play: your money pace over the first day, each egg's Bad Luck counter from its first rare hatch, and your pets' growth as they level. Until then the app says it's still learning.</div>
       <ul class="su-tips"><li><b>🔔</b> up top pauses pings for an hour.</li><li><b>🧺</b> unlocks harvesting when you want to sweep your garden.</li><li>On the <b>Weather</b> tab, pick a pet team for each weather and the app will suggest it.</li></ul>` };
 }
 function renderWelcome() {
@@ -6824,6 +6924,7 @@ function renderWelcome() {
     return;
   }
   const step = SETUP_STEPS[WELCOME_STEP - 1];
+  if (step === 'selling') SHARE_ASKED_IN_SETUP = true;
   const b = setupBody(step);
   const n = SETUP_STEPS.length;
   const qs = n - 2; // the questions, not hello and done
@@ -6853,7 +6954,9 @@ function showWelcome() {
 }
 function maybeWelcome() {
   if (S.ui && S.ui.welcomed) return;
-  const used = (S.alerts.custom || []).length || (S.alerts.disabled || []).length || (S.logoff.kinds || []).length || (S.weatherTeams && S.weatherTeams.enabled) || (S.ui && (S.ui.petPrefs || S.ui.actionBar)) || (HISTORY || []).length;
+  // (A new install's own "action bar off" isn't use: only a bar you've set up.)
+  const barSetUp = Boolean(S.ui && S.ui.actionBar && Array.isArray(S.ui.actionBar.slots));
+  const used = (S.alerts.custom || []).length || (S.alerts.disabled || []).length || (S.logoff.kinds || []).length || (S.weatherTeams && S.weatherTeams.enabled) || (S.ui && S.ui.petPrefs) || barSetUp || (HISTORY || []).length;
   if (used) {
     S.ui = Object.assign({}, S.ui, { welcomed: true });
     if (window.app.welcomedSet) window.app.welcomedSet(true);
@@ -6902,6 +7005,9 @@ async function setupSwitch(id) {
     renderDesktopNotify();
   } else if (id === 'petfood') {
     await setLock({ petFood: !LOCK.petFood });
+  } else if (id === 'actionbar') {
+    KEYS = await window.app.keysSetBar({ on: !(KEYS && KEYS.bar && KEYS.bar.on) });
+    if (typeof renderKeys === 'function') renderKeys();
   } else if (id === 'themes') {
     const on = S.ui && S.ui.eventThemes === false;
     S.ui = Object.assign({}, S.ui, { eventThemes: on });
@@ -7141,7 +7247,7 @@ function renderPetFood(st, stale) {
   if (!box) return;
   const pets = (st && st.pets) || [];
   if (!pets.length) {
-    box.innerHTML = '<div class="empty">Shows your active pets once the game is connected.</div>';
+    box.innerHTML = `<div class="empty">${st && st.foundSelf ? 'No pets are out, so nobody is eating yet.' : 'Shows your active pets once the game is connected.'}</div>`;
     return;
   }
   const noTrough = st.trough && !st.trough.present;
@@ -7286,7 +7392,7 @@ function renderMutationCard(b) {
   out.push(barRow('Either', 'total', b.special != null ? b.special : b.gold + b.rainbow, b.total));
   out.push(etaLine(GARDEN_STATUS));
   const bits = [`Out of all ${b.total.toLocaleString()} crops growing.`];
-  if (b.matureKnown && b.mature < b.total) bits.push(`${b.mature.toLocaleString()} are ripe. Growing crops catch weather too, just less often.`);
+  if (b.matureKnown && b.mature < b.total) bits.push(`${b.mature.toLocaleString()} ${b.mature === 1 ? 'is' : 'are'} ripe. Growing crops catch weather too, just less often.`);
   out.push(`<div class="note">${bits.join(' ')}</div>`);
   box.innerHTML = out.join('');
 }
@@ -8075,15 +8181,23 @@ function renderTeams() {
   // Don't rebuild the menus while one is open, or it snaps shut.
   const active = document.activeElement;
   if (!(active && active.closest && active.closest('#teamPicks'))) {
-    const rows = [{ id: 'clear', label: '☀️ Clear skies', hint: 'The team to go back to afterwards' }]
+    // Clear skies can detect your usual team (v0.75.1): the last saved team
+    // you ran for 10 minutes in clear skies, worked out by the app.
+    const usual = st && st.usualTeam;
+    const clearHint = wt.clear === 'auto'
+      ? (usual ? `Detected: <b>${esc(usual.name)}</b>, the last team you ran 10+ minutes in clear skies` : 'Detecting: run a saved team for 10 minutes in clear skies')
+      : 'The team to go back to afterwards';
+    const rows = [{ id: 'clear', label: '☀️ Clear skies', hint: clearHint }]
       .concat(KINDS.map((k) => ({ id: k.id, label: `${k.emoji} ${k.label}` })));
     $('teamPicks').innerHTML = rows.map((r) => {
       const chosen = wt[r.id] || '';
-      const missing = chosen && teams.length && !teams.some((t) => t.id === chosen);
+      const auto = r.id === 'clear' && chosen === 'auto';
+      const missing = chosen && !auto && teams.length && !teams.some((t) => t.id === chosen);
       const opts = ['<option value="">No suggestion</option>']
+        .concat(r.id === 'clear' ? [`<option value="auto"${auto ? ' selected' : ''}>🔍 Detect my usual team</option>`] : [])
         .concat(teams.map((t) => `<option value="${esc(t.id)}"${t.id === chosen ? ' selected' : ''}>${esc(t.name)}</option>`))
         .concat(missing ? [`<option value="${esc(chosen)}" selected>(team not found)</option>`] : [])
-        .concat(chosen && !teams.length ? [`<option value="${esc(chosen)}" selected>(saved team)</option>`] : []);
+        .concat(chosen && !auto && !teams.length ? [`<option value="${esc(chosen)}" selected>(saved team)</option>`] : []);
       return `<div class="team-pick"><span>${r.label}${r.hint ? `<div class="rule-desc">${r.hint}</div>` : ''}</span><select data-team-kind="${r.id}" aria-label="Team for ${esc(r.label)}">${opts.join('')}</select></div>`;
     }).join('');
   }
@@ -8170,7 +8284,8 @@ function changeTrigger(id, field, value) {
 function wireTriggers() {
   $('addTrigger').addEventListener('click', () => {
     S.teamTriggers = S.teamTriggers || [];
-    const usual = S.weatherTeams && S.weatherTeams.clear;
+    let usual = S.weatherTeams && S.weatherTeams.clear;
+    if (usual === 'auto') usual = (GARDEN_STATUS && GARDEN_STATUS.usualTeam && GARDEN_STATUS.usualTeam.id) || '';
     S.teamTriggers.push({
       id: 't' + Date.now().toString(36),
       on: true,
@@ -8612,40 +8727,25 @@ function fmtEvery(days) {
   return `about every ${Math.round(days / 30)} months`;
 }
 
-// The Money tab is hidden until a full day of coins has been measured, then
-// appears (and stays). Until then the Garden tab says how far along it is.
-let MONEY_WAS = null;
+// The Money tab (v0.78.0): open as soon as the app has read your wallet and
+// garden. Before that (the game not connected yet), a card says what it's
+// waiting for. Until the measured numbers have settled (a day; two weeks for
+// gardens over 1B), a slim banner says it's still learning your pace and
+// how far along it is. It used to stay locked for that whole time.
 function applyMoneyUnlock(b) {
   const btn = document.querySelector('nav [data-tab="money"]');
   if (!btn) return;
   const on = Boolean(b && b.unlocked);
   const hiddenByYou = Boolean(b && b.unlockMode === 'off');
-  // The tab is always there (unless you chose to keep it hidden). Until it
-  // has watched enough play to be useful, it opens on a welcome card that
-  // says what it is, how far along it is, and lets you open it anyway.
   btn.hidden = hiddenByYou;
   const sec = $('tab-money');
   sec.classList.toggle('warming', !on);
   const intro = $('moneyIntro');
   intro.hidden = on;
   if (!on) {
-    const h = b ? Math.max(0, Number(b.measuredHours) || 0) : 0;
-    const days = (b && b.unlockDays) || 1;
-    const need = days * 24;
-    // v0.63.6: a cover over the tab (its content blurred underneath) with a
-    // countdown: what's left, in hours (or days) of play, since it only
-    // learns while the game's open here.
-    const frac = Math.max(0, Math.min(1, h / need));
-    const pct = Math.round(frac * 100);
-    const rem = Math.max(0, need - h);
-    const left = rem < 1 ? 'less than an hour of play' : rem < 48 ? `about ${Math.ceil(rem)} more hour${Math.ceil(rem) === 1 ? '' : 's'} of play` : `about ${Math.ceil(rem / 24)} more days of play`;
-    const doneTxt = need >= 48 ? `${Math.floor(h / 24)} of ${days} days` : `${Math.floor(h)} of ${need} hours`;
-    const C = 2 * Math.PI * 34;
-    intro.innerHTML = `<div class="mi-ring" aria-label="${pct}% ready"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" class="mi-track"/><circle cx="40" cy="40" r="34" class="mi-fill" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - frac)).toFixed(1)}"/></svg><span>${pct}%</span></div>
-      <div class="mi-title">Garden Buddy is gathering data</div>
-      <p class="mi-lead">Come back after <b>${left}</b> and this tab will unlock.</p>
-      <div class="mi-sub">${esc(doneTxt)} watched so far · it learns while the game's open here${days > 1 ? ' (big gardens take two weeks: one big purchase skews a day)' : ''}</div>
-      <div class="mi-list-title">When it unlocks, you'll get</div>
+    intro.innerHTML = `<div class="mi-title">Waiting for your garden</div>
+      <p class="mi-lead">The Money tab opens as soon as Garden Buddy has read your wallet and garden, a moment after the game connects.</p>
+      <div class="mi-list-title">You'll get</div>
       <ul class="mi-list">
         <li>📈 a chart of your money: the last week, and the next two</li>
         <li>🌙 when the things you want will likely show up, and if you'll afford them</li>
@@ -8654,9 +8754,20 @@ function applyMoneyUnlock(b) {
       </ul>
       <button class="mi-peek" id="moneyOpenAnyway">Open it now anyway</button>`;
   }
+  const learn = $('moneyLearn');
+  const learning = on && !hiddenByYou && b && !b.settled;
+  learn.hidden = !learning;
+  if (learning) {
+    const days = Number(b.settleDays) || 1;
+    const need = days * 24;
+    const h = Math.max(0, Number(b.measuredHours) || 0);
+    const pct = Math.max(2, Math.min(100, Math.round((h / need) * 100)));
+    const done = need >= 48 ? `${Math.floor(h / 24)} of ${days} days` : `${Math.floor(h)} of ${need} hours`;
+    learn.innerHTML = `<div class="ml-top"><b>📈 Still learning your pace</b><span>${esc(done)}</span></div>
+      <div class="ml-bar"><i style="width:${pct}%"></i></div>
+      <div class="ml-text">Safe to spend, the forecast and your wants already work from your garden. They get sharper as Garden Buddy watches your coins come and go: it notes them every half hour while the game's open here${days > 1 ? ', and big gardens take two weeks to settle (one big purchase can skew a day)' : ''}.</div>`;
+  }
   for (const c of document.querySelectorAll('#moneyUnlock .chip')) c.classList.toggle('on', c.dataset.unlock === ((b && b.unlockMode) || 'auto'));
-  if (MONEY_WAS === false && on) toast('💰 Your Money tab is ready!');
-  MONEY_WAS = on;
   if (hiddenByYou && document.querySelector('nav [data-tab="money"][aria-selected="true"]')) showTab('garden');
 }
 
@@ -9460,7 +9571,10 @@ function combinedChart(fs, wi, events) {
   const HIST = fs.history && fs.history.line && fs.history.line.length > 1 ? fs.history : null;
   const P = HIST ? Math.min(7, HIST.days) : 0;
   const past = HIST ? HIST.line.filter((p) => p[0] >= -P) : [];
-  const EV = fs.everything && fs.everything.line && fs.everything.line.length ? fs.everything : null;
+  // (v0.78.0) Not for gardens under 1B: for a new player with a few thousand
+  // coins, "everything" (celestials, the dearest decor) dives to -750B.
+  const bigEnough = !(BUDGET && Number.isFinite(Number(BUDGET.netWorth)) && Number(BUDGET.netWorth) < 1e9);
+  const EV = bigEnough && fs.everything && fs.everything.line && fs.everything.line.length ? fs.everything : null;
   const boss = EV ? EV.line.filter((p) => p[0] >= 0 && p[0] <= end) : [];
   // Your expected burn rate (v0.67.3): only once two weeks of spending are in.
   const ORANGE = '#fb923c';
@@ -10345,9 +10459,11 @@ function renderRooms() {
     $('roomHereBtns').innerHTML = '';
   }
   const check = ROOMS && ROOMS.check;
-  // Only worth mentioning when it isn't working (details in Troubleshooting).
+  // Only worth mentioning when it isn't working, in plain words (v0.78.0:
+  // it showed HTTP codes and paths to everyone, and the game's lookup has
+  // been gone for a while; the details are in a saved sample).
   $('roomCheck').innerHTML = check && !check.ok
-    ? `⚠️ ${esc(check.text)} Counts come from the community list where a room is shared there; other rooms show as unknown rather than empty. A sample (Extras tab, 🛠 Troubleshooting) would help when reporting it.`
+    ? 'Room sizes come from the community list: the game doesn\'t share how full other rooms are, so a room nobody has shared there shows as unknown.'
     : '';
 
   if (!ROOMS) return;

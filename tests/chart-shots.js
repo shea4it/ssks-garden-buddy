@@ -2309,6 +2309,24 @@ app.whenReady().then(async () => {
       fs.mkdirSync(SHOTS, { recursive: true });
       await shotOf('#tab-weather > .card', 'planner', 8);
     }
+    if (MODE === 'detectteam') {
+      // v0.75.1: clear skies set to "Detect my usual team", with one detected.
+      const sample = JSON.parse(fs.readFileSync(process.env.MG_SAMPLE || path.join(__dirname, 'fixtures', 'status-sample.json'), 'utf8'));
+      const st = sample.lastStatus;
+      st.at = Date.now();
+      const t0 = (st.teams || [])[0] || { id: 'x', name: 'farm team' };
+      st.usualTeam = { id: t0.id, name: t0.name };
+      await wait(4500);
+      await run("(() => { const sk = document.querySelector('[data-wgo=\"skip\"]'); if (sk) sk.click(); const b = document.getElementById('shareAskNo'); if (b) b.click(); return true; })()");
+      await run(`(() => { window.__holdStatus = true; GARDEN_STATUS = ${JSON.stringify(st)}; LAST_TEAMS = GARDEN_STATUS.teams || []; S.weatherTeams = Object.assign({}, S.weatherTeams, { enabled: true, clear: 'auto' }); showTab('weather'); renderTeams(); return true; })()`);
+      await wait(700);
+      out.detectteam = await run("(() => { const s = document.querySelector('#teamPicks [data-team-kind=clear]'); return { value: s && s.value, label: s && s.options[s.selectedIndex].textContent, hint: (document.querySelector('#teamPicks .rule-desc') || {}).textContent }; })()");
+      for (let i = 0; i < 6; i += 1) {
+        await run("(() => { const b = document.getElementById('shareAskNo'); if (b && b.offsetParent) b.click(); return true; })()");
+        await wait(500);
+      }
+      await shotOf('#teamPicks', 'detectteam', 8);
+    }
     if (MODE === 'pots') {
       // v0.63.0: the pet-food pots card: plant one (a real PlantGardenPlant),
       // pot one (a real PotPlant with a fresh id; the stand-in doesn't make
@@ -3078,6 +3096,7 @@ app.whenReady().then(async () => {
         const screens = Math.min(4, Math.ceil(info.sh / Math.max(1, info.ch - 60)));
         for (let i = 0; i < screens; i += 1) {
           await run(`document.querySelector('main').scrollTop = ${i} * (document.querySelector('main').clientHeight - 60)`);
+          await run("(() => { const b = document.getElementById('shareAskNo'); if (b && b.offsetParent) b.click(); return true; })()");
           await wait(350);
           fs.writeFileSync(path.join(SHOTS, `petviews-${v}-${i}.png`), (await panel().capturePage()).toPNG());
         }

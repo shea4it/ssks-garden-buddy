@@ -362,6 +362,7 @@
       if (coins) send('petCoins', coins);
       const hatched = hatchOf(logs[i]);
       if (hatched) send('hatch', Object.assign({ eggsHatched: eggsHatched() }, hatched));
+      if (hatched) noteHatchedPet(hatched.petId);
     }
     obs.seenLog = new Set(keys);
   }
@@ -973,6 +974,7 @@
   let spotTimer = null;
   function onStateChanged() {
     checkActivity();
+    try { namingTick(); } catch (err) { /* never in the way */ }
     // The hand map follows a hotbar change quickly, but not on every frame:
     // once per quarter second at most, off the message handler.
     if (!spotTimer) {
@@ -1132,6 +1134,9 @@
       obs.selfPlayerId = msg.selfPlayerId || msg.playerId || obs.selfPlayerId;
       obs.seenLog = null;
       obs.cropKeys = null;
+      obs.naming.count = null;
+      obs.naming.pending = null;
+      obs.naming.busy = false;
       onStateChanged();
       // Give the game a few seconds to finish loading its scripts first.
       setTimeout(readCatalog, 8000);
@@ -1180,6 +1185,7 @@
       // The lineup you had out (v0.56.5): a pet swap restarts the wait for
       // it to settle; doing something else means you've moved on.
       noteCommandForLineup(env.command);
+      try { noteRenameCandidate(env.command); } catch (err) { /* never in the way */ }
       try { learnPotCommand(env.command); } catch (err) { /* never in the way */ }
       try { calibrateFrom(env.command); } catch (err) { /* never in the way */ }
       try { notePlanted(env.command); } catch (err) { /* never in the way */ }
@@ -1435,7 +1441,7 @@
     if ((mode.hydro || []).length) bits.push(mode.hydro.map((x) => HV_NAMES[x] || x).join(' or '));
     if ((mode.lunar || []).length) bits.push(mode.lunar.map((x) => HV_NAMES[x] || x).join(' or '));
     if (mode.size) bits.push('full size');
-    return bits.length ? bits.join(' · ') : 'anything';
+    return bits.length ? bits.join(' · ') : 'any ripe crop';
   }
 
   // A small badge in the game's corner while the lock is on, and a brief
@@ -1551,6 +1557,212 @@
     });
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ---------------------------------------------------------------- *
+   * Pets named by hatch number (v0.75.0, the owner's request: he names his
+   * pets by hand with the game's own "eggs hatched" count, his Rainbow Pig is
+   * "1605"). Off unless turned on.
+   *
+   * The app doesn't guess the game's rename command: the first time you
+   * rename a pet yourself, it notes the command (the field holding the pet's
+   * id and the field holding the name) and learns it once the server shows
+   * that pet with that name. After that, each new pet with no name gets the
+   * game's eggs-hatched count for it: your 3,445th hatch is "3445". A Double
+   * Hatch's extra pet counts too (the game's total includes it): the egg's
+   * own pet first, the extra one next. A pet that already has a name is never
+   * renamed. Names go one at a time, each waiting for the server's answer.
+   * ---------------------------------------------------------------- */
+  // style (v0.76.0): 'number' (the hatch number) or 'cute' (a cute name,
+  // v0.77.0 picked by the app: it knows each pet's Pet Power and the names
+  // it's given lately; asked with 'petsToName', answered by queuePetNames).
+  obs.naming = { on: false, style: 'number', shape: null, count: null, base: null, pending: null, order: [], queue: [], busy: false, learn: null, log: [], named: 0, failed: null };
+  obs.setPetNaming = function setPetNaming(cfg) {
+    const nm = obs.naming;
+    nm.on = Boolean(cfg && cfg.on);
+    nm.style = cfg && cfg.style === 'cute' ? 'cute' : 'number';
+    const s = cfg && cfg.shape;
+    nm.shape = s && typeof s.type === 'string' && typeof s.idField === 'string' && typeof s.nameField === 'string'
+      ? { type: s.type.slice(0, 60), idField: s.idField.slice(0, 40), nameField: s.nameField.slice(0, 40), extra: s.extra && typeof s.extra === 'object' ? s.extra : {} }
+      : null;
+    // Off stops the names still waiting for new pets; "Name my unnamed
+    // pets" (bulk) has its own Stop.
+    if (!nm.on) nm.queue = nm.queue.filter((j) => j.bulk);
+    setTimeout(namingPump, 0);
+    // Turned on: what's here now is the starting point, so a hatch in the
+    // very next frame is still new (v0.76.0).
+    if (nm.on && nm.shape && nm.count == null && obs.state) {
+      try {
+        const c = eggsHatched();
+        if (c != null) {
+          nm.count = c;
+          nm.base = new Set(allPets().map((p) => p.id));
+          nm.pending = null;
+        }
+      } catch (err) {
+        /* the next frame sets it */
+      }
+    }
+    return { on: nm.on, style: nm.style, learned: Boolean(nm.shape) };
+  };
+  // Names for new pets, in order: the hatch number from `from`; in the cute
+  // style the app is asked to pick. Named pets are kept.
+  function queueNames(fresh, pets, from) {
+    const nm = obs.naming;
+    const unnamed = fresh.filter((p) => !p.name);
+    for (const p of fresh) if (p.name) namingLog({ kept: p.species, had: p.name.slice(0, 20) });
+    if (nm.style === 'cute') {
+      if (unnamed.length) send('petsToName', { pets: unnamed.map((p) => ({ id: p.id, species: p.species, mutations: p.mutations })) });
+      return;
+    }
+    if (from == null) return;
+    fresh.forEach((p, i) => {
+      if (!p.name) nm.queue.push({ petId: p.id, species: p.species, name: String(from + 1 + i) });
+    });
+  }
+  // Names the app picked: [{ petId, species, name }], bulk for "Name my
+  // unnamed pets". Each is checked again just before it's sent (still
+  // yours, still unnamed).
+  obs.queuePetNames = function queuePetNames(list, bulk) {
+    const nm = obs.naming;
+    const have = new Set(nm.queue.map((j) => j.petId));
+    for (const j of Array.isArray(list) ? list : []) {
+      if (!j || !j.petId || !j.name || have.has(String(j.petId))) continue;
+      have.add(String(j.petId));
+      nm.queue.push({ petId: String(j.petId), species: String(j.species || ''), name: String(j.name).slice(0, 20), bulk: Boolean(bulk) });
+    }
+    setTimeout(namingPump, 0);
+    return nm.queue.length;
+  };
+  obs.stopPetNames = function stopPetNames() {
+    const nm = obs.naming;
+    const before = nm.queue.length;
+    nm.queue = nm.queue.filter((j) => !j.bulk);
+    return before - nm.queue.length;
+  };
+  const looksLikeId = (v) => /^[0-9a-f-]{16,}$/i.test(String(v));
+  function namingLog(entry) {
+    const nm = obs.naming;
+    nm.log.push(Object.assign({ at: Date.now() }, entry));
+    if (nm.log.length > 20) nm.log.shift();
+  }
+  // A command the game sent: could it be a rename? (One field holds a pet's
+  // id, another a short name.) Only confirmed by what the server does next.
+  function noteRenameCandidate(cmd) {
+    if (!cmd || typeof cmd !== 'object' || !cmd.type) return;
+    const entries = Object.entries(cmd).filter(([k]) => k !== 'type');
+    if (!entries.some(([, v]) => typeof v === 'string' && v && !looksLikeId(v) && v.length <= 40)) return;
+    const ids = new Set(allPets().map((p) => p.id));
+    const idHit = entries.find(([, v]) => typeof v === 'string' && ids.has(v));
+    if (!idHit) return;
+    const others = entries.filter(([k, v]) => k !== idHit[0] && typeof v === 'string' && v.trim() && v.length <= 40 && !ids.has(v) && !looksLikeId(v));
+    const named = others.filter(([k]) => /name/i.test(k));
+    const nameHit = named.length === 1 ? named[0] : others.length === 1 ? others[0] : null;
+    if (!nameHit) return;
+    const extra = {};
+    for (const [k, v] of entries) {
+      if (k === idHit[0] || k === nameHit[0]) continue;
+      if (typeof v === 'number' || typeof v === 'boolean') extra[k] = v;
+    }
+    obs.naming.learn = { at: Date.now(), type: String(cmd.type).slice(0, 60), idField: idHit[0], nameField: nameHit[0], extra, petId: idHit[1], name: nameHit[1].trim() };
+  }
+  function noteHatchedPet(petId) {
+    if (!petId) return;
+    const o = obs.naming.order;
+    o.push(String(petId));
+    if (o.length > 30) o.shift();
+  }
+  function namingTickJob() {
+    const nm = obs.naming;
+    if (nm.learn) {
+      if (Date.now() - nm.learn.at > 10000) nm.learn = null;
+      else {
+        const p = allPets().find((x) => x.id === nm.learn.petId);
+        if (p && p.name && p.name.trim() === nm.learn.name) {
+          const L = nm.learn;
+          nm.learn = null;
+          nm.shape = { type: L.type, idField: L.idField, nameField: L.nameField, extra: L.extra };
+          namingLog({ learned: L.type });
+          send('petNamingLearned', nm.shape);
+        }
+      }
+    }
+    if (!nm.on || !nm.shape) {
+      nm.count = null;
+      nm.base = null;
+      nm.pending = null;
+      return;
+    }
+    const c = eggsHatched();
+    if (c == null) return;
+    if (nm.count == null || nm.base == null || c < nm.count) {
+      nm.count = c;
+      nm.base = new Set(allPets().map((p) => p.id));
+      nm.pending = null;
+      return;
+    }
+    if (c === nm.count && !nm.pending) return;
+    if (!nm.pending) nm.pending = { from: nm.count, at: Date.now() };
+    const pets = allPets();
+    const fresh = pets.filter((p) => !nm.base.has(p.id));
+    const gained = c - nm.pending.from;
+    if (fresh.length === gained) {
+      // The egg's own pet (in the game's log) before a Double Hatch's extra.
+      const rank = (p) => {
+        const i = nm.order.indexOf(p.id);
+        return i < 0 ? 1000 : i;
+      };
+      fresh.sort((a, b) => rank(a) - rank(b));
+      queueNames(fresh, pets, nm.pending.from);
+      nm.base = new Set(pets.map((p) => p.id));
+      nm.count = c;
+      nm.pending = null;
+      setTimeout(namingPump, 300);
+    } else if (Date.now() - nm.pending.at > 4000) {
+      // The numbers don't add up (hatches the app didn't see, say): better
+      // no number than a wrong one. A cute name needs no number.
+      if (nm.style === 'cute') queueNames(fresh, pets, null);
+      else namingLog({ skipped: true, from: nm.pending.from, to: c, newPets: fresh.length });
+      nm.base = new Set(pets.map((p) => p.id));
+      nm.count = c;
+      nm.pending = null;
+      setTimeout(namingPump, 300);
+    }
+  }
+  const namingTick = perfTimed('naming', namingTickJob);
+  async function namingPump() {
+    const nm = obs.naming;
+    if (nm.busy || !nm.shape || !nm.queue.length) return;
+    if (!obs.gameSocket || obs.gameSocket.readyState !== 1) {
+      setTimeout(namingPump, 2000);
+      return;
+    }
+    const job = nm.queue.shift();
+    const pet = allPets().find((p) => p.id === job.petId);
+    if (!pet || pet.name) {
+      send('petNamed', { ok: false, skipped: true, petId: job.petId, bulk: Boolean(job.bulk), species: job.species, name: job.name });
+      setTimeout(namingPump, 0);
+      return;
+    }
+    nm.busy = true;
+    const cmd = Object.assign({}, nm.shape.extra, { type: nm.shape.type, [nm.shape.idField]: job.petId, [nm.shape.nameField]: job.name });
+    let r;
+    try {
+      r = await sendAndWait(cmd, 'NamePet:' + job.name, 5000);
+    } catch (err) {
+      r = { ok: false, code: String((err && err.message) || err) };
+    }
+    nm.busy = false;
+    if (r.ok) {
+      nm.named += 1;
+      nm.failed = null;
+      namingLog({ named: job.species, n: job.name });
+    } else {
+      nm.failed = { at: Date.now(), name: job.name, code: String(r.code || 'refused').slice(0, 80) };
+      namingLog({ failed: job.species, n: job.name, code: nm.failed.code });
+    }
+    send('petNamed', { ok: r.ok, petId: job.petId, bulk: Boolean(job.bulk), species: job.species, name: job.name, code: r.ok ? null : nm.failed.code });
+    setTimeout(namingPump, 700);
+  }
   function lockList() {
     const slot = mySlot();
     const ids = (slot && slot.data && slot.data.inventory && slot.data.inventory.favoritedItemIds) || [];
@@ -2671,7 +2883,11 @@
     teamBtn.textContent = t ? `🔁 ${t.name}` : '🔁 Last team';
     teamBtn.title = t ? `Swap back to ${t.name} (Ctrl+Shift+T) · drag to move, double-click to put it back` : 'Once you swap pets, this brings the ones before back · drag to move';
     teamBtn.style.opacity = t ? '1' : '.55';
-    teamBtn.style.display = '';
+    // Nothing to swap back to and no pets out (a new player): no button
+    // floating over the game (v0.78.0).
+    let pets = 1;
+    try { pets = petsOut().length; } catch (err) { /* keep it */ }
+    teamBtn.style.display = !t && !pets ? 'none' : '';
     placeTeamButton();
   }
   obs.setTeamButton = function setTeamButton(x) {
@@ -5041,6 +5257,8 @@
       outgoingShape: obs.outgoingShape || null,
       movement: { sample: obs.movementSample, selfPos: obs.selfPos, meTile: obs.meTile, calib: obs.mapCalib.slice(-12), fit: (() => { try { return calibFit(); } catch (err) { return null; } })() },
       lockMode: obs.lockMode,
+      // Pets named by hatch number (v0.75.0): what was learned, and the last few.
+      naming: { on: obs.naming.on, style: obs.naming.style, shape: obs.naming.shape, count: obs.naming.count, pending: obs.naming.pending, queued: obs.naming.queue.length, named: obs.naming.named, failed: obs.naming.failed, learning: obs.naming.learn ? { type: obs.naming.learn.type, idField: obs.naming.learn.idField, nameField: obs.naming.learn.nameField } : null, log: obs.naming.log.slice() },
       commandTypes: obs.commandTypes,
       commandShapes: obs.commandShapes,
       // One whole example of each kind of activity-log entry (the log itself

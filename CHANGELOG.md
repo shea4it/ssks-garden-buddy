@@ -3,6 +3,69 @@
 What changed in each version, in plain words. The app checks for new
 versions by itself; press **Update now** when it tells you.
 
+## 0.78.0 (beta)
+A first-run pass, as a brand-new player and as an existing player new to
+the app.
+- **The Money tab opens right away.** It used to stay locked for a day, or
+  two weeks for gardens over 1B. Now it opens as soon as your garden's been
+  read, with a slim "Still learning your pace" banner until the numbers
+  settle.
+- **"Ready" fits new players.** Until you choose your own rule, it follows
+  your stage: any ripe crop early, full-size Gold or Rainbow mid, the full
+  rule late. New players' ripe crops count, and Harvesting unlocked works.
+- **A cleaner game screen to start:** the action bar is off for new
+  installs (the setup offers it), and the swap-back button waits until
+  there's a team to swap back to.
+- **New players start with no wants** (late-game defaults only for gardens
+  worth 1B+), and the "buy everything" line is hidden under 1B.
+- The share question no longer pops up right after the setup asked it.
+- The setup opens Home when you finish, says which numbers fill in as you
+  play, and words the ready rule clearly ("a weather mutation").
+- Pets with no pets yet: proper empty states, and the team builder's
+  button stays off for an empty build.
+- Rooms: a plain note instead of HTTP codes when room sizes come from the
+  community list.
+- Fixes: "1 is ripe", "short 1B" (not "1000M"), "any ripe crop" on the
+  Harvesting unlocked bar.
+
+## 0.77.0 (beta)
+- **Name my unnamed pets**: one press gives every pet without a name a cute
+  name. Pets that already have one are left alone.
+- **About 15,000 cute names**, up from about 400, with two-word ones
+  ("Sleepy Tofu", "Lil Waffles"). No name repeats within 1,500 hatches.
+- **Better names for better pets.** Your top 10% by Pet Power get grand
+  names ("Maximus", "Empress Tofu"), the next 30% fancy ones ("Reginald",
+  "Sir Waffles"). Gold and Rainbow pets still get their own, with grand
+  ones for the best ("Midas", "Aurora").
+
+## 0.76.0 (beta)
+- **Cute names for new pets.** Name new pets (Pets → Now) now has a style:
+  🔢 Hatch number or 🎀 Cute name. Cute names are random, some fit the
+  species, Gold and Rainbow pets usually get their own, and no two of your
+  pets share one.
+
+## 0.75.1 (beta)
+- **Detect my usual team** for clear skies (Weather → suggested teams).
+  Uses the last saved team you ran for 10+ minutes in clear weather, so the
+  pick follows your everyday team without you changing it. The detected
+  team is shown under the menu. Harvest teams and unanswered suggestions
+  don't count.
+
+## 0.75.0 (beta)
+- **Name new pets by hatch number** (Pets → Now, off unless you turn it
+  on). Each new pet gets the game's own eggs-hatched count as its name:
+  your 3,445th hatch is "3445". A Double Hatch's extra pet gets the next
+  number. A pet that already has a name keeps it, and pets you had before
+  aren't touched.
+  - The first time, rename any pet once in the game yourself (any name; you
+    can change it back). That's how the app learns the way the game names
+    pets; the line under the switch says when it has.
+  - Names go out one at a time, right after each hatch. If the numbers ever
+    don't add up (a hatch the app didn't see), that pet is left unnamed
+    rather than given a wrong number.
+  - It's the one thing the app sends without your press (it follows your
+    hatch, and only changes a name), so it's off until you turn it on.
+
 ## 0.74.1 (beta)
 - **A weather team suggestion goes away when its weather does.** Away for a
   whole spell of weather, you came back to "Put out your rain team?" under
